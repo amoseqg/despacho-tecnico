@@ -362,7 +362,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
           <textarea id="c-descricao-colada" class="input" rows="5" placeholder="Cole aqui todo o texto do chamado. O sistema localizará automaticamente a designação do circuito na base."></textarea>
           <select id="c-opcoes" class="select hidden" style="margin-top:5px"></select>
           <div id="c-status" style="font-size:.65rem;margin-top:4px;color:var(--gr)">Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.</div>
-          <input type="hidden" id="c-pr"><input type="hidden" id="c-sdm"><input type="hidden" id="c-ci">
+          <input type="hidden" id="c-ci">
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label class="label">Protocolo identificado</label><input type="text" id="c-pr" class="input" readonly placeholder="Será preenchido pela descrição"></div>
+          <div class="form-group"><label class="label">SDM identificado</label><input type="text" id="c-sdm" class="input" readonly placeholder="Será preenchido pela descrição"></div>
         </div>
         <div class="grid-2">
           <div class="form-group"><label class="label">Quem abriu o chamado</label><select id="c-abertura" class="select"><option value="">Selecione...</option><option value="Vectra">Vectra</option><option value="Método">Método</option><option value="Umtelecom">Umtelecom</option></select></div>
@@ -938,6 +942,15 @@ function buscarCircuito() {
   return null;
 }
 
+function extrairCampoDaDescricao(texto,tipo){
+  const rotulo=tipo==='protocolo'
+    ? '(?:N[º°O.]?\\s*)?PROTOCOLO(?:\\s*N[º°O.]?)?'
+    : 'SDM(?:\\s*N[º°O.]?)?';
+  const re=new RegExp('\\b'+rotulo+'\\s*[:#=\\-]?\\s*([A-Z0-9][A-Z0-9._\\/-]*)','i');
+  const achado=String(texto||'').match(re);
+  return achado ? achado[1].trim() : '';
+}
+
 function buscarCircuitoNaDescricao() {
   const campo=el('c-descricao-colada');
   const texto=String(campo?.value||'').trim();
@@ -947,10 +960,13 @@ function buscarCircuitoNaDescricao() {
   opcoes.classList.add('hidden');
 
   if(!texto){
-    status.textContent='Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.';
+    status.textContent='Cole a descrição para localizar automaticamente protocolo, SDM e circuito.';
     status.style.color='var(--gr)';
     return null;
   }
+
+  el('c-pr').value=extrairCampoDaDescricao(texto,'protocolo');
+  el('c-sdm').value=extrairCampoDaDescricao(texto,'sdm');
 
   const textoNormalizado=normalizarCircuito(texto);
   let encontrados=SITES_PEII.filter(site=>{
@@ -968,7 +984,6 @@ function buscarCircuitoNaDescricao() {
   const unicos=[...new Map(encontrados.map(site=>[site[0],site])).values()];
   if(unicos.length===1){
     const site=preencherSite(unicos[0]);
-    el('c-pr').value=site[0];
     if(el('c-de') && !el('c-de').value.trim()) el('c-de').value=texto;
     status.textContent='✓ Designação localizada: '+site[0]+' — dados preenchidos automaticamente.';
     status.style.color='var(--g)';
@@ -992,7 +1007,6 @@ function selecionarCircuitoDaDescricao(valor){
   const site=SITE_INDEX.get(normalizarCircuito(valor));
   if(!site) return;
   preencherSite(site);
-  el('c-pr').value=site[0];
   if(el('c-de') && !el('c-de').value.trim()) el('c-de').value=el('c-descricao-colada').value.trim();
   el('c-status').textContent='✓ Designação selecionada: '+site[0]+' — dados preenchidos automaticamente.';
   el('c-status').style.color='var(--g)';
@@ -1391,7 +1405,7 @@ function addCh() {
   const liberarArea = el('c-liberar-area').checked;
   const en = el('c-en').value.trim();
   const de = el('c-de').value.trim();
-  if (!pr) { alert('Preencha o protocolo'); return; }
+  if (!pr) { alert('Protocolo não localizado na descrição colada. Verifique se o texto contém a palavra “Protocolo” seguida do número.'); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
   if (!site) { alert('Informe um circuito válido da base de dados'); return; }
   if (!skill) { alert('Selecione a skill necessária para o chamado'); return; }
