@@ -2191,9 +2191,11 @@ function clsEx() {
   if (TI) clearInterval(TI);
 }
 
-function cfEx() {
+async function cfEx() {
   const c = D.ch.find(x => x.id === EID);
   if(!c) return;
+  const btn=el('btn-cf-ex'), textoBtn=btn?.textContent;
+  const anterior={ex:c.ex,st:c.st,cc:c.cc,ap:c.ap,ajuste:c.ajuste};
   const eraAjuste = !!c.ajuste;
   finalizarMascaraEncerramento();
   const vkmTxt = (el('ex-vkm').value || '').replace('R$ ', '').replace(',', '.');
@@ -2218,10 +2220,20 @@ function cfEx() {
     c.ap = { status: 'pendente', obs: '', data: ag(), reenviado: true };
     c.ajuste = null;
   }
-  sv();
-  clsEx();
-  rTat(); rTco(); rTdb();
-  alert('Chamado encerrado com sucesso!');
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
+    await sbPersistirFinalizacao(c);
+    lsSet('dd',D);
+    clsEx();
+    rTat(); rTco(); rTdb();
+    alert('Chamado encerrado e sincronizado com o administrador!');
+  }catch(err){
+    c.ex=anterior.ex;c.st=anterior.st;c.cc=anterior.cc;c.ap=anterior.ap;c.ajuste=anterior.ajuste;
+    lsSet('dd',D);
+    sbShowError('Não foi possível finalizar o chamado no servidor',err);
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=textoBtn||'✅ Encerrar Chamado';}
+  }
 }
 
 // ========== EXPORTAÇÕES EXCEL ==========
@@ -2815,6 +2827,43 @@ function sbChamadoRow(c){
   };
 }
 
+async function sbPersistirFinalizacao(c){
+  if(!SB_PROFILE || SB_PROFILE.tipo!=='tecnico') throw new Error('Sessão do técnico inválida.');
+  if(!sbUUID(c.id)) throw new Error('Chamado ainda não possui identificação válida no servidor.');
+  if(c.te!==SB_PROFILE.usuario) throw new Error('Este chamado não está atribuído ao técnico conectado.');
+  const execucao={
+    chamado_id:c.id,
+    tecnico_id:SB_PROFILE.id,
+    cidade_origem:c.ex?.co||null,
+    cidade_destino:c.ex?.cd||null,
+    cidade_retorno:c.ex?.cr||null,
+    km_total:sbNum(c.ex?.km),
+    valor_km:sbNum(c.ex?.vkm),
+    atividade:c.ex?.atv||null,
+    valor_atividade:sbNum(c.ex?.vatv),
+    valor_avulso:sbNum(c.ex?.avulso),
+    utp_metros:sbNum(c.ex?.utp),
+    cci_metros:sbNum(c.ex?.cci),
+    canaleta_metros:sbNum(c.ex?.can),
+    valor_materiais:sbNum(c.ex?.tmat),
+    observacao:c.ex?.obs||null,
+    relatorio_encerramento:c.ex?.relatorio||null,
+    valor_total:sbNum(c.ex?.total),
+    atualizado_em:new Date().toISOString()
+  };
+  const {error:execErr}=await SB.from('execucoes').upsert(execucao,{onConflict:'chamado_id'});
+  if(execErr) throw execErr;
+  const {data,error}=await SB.from('chamados').update({
+    status:'concluida',
+    concluido_em:sbIso(c.cc)||new Date().toISOString(),
+    atualizado_em:new Date().toISOString()
+  }).eq('id',c.id).eq('tecnico_id',SB_PROFILE.id).select('id,status,concluido_em').single();
+  if(error) throw error;
+  if(!data || data.status!=='concluida') throw new Error('O servidor não confirmou a conclusão do chamado.');
+  sbSetConnectionBadge('Finalização sincronizada',true);
+  return data;
+}
+
 async function sbSyncAll(){
   if(!SB_PROFILE) return;
   if(SB_SYNCING){ SB_SYNC_AGAIN=true; return; }
@@ -2825,8 +2874,22 @@ async function sbSyncAll(){
       const old=c.id; const {data,error}=await SB.from('chamados').insert(sbChamadoRow(c)).select('id').single(); if(error) throw error; c.id=data.id;
       (D.mr||[]).forEach(r=>{if(r.chamadoId===old) r.chamadoId=data.id;});
     }
-    const chRows=D.ch.filter(x=>sbUUID(x.id)).map(c=>({id:c.id,...sbChamadoRow(c)}));
-    if(chRows.length){ const {error}=await SB.from('chamados').upsert(chRows,{onConflict:'id'}); if(error) throw error; }
+    if(SB_PROFILE.tipo==='admin'){
+      const chRows=D.ch.filter(x=>sbUUID(x.id)).map(c=>({id:c.id,...sbChamadoRow(c)}));
+      if(chRows.length){ const {error}=await SB.from('chamados').upsert(chRows,{onConflict:'id'}); if(error) throw error; }
+    }else{
+      for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario)){
+        const {error}=await SB.from('chamados').update({
+          status:c.st||'pendente',
+          motivo_recusa:c.mr||null,
+          aceito_em:sbIso(c.ae),
+          iniciado_em:sbIso(c.am),
+          concluido_em:sbIso(c.cc),
+          atualizado_em:new Date().toISOString()
+        }).eq('id',c.id).eq('tecnico_id',SB_PROFILE.id);
+        if(error) throw error;
+      }
+    }
     if(SB_PROFILE.tipo==='admin'){
       const nowIds=new Set(D.ch.filter(x=>sbUUID(x.id)).map(x=>x.id)); const deleted=[...SB_LOADED_CH].filter(id=>!nowIds.has(id));
       if(deleted.length){ const {error}=await SB.from('chamados').delete().in('id',deleted); if(error) throw error; }
