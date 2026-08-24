@@ -946,9 +946,13 @@ function extrairCampoDaDescricao(texto,tipo){
   const rotulo=tipo==='protocolo'
     ? '(?:N[º°O.]?\\s*)?PROTOCOLO(?:\\s*N[º°O.]?)?'
     : 'SDM(?:\\s*N[º°O.]?)?';
-  const re=new RegExp('\\b'+rotulo+'\\s*[:#=\\-]?\\s*([A-Z0-9][A-Z0-9._\\/-]*)','i');
-  const achado=String(texto||'').match(re);
-  return achado ? achado[1].trim() : '';
+  const conteudo=String(texto||'');
+  const achadoRotulo=conteudo.match(new RegExp('\\b'+rotulo,'i'));
+  if(!achadoRotulo) return '';
+  const inicio=(achadoRotulo.index||0)+achadoRotulo[0].length;
+  const trecho=conteudo.slice(inicio,inicio+120).split(/\\r?\\n|[;|]/)[0];
+  const candidatos=trecho.match(/[A-Z0-9._\\/-]*\\d[A-Z0-9._\\/-]*/ig)||[];
+  return candidatos.length ? candidatos[0].trim() : '';
 }
 
 function buscarCircuitoNaDescricao() {
