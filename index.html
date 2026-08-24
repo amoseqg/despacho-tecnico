@@ -1392,7 +1392,28 @@ function rMlEstoque(){
 function rMateriaisCadastro(){const b=el('mat-cadastro-lista');if(!b)return;b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th></th></tr></thead><tbody>'+D.mat.map(m=>`<tr><td>${escM(m.nome)}</td><td>${m.unidade}</td><td>${m.estoque||0}</td><td><button class="btn btn-r btn-rm-mat" data-id="${m.id}">Excluir</button></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Cadastre os materiais disponíveis.</div>'}
 function addMaterial(){const nome=el('mat-nome').value.trim(),un=el('mat-un').value;if(!nome){alert('Informe o material');return;}if(D.mat.some(m=>m.nome.toLowerCase()===nome.toLowerCase())){alert('Material já cadastrado');return;}D.mat.push({id:'MAT-'+Date.now(),nome,unidade:un,estoque:0,c:ag()});sv();el('mat-nome').value='';rMl();alert('Material cadastrado com sucesso!');}
 function ajusteEstoque(){const id=el('ml-estoque-material').value,q=Number(el('ml-estoque-qtd').value);const m=materialById(id);if(!m||q<0){alert('Selecione o material e informe uma quantidade válida');return;}m.estoque=q;sv();rMl();alert('Estoque atualizado.');}
-function direcionarMaterial(id){const r=D.mr.find(x=>x.id===id);if(!r)return;r.status='direcionado';r.direcionadoEm=ag();r.direcionadoPor=S.n;sv();rMl();alert('Solicitação direcionada para a separação logística.');}
+async function direcionarMaterial(id){
+  const r=D.mr.find(x=>x.id===id);
+  if(!r)return;
+  const btn=document.querySelector('.btn-mat-direcionar[data-id="'+CSS.escape(String(id))+'"]');
+  const textoBtn=btn?.textContent;
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
+    const confirmado=await sbDirecionarMaterial(r);
+    r.status='direcionado';
+    r.direcionadoEm=confirmado.direcionado_em;
+    r.direcionadoPor=S.n;
+    r.responsavel=S.n;
+    lsSet('dd',D);
+    rMl();
+    alert('Solicitação direcionada e confirmada no servidor.');
+  }catch(err){
+    sbShowError('Não foi possível direcionar para separação',err);
+    await sbRecarregarDados();
+  }finally{
+    if(btn&&document.body.contains(btn)){btn.disabled=false;btn.textContent=textoBtn||'➡️ Direcionar para separação';}
+  }
+}
 function separarMaterial(id){const r=D.mr.find(x=>x.id===id),m=r&&materialById(r.materialId);if(!r||!m)return;const q=Number(prompt(`Quantidade a separar (solicitada: ${r.qtdSolicitada}; estoque: ${m.estoque||0})`,String(r.qtdSolicitada)));if(!q||q<1)return;if(q>(m.estoque||0)){alert('Quantidade superior ao estoque disponível.');return;}m.estoque-=q;r.qtdSeparada=q;r.status='separado';r.responsavel=S.n;r.separadoEm=ag();sv();rMl();alert('Material separado com sucesso.');}
 function entregarMaterial(id){const r=D.mr.find(x=>x.id===id);if(!r)return;const q=Number(prompt(`Quantidade entregue ao técnico (separada: ${r.qtdSeparada||0})`,String(r.qtdSeparada||r.qtdSolicitada)));if(!q||q<1||q>(r.qtdSeparada||0)){alert('Informe uma quantidade válida.');return;}r.qtdEntregue=q;r.status='entregue';r.entregueEm=ag();sv();rMl();alert('Entrega registrada. O material já está disponível na área do técnico.');}
 function rTmat(){
@@ -2835,6 +2856,22 @@ function sbChamadoRow(c){
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:sbIso(c.cr)||new Date().toISOString(), aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
   };
+}
+
+async function sbDirecionarMaterial(solicitacao){
+  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin') throw new Error('Somente administradores podem direcionar materiais.');
+  if(!sbUUID(solicitacao.id)) throw new Error('A solicitação ainda não possui identificação válida no servidor.');
+  const agora=new Date().toISOString();
+  const {data,error}=await SB.from('solicitacoes_material').update({
+    status:'direcionado',
+    responsavel_id:SB_PROFILE.id,
+    direcionado_em:agora,
+    atualizado_em:agora
+  }).eq('id',solicitacao.id).select('id,status,direcionado_em').single();
+  if(error) throw error;
+  if(!data || data.status!=='direcionado') throw new Error('O servidor não confirmou o direcionamento.');
+  sbSetConnectionBadge('Direcionamento sincronizado',true);
+  return data;
 }
 
 async function sbPersistirAprovacoes(chamados,status,observacao){
