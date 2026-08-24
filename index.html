@@ -1746,7 +1746,30 @@ function cfTr() {
   alert('Chamado transferido com sucesso!');
 }
 
-function rmTc(u) { if (!confirm('Remover técnico?')) return; D.tc = D.tc.filter(t => t.u !== u); sv(); rTc(); }
+async function rmTc(u) {
+  if (!confirm('Remover técnico?')) return;
+  if (!SB_PROFILE || SB_PROFILE.tipo !== 'admin') {
+    alert('Somente administradores podem excluir técnicos.');
+    return;
+  }
+  const tecnico = D.tc.find(t => t.u === u);
+  if (!tecnico?._id) {
+    alert('Não foi possível identificar o técnico no Supabase.');
+    return;
+  }
+  try {
+    const { error } = await SB.from('perfis').update({ ativo: false }).eq('id', tecnico._id);
+    if (error) throw error;
+    D.tc = D.tc.filter(t => t.u !== u);
+    lsSet('dd', D);
+    rTc();
+    alert('Técnico excluído com sucesso.');
+  } catch (err) {
+    sbShowError('Não foi possível excluir o técnico', err);
+    await sbLoadAll().catch(() => {});
+    rTc();
+  }
+}
 function rmAd(u) { if (!confirm('Remover administrador?')) return; D.ad = D.ad.filter(a => a.u !== u); sv(); rAd(); }
 
 // ========== RENDER TÉCNICO ==========
@@ -2584,7 +2607,7 @@ async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
   const [pR,cR,eR,aR,tR,mR,sR] = await Promise.all([
-    SB.from('perfis').select('*').order('nome'),
+    SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     SB.from('chamados').select('*').order('criado_em',{ascending:true}),
     SB.from('execucoes').select('*'),
     SB.from('aprovacoes').select('*'),
