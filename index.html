@@ -2807,14 +2807,41 @@ const SB_ACCOUNT_CREATOR = window.supabase.createClient(SUPABASE_URL, SUPABASE_P
 async function sbCriarContaPerfil({nome,usuario,email,senha,tipo,regiao=null,skills=[],areas=[],adminGeral=false}){
   if(!SB_PROFILE || SB_PROFILE.tipo!=='admin') throw new Error('Somente um administrador autenticado pode criar novas contas.');
 
-  // Evita duplicidade no cadastro de perfis antes de chamar o Auth.
+  // Verifica perfis ativos e também permite reativar uma conta excluída.
   const {data:existentes,error:buscaErr}=await SB.from('perfis')
-    .select('id,usuario,email')
+    .select('id,usuario,email,ativo')
     .or(`usuario.eq.${usuario},email.eq.${email}`)
     .limit(5);
   if(buscaErr) throw buscaErr;
-  if((existentes||[]).some(x=>String(x.usuario||'').toLowerCase()===usuario.toLowerCase())) throw new Error('Este usuário já está cadastrado.');
-  if((existentes||[]).some(x=>String(x.email||'').toLowerCase()===email.toLowerCase())) throw new Error('Este e-mail já está cadastrado.');
+  const usuarioNormalizado=usuario.toLowerCase(), emailNormalizado=email.toLowerCase();
+  const mesmoUsuario=(existentes||[]).find(x=>String(x.usuario||'').toLowerCase()===usuarioNormalizado);
+  const mesmoEmail=(existentes||[]).find(x=>String(x.email||'').toLowerCase()===emailNormalizado);
+  const perfilExcluido=(existentes||[]).find(x=>
+    x.ativo===false &&
+    String(x.usuario||'').toLowerCase()===usuarioNormalizado &&
+    String(x.email||'').toLowerCase()===emailNormalizado
+  );
+  if(perfilExcluido){
+    const atualizacao={
+      nome, usuario, email, tipo,
+      admin_geral:tipo==='admin' ? !!adminGeral : false,
+      regiao:tipo==='tecnico' ? regiao : null,
+      skills:tipo==='tecnico' ? skills : [],
+      areas:tipo==='tecnico' ? areas : [],
+      ativo:true
+    };
+    const {error:reativarErr}=await SB.from('perfis').update(atualizacao).eq('id',perfilExcluido.id);
+    if(reativarErr) throw reativarErr;
+    const redirectTo=window.location.origin + window.location.pathname;
+    const {error:senhaErr}=await SB.auth.resetPasswordForEmail(email,{redirectTo});
+    if(senhaErr){
+      await SB.from('perfis').update({ativo:false}).eq('id',perfilExcluido.id);
+      throw new Error('O perfil foi localizado, mas não foi possível enviar a redefinição de senha: '+senhaErr.message);
+    }
+    return {reativado:true,perfil:{id:perfilExcluido.id,...atualizacao}};
+  }
+  if(mesmoUsuario) throw new Error('Este usuário já está cadastrado.');
+  if(mesmoEmail) throw new Error('Este e-mail já está cadastrado.');
 
   const {data:authData,error:authErr}=await SB_ACCOUNT_CREATOR.auth.signUp({
     email,
@@ -2863,9 +2890,11 @@ addTec = async function(){
     el('t-n').value=''; el('t-u').value=''; el('t-e').value=''; el('t-s').value=''; el('t-sc').value='';
     document.querySelectorAll('input[name="t-sk"],input[name="t-ar"]').forEach(x=>x.checked=false);
     if(el('t-multi')) el('t-multi').checked=false;
-    alert(res.confirmacaoPendente
-      ? 'Conta e perfil do técnico criados. O Supabase pode exigir confirmação do e-mail antes do primeiro acesso.'
-      : 'Conta e perfil do técnico criados com sucesso!');
+    alert(res.reativado
+      ? 'Técnico reativado com sucesso. Enviamos um link para o e-mail cadastrado definir uma nova senha.'
+      : (res.confirmacaoPendente
+        ? 'Conta e perfil do técnico criados. O Supabase pode exigir confirmação do e-mail antes do primeiro acesso.'
+        : 'Conta e perfil do técnico criados com sucesso!'));
   }catch(err){sbShowError('Não foi possível criar a conta do técnico',err);}
   finally{if(btn){btn.disabled=false;btn.innerHTML=txt||'👤 Criar conta e perfil';}}
 };
