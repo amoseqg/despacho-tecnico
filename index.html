@@ -335,7 +335,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
         </div>
         <div class="grid-2">
           <div class="form-group"><label class="label">Região</label>
-            <select id="t-r" class="select"><option value="capital">🏙️ Capital (6h)</option><option value="interior">🌾 Interior (8h)</option></select>
+            <select id="t-r" class="select"><option value="capital">🏙️ Capital (6h)</option><option value="interior">🌾 Interior (8h)</option><option value="noronha">🏝️ Fernando de Noronha (6h)</option></select>
           </div>
         </div>
         <div class="form-group"><label class="label">Skills do Técnico (selecione uma ou mais)</label>
@@ -387,7 +387,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
         <div class="grid-2">
           <div class="form-group"><label class="label">Endereço</label><input type="text" id="c-en" class="input" readonly></div>
           <div class="form-group"><label class="label">Região</label>
-            <select id="c-re" class="select" disabled><option value="capital">🏙️ Capital — SLA 6 horas</option><option value="interior">🌾 Interior — SLA 8 horas</option></select>
+            <select id="c-re" class="select" disabled><option value="capital">🏙️ Capital — SLA 6 horas</option><option value="interior">🌾 Interior — SLA 8 horas</option><option value="noronha">🏝️ Fernando de Noronha — SLA 6 horas</option></select>
           </div>
         </div>
         <div class="grid-2">
@@ -731,7 +731,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 // ========== CONFIGURAÇÃO ==========
 const SLA = {
   capital: { v: 3*3600, a: 4.5*3600, r: 6*3600 },
-  interior: { v: 4*3600, a: 6*3600, r: 8*3600 }
+  interior: { v: 4*3600, a: 6*3600, r: 8*3600 },
+  noronha: { v: 3*3600, a: 4.5*3600, r: 6*3600 }
 };
 
 const cidades = [
@@ -1088,6 +1089,8 @@ function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
 function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra' })[v] || 'Não definida'; }
 function nomeArea(v) { return ({ norte: 'Norte', leste: 'Leste', sul: 'Sul', oeste: 'Oeste', interior: 'Interior', noronha: 'Fernando de Noronha' })[v] || 'Não definida'; }
+function nomeRegiao(v) { return ({ capital: '🏙️ Capital', interior: '🌾 Interior', noronha: '🏝️ Fernando de Noronha' })[v] || 'Região não definida'; }
+function slaRegiao(v) { return v === 'interior' ? '8h' : '6h'; }
 function skillsTec(t) { return t.sk && t.sk.length ? t.sk : ['voz','dados','infra']; }
 function areasTec(t) { return t.ar && t.ar.length ? t.ar : (t.r === 'interior' ? ['interior'] : ['norte','leste','sul','oeste']); }
 function tecnicoCompativel(t, c) {
@@ -1099,6 +1102,8 @@ const CIDADES_CAPITAL = new Set(['recife','olinda','jaboatao dos guararapes','pa
 function chaveCidade(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 function detectarRegiaoPlanilha(regiao, cidade) {
   const raw = chaveCidade(regiao);
+  const cidadeChave = chaveCidade(cidade);
+  if (raw.includes('noronha') || cidadeChave.includes('fernando de noronha')) return { tipo: 'noronha', area: 'noronha' };
   // A planilha é a fonte de verdade da região operacional. Aceita variações
   // como "Norte", "Região Norte", "Capital - Norte", etc.
   if (raw.includes('norte')) return { tipo: 'capital', area: 'norte' };
@@ -1179,9 +1184,11 @@ function atualizarTecnicosChamado() {
 }
 
 function atualizarCamposRegiao() {
-  const capitalTec = el('t-r').value === 'capital';
+  const regiaoTec = el('t-r').value;
   document.querySelectorAll('input[name="t-ar"]').forEach(x => {
-    const disponivel = capitalTec ? !['interior','noronha'].includes(x.value) : ['interior','noronha'].includes(x.value);
+    const disponivel = regiaoTec === 'capital'
+      ? !['interior','noronha'].includes(x.value)
+      : (regiaoTec === 'noronha' ? x.value === 'noronha' : x.value === 'interior');
     x.disabled = !disponivel;
     if (!disponivel) x.checked = false;
   });
@@ -1306,7 +1313,9 @@ function enterAdm() {
 function enterTec() {
   hide('t0'); hide('t1'); hide('pa'); show('pt');
   el('tn').textContent = S.n;
-  const b = S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>';
+  const b = S.r === 'noronha'
+    ? '<span class="badge b-capital">🏝️ Fernando de Noronha (6h)</span>'
+    : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
   el('tr').innerHTML = b;
   tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
   startLoop();
@@ -1493,7 +1502,7 @@ function rTc() {
   if(!tb) return;
   tb.innerHTML = D.tc.map(t => {
     const a = D.ch.filter(c => c.te === t.u && c.st === 'andamento').length;
-    const r = t.r === 'capital' ? '🏙️ Capital' : '🌾 Interior';
+    const r = nomeRegiao(t.r);
     const skTec = skillsTec(t);
     const sk = ['voz','dados','infra'].every(x => skTec.includes(x)) ? 'Multi-skill (Voz, Dados e Infra)' : skTec.map(nomeSkill).join(', ');
     const ar = areasTec(t).map(nomeArea).join(', ');
@@ -1527,7 +1536,7 @@ function rCh() {
   }).join('') : '<div class="empty"><h3>Nenhum chamado em aberto</h3></div>';
 
   if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando técnico</span></div>
-    <div class="os-r"><b>Site:</b> ${c.si}</div><div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : 'Interior')} — SLA ${c.re === 'capital' ? '6h' : '8h'}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
+    <div class="os-r"><b>Site:</b> ${c.si}</div><div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${adminGeral() ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
   if(elRe) elRe.innerHTML = re.length ? re.map(c => {
@@ -1598,7 +1607,7 @@ function rAt() {
   const list = D.ch.filter(c => c.st === 'andamento');
   tb.innerHTML = list.map(c => {
     const t = tm(c.am, c.re);
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${c.re === 'capital' ? '🏙️ Capital' : '🌾 Interior'}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${adminGeral() ? ` <button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</td></tr>`;
+    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${adminGeral() ? ` <button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
