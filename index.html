@@ -349,7 +349,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
       <div class="card">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">👷 Técnicos Cadastrados</h3>
         <div style="overflow-x:auto"><table class="table">
-          <thead><tr><th>Nome</th><th>Usuário</th><th>E-mail</th><th>Região</th><th>Skills</th><th>Áreas</th><th>Chamados ativos</th><th>Status</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Usuário</th><th>E-mail</th><th>Região</th><th>Skills</th><th>Áreas</th><th>Ativas</th><th></th></tr></thead>
           <tbody id="tb-tc"></tbody>
         </table></div>
       </div>
@@ -476,9 +476,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
         <button class="btn btn-p" id="btn-add-adm">🛡️ Criar conta e perfil</button>
       </div>
       <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📋 Administradores</h3><div style="font-size:.68rem;color:var(--gr);margin-bottom:10px">Use Editar para dados do perfil, Desativar/Reativar para bloquear ou liberar o acesso ao sistema e Senha para enviar o link de recuperação ao e-mail cadastrado.</div>
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📋 Administradores</h3>
         <div style="overflow-x:auto"><table class="table">
-          <thead><tr><th>Nome</th><th>Usuário</th><th>E-mail</th><th>Status</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Nome</th><th>Usuário</th><th>E-mail</th><th></th></tr></thead>
           <tbody id="tb-ad"></tbody>
         </table></div>
       </div>
@@ -1367,19 +1367,16 @@ function rTc() {
     const skTec = skillsTec(t);
     const sk = ['voz','dados','infra'].every(x => skTec.includes(x)) ? 'Multi-skill (Voz, Dados e Infra)' : skTec.map(nomeSkill).join(', ');
     const ar = areasTec(t).map(nomeArea).join(', ');
-    const status=t.ativo!==false?'<span class="badge b-concluido">Ativo</span>':'<span class="badge b-recusado">Desativado</span>';
-    return `<tr><td>${t.n}</td><td>${t.u}</td><td>${t.e || 'Não cadastrado'}</td><td>${r}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td>${status}</td><td style="white-space:nowrap"><button class="btn btn-p" onclick="sbEditarPerfil('${t._id}')" style="padding:4px 7px;font-size:.58rem">✏️ Editar</button> <button class="btn ${t.ativo!==false?'btn-r':'btn-g'}" onclick="sbAlternarAtivo('${t._id}')" style="padding:4px 7px;font-size:.58rem">${t.ativo!==false?'⛔ Desativar':'✅ Reativar'}</button> <button class="btn" onclick="sbRedefinirSenhaPerfil('${t._id}')" style="padding:4px 7px;font-size:.58rem">🔑 Senha</button></td></tr>`;
-  }).join('') || '<tr><td colspan="9" class="empty">Nenhum técnico cadastrado</td></tr>';
+    return `<tr><td>${t.n}</td><td>${t.u}</td><td>${t.e || 'Não cadastrado'}</td><td>${r}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-s btn-reset-senha" data-u="${t.u}" data-email="${t.e || ''}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button><button class="btn btn-r btn-rm-tec" data-u="${t.u}" style="padding:4px 8px;font-size:.6rem" title="Excluir técnico">🗑️</button></div></td></tr>`;
+  }).join('') || '<tr><td colspan="8" class="empty">Nenhum técnico cadastrado</td></tr>';
 }
 
 function rAd() {
   const tb = el('tb-ad');
   if(!tb) return;
-  tb.innerHTML = D.ad.map(a => {
-    const status=a.ativo!==false?'<span class="badge b-concluido">Ativo</span>':'<span class="badge b-recusado">Desativado</span>';
-    const self=SB_PROFILE && SB_PROFILE.id===a._id;
-    return `<tr><td>${a.n}${a.p ? ' <span class="badge b-pendente">Geral</span>' : ''}</td><td>${a.u}</td><td>${a.e || 'Não cadastrado'}</td><td>${status}</td><td style="white-space:nowrap"><button class="btn btn-p" onclick="sbEditarPerfil('${a._id}')" style="padding:4px 7px;font-size:.58rem">✏️ Editar</button> ${self?'':`<button class="btn ${a.ativo!==false?'btn-r':'btn-g'}" onclick="sbAlternarAtivo('${a._id}')" style="padding:4px 7px;font-size:.58rem">${a.ativo!==false?'⛔ Desativar':'✅ Reativar'}</button>`} <button class="btn" onclick="sbRedefinirSenhaPerfil('${a._id}')" style="padding:4px 7px;font-size:.58rem">🔑 Senha</button></td></tr>`;
-  }).join('') || '<tr><td colspan="5" class="empty">Nenhum administrador cadastrado</td></tr>';
+  tb.innerHTML = D.ad.map(a =>
+    `<tr><td>${a.n}${a.p ? ' <span class="badge b-pendente">Geral</span>' : ''}</td><td>${a.u}</td><td>${a.e || 'Não cadastrado'}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-s btn-reset-senha" data-u="${a.u}" data-email="${a.e || ''}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${a.p ? '' : `<button class="btn btn-r btn-rm-adm" data-u="${a.u}" style="padding:4px 8px;font-size:.6rem" title="Excluir administrador">🗑️</button>`}</div></td></tr>`
+  ).join('');
 }
 
 function rCh() {
@@ -2390,7 +2387,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-rm-tec, .btn-rm-adm, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
@@ -2400,6 +2397,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-rc')) { opRc(t.dataset.id); }
     if(t.classList.contains('btn-ex')) { opEx(t.dataset.id); }
     if(t.classList.contains('btn-ajustar')) { reabrirAjuste(t.dataset.id); }
+    if(t.classList.contains('btn-reset-senha')) { enviarRedefinicaoSenhaAdmin(t.dataset.u, t.dataset.email); }
     if(t.classList.contains('btn-rm-tec')) { rmTc(t.dataset.u); }
     if(t.classList.contains('btn-rm-adm')) { rmAd(t.dataset.u); }
     if(t.classList.contains('btn-mat-direcionar')) { direcionarMaterial(t.dataset.id); }
@@ -2549,6 +2547,10 @@ const SB = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, 
   db: { schema: 'public' }
 });
 window.SB = SB;
+window.__DT_PASSWORD_RECOVERY = false;
+SB.auth.onAuthStateChange((event) => {
+  if(event === 'PASSWORD_RECOVERY') window.__DT_PASSWORD_RECOVERY = true;
+});
 let SB_PROFILE = null;
 let SB_SYNC_TIMER = null;
 let SB_SYNCING = false;
@@ -2594,7 +2596,7 @@ async function sbLoadAll(){
 
   D.tc=[]; D.ad=[];
   (pR.data||[]).forEach(p=>{
-    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],p:!!p.admin_geral,ativo:p.ativo!==false,c:p.criado_em};
+    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],p:!!p.admin_geral,c:p.criado_em};
     if(p.tipo==='admin') D.ad.push(x); else D.tc.push(x);
   });
 
@@ -2723,7 +2725,7 @@ doLogin = async function(){
   const btn=el('btn-login'); if(btn){btn.disabled=true;btn.textContent='Entrando...';}
   try{
     const {data,error}=await SB.auth.signInWithPassword({email,password:senha}); if(error) throw error;
-    const {data:p,error:pErr}=await SB.from('perfis').select('*').eq('id',data.user.id).single(); if(pErr) throw pErr; if(p.ativo===false) throw new Error('Esta conta está desativada. Procure um administrador.');
+    const {data:p,error:pErr}=await SB.from('perfis').select('*').eq('id',data.user.id).single(); if(pErr) throw pErr;
     if(!p.ativo) throw new Error('Usuário desativado.');
     if(loginType==='adm' && p.tipo!=='admin') throw new Error('Este usuário não possui perfil de administrador.');
     if(loginType==='tec' && p.tipo!=='tecnico') throw new Error('Este usuário não possui perfil de técnico.');
@@ -2743,14 +2745,33 @@ salvarMinhaSenha = async function(){
   const nova=el('ms-nova').value, conf=el('ms-conf').value;
   if(nova.length<6){alert('A nova senha deve ter pelo menos 6 caracteres');return;} if(nova!==conf){alert('A confirmação da nova senha não confere');return;}
   const {error}=await SB.auth.updateUser({password:nova}); if(error){sbShowError('Não foi possível alterar a senha',error);return;}
-  el('m-senha').classList.remove('a'); alert('Senha atualizada com sucesso no Supabase Auth.');
+  el('m-senha').classList.remove('a');
+  if(window.__DT_PASSWORD_RECOVERY){
+    window.__DT_PASSWORD_RECOVERY=false;
+    try{ history.replaceState(null,'',window.location.pathname + window.location.search); }catch(e){}
+    if(el('ms-atual')) el('ms-atual').closest('.form-group').style.display='';
+  }
+  alert('Senha atualizada com sucesso no Supabase Auth.');
 };
 
 recuperarSenha = async function(){
   const email=el('rec-e').value.trim().toLowerCase(); if(!emailValido(email)){alert('Informe o e-mail cadastrado');return;}
-  const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:window.location.href.split('#')[0]}); if(error){sbShowError('Não foi possível enviar a recuperação',error);return;}
-  el('m-rec').classList.remove('a'); alert('Solicitação enviada. Verifique o e-mail para redefinir a senha.');
+  const redirectTo=window.location.origin + window.location.pathname;
+  const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo}); if(error){sbShowError('Não foi possível enviar a recuperação',error);return;}
+  el('m-rec').classList.remove('a'); alert('Solicitação enviada. Verifique o e-mail e clique no link para cadastrar uma nova senha.');
 };
+
+async function enviarRedefinicaoSenhaAdmin(usuario,email){
+  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin'){ alert('Somente administradores podem enviar redefinição de senha.'); return; }
+  email=String(email||'').trim().toLowerCase();
+  if(!emailValido(email)){ alert('Este usuário não possui um e-mail válido cadastrado.'); return; }
+  const nome=usuario||email;
+  if(!confirm(`Enviar um link de redefinição de senha para ${nome} (${email})?`)) return;
+  const redirectTo=window.location.origin + window.location.pathname;
+  const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo});
+  if(error){ sbShowError('Não foi possível enviar a redefinição de senha',error); return; }
+  alert(`Link de redefinição enviado para ${email}. A senha atual não fica visível para o administrador.`);
+}
 
 // Cliente auxiliar para criar uma nova conta sem substituir a sessão do administrador logado.
 // A conta Auth é criada pelo endpoint público de signup; o perfil é inserido pelo cliente principal,
@@ -2846,67 +2867,25 @@ addAdm = async function(){
   finally{if(btn){btn.disabled=false;btn.innerHTML=txt||'🛡️ Criar conta e perfil';}}
 };
 
-
-async function sbObterPerfil(id){
-  const {data,error}=await SB.from('perfis').select('*').eq('id',id).single();
-  if(error) throw error;
-  return data;
-}
-
-async function sbEditarPerfil(id){
-  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin'){ alert('Somente administradores podem editar perfis.'); return; }
-  try{
-    const p=await sbObterPerfil(id);
-    const nome=prompt('Nome do usuário:',p.nome||''); if(nome===null) return;
-    const usuario=prompt('Usuário de acesso/identificação:',p.usuario||''); if(usuario===null) return;
-    const up={nome:nome.trim(),usuario:usuario.trim()};
-    if(!up.nome||!up.usuario){ alert('Nome e usuário são obrigatórios.'); return; }
-    if(p.tipo==='tecnico'){
-      const regiao=prompt('Região (capital ou interior):',p.regiao||'capital'); if(regiao===null) return;
-      const skills=prompt('Skills separadas por vírgula (voz,dados,infra):',(p.skills||[]).join(',')); if(skills===null) return;
-      const areas=prompt('Áreas separadas por vírgula (norte,leste,sul,oeste,interior):',(p.areas||[]).join(',')); if(areas===null) return;
-      up.regiao=String(regiao).trim().toLowerCase();
-      up.skills=String(skills).split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
-      up.areas=String(areas).split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
-      if(!['capital','interior'].includes(up.regiao)){ alert('Use capital ou interior na região.'); return; }
-    }
-    const {error}=await SB.from('perfis').update(up).eq('id',id); if(error) throw error;
-    await sbLoadAll(); rTc(); rAd(); atualizarTecnicosChamado();
-    alert('Perfil atualizado com sucesso. O e-mail de autenticação não é alterado por esta tela.');
-  }catch(err){ sbShowError('Não foi possível editar o perfil',err); }
-}
-
-async function sbAlternarAtivo(id){
-  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin'){ alert('Somente administradores podem alterar o status.'); return; }
-  if(SB_PROFILE.id===id){ alert('Você não pode desativar a própria conta enquanto está logado.'); return; }
-  try{
-    const p=await sbObterPerfil(id), novo=p.ativo===false;
-    if(!confirm(`${novo?'Reativar':'Desativar'} a conta de ${p.nome}?`)) return;
-    const {error}=await SB.from('perfis').update({ativo:novo}).eq('id',id); if(error) throw error;
-    await sbLoadAll(); rTc(); rAd(); atualizarTecnicosChamado();
-    alert(`Conta ${novo?'reativada':'desativada'} com sucesso.`);
-  }catch(err){ sbShowError('Não foi possível alterar o status da conta',err); }
-}
-
-async function sbRedefinirSenhaPerfil(id){
-  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin'){ alert('Somente administradores podem solicitar redefinição de senha.'); return; }
-  try{
-    const p=await sbObterPerfil(id);
-    if(!p.email) throw new Error('Este perfil não possui e-mail cadastrado.');
-    if(!confirm(`Enviar e-mail de redefinição de senha para ${p.email}?`)) return;
-    const {error}=await SB.auth.resetPasswordForEmail(p.email,{redirectTo:window.location.href.split('#')[0]}); if(error) throw error;
-    alert('E-mail de redefinição de senha enviado.');
-  }catch(err){ sbShowError('Não foi possível solicitar a redefinição de senha',err); }
-}
-
 async function sbRestoreSession(){
   try{
     const {data:{session}}=await SB.auth.getSession();
     if(!session){ S=null; lsRemove('ss'); sbSetConnectionBadge('Aguardando login', true); return; }
-    const {data:p,error}=await SB.from('perfis').select('*').eq('id',session.user.id).single(); if(error) throw error; if(p.ativo===false){ await SB.auth.signOut(); throw new Error('Conta desativada'); }
+    const {data:p,error}=await SB.from('perfis').select('*').eq('id',session.user.id).single(); if(error) throw error;
     SB_PROFILE=p; await sbLoadAll();
     S=p.tipo==='admin'?{t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id}:{t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id}; ss();
-    setTimeout(()=>{ if(p.tipo==='admin') enterAdm(); else enterTec(); },0);
+    setTimeout(()=>{
+      if(p.tipo==='admin') enterAdm(); else enterTec();
+      if(window.__DT_PASSWORD_RECOVERY){
+        setTimeout(()=>{
+          try{
+            abrirMinhaSenha();
+            if(el('ms-atual')) el('ms-atual').closest('.form-group').style.display='none';
+            alert('Recuperação de senha autorizada. Digite e confirme sua nova senha.');
+          }catch(e){ console.error(e); }
+        },250);
+      }
+    },0);
   }catch(err){ console.error(err); SB_PROFILE=null; S=null; lsRemove('ss'); sbSetConnectionBadge('Sessão inválida', false); }
 }
 
