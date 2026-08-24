@@ -357,13 +357,15 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
     <div id="v-ch" class="hidden">
       <div class="card" style="margin-bottom:12px">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📞 Novo Chamado</h3>
-        <div class="grid-3">
-          <div class="form-group"><label class="label">Protocolo (preenchimento manual)</label><input type="text" id="c-pr" class="input" placeholder="Nº protocolo"></div>
-          <div class="form-group"><label class="label">SDM</label><input type="text" id="c-sdm" class="input" placeholder="Número do SDM"></div>
-          <div class="form-group"><label class="label">Quem abriu o chamado</label><select id="c-abertura" class="select"><option value="">Selecione...</option><option value="Vectra">Vectra</option><option value="Método">Método</option><option value="Umtelecom">Umtelecom</option></select></div>
+        <div class="form-group">
+          <label class="label">Cole a descrição do chamado</label>
+          <textarea id="c-descricao-colada" class="input" rows="5" placeholder="Cole aqui todo o texto do chamado. O sistema localizará automaticamente a designação do circuito na base."></textarea>
+          <select id="c-opcoes" class="select hidden" style="margin-top:5px"></select>
+          <div id="c-status" style="font-size:.65rem;margin-top:4px;color:var(--gr)">Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.</div>
+          <input type="hidden" id="c-pr"><input type="hidden" id="c-sdm"><input type="hidden" id="c-ci">
         </div>
         <div class="grid-2">
-          <div class="form-group"><label class="label">Circuito</label><input type="text" id="c-ci" class="input" placeholder="Digite apenas o número ou o circuito completo" autocomplete="off"><select id="c-opcoes" class="select hidden" style="margin-top:5px"></select><div id="c-status" style="font-size:.65rem;margin-top:4px;color:var(--gr)">Digite o circuito para carregar os dados do site.</div></div>
+          <div class="form-group"><label class="label">Quem abriu o chamado</label><select id="c-abertura" class="select"><option value="">Selecione...</option><option value="Vectra">Vectra</option><option value="Método">Método</option><option value="Umtelecom">Umtelecom</option></select></div>
         </div>
         <div class="grid-2">
           <div class="form-group"><label class="label">Site / Cliente</label><input type="text" id="c-si" class="input" readonly></div>
@@ -936,6 +938,66 @@ function buscarCircuito() {
   return null;
 }
 
+function buscarCircuitoNaDescricao() {
+  const campo=el('c-descricao-colada');
+  const texto=String(campo?.value||'').trim();
+  const status=el('c-status'), opcoes=el('c-opcoes');
+  el('c-pr').value=''; el('c-sdm').value=''; el('c-ci').value='';
+  limparSite();
+  opcoes.classList.add('hidden');
+
+  if(!texto){
+    status.textContent='Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.';
+    status.style.color='var(--gr)';
+    return null;
+  }
+
+  const textoNormalizado=normalizarCircuito(texto);
+  let encontrados=SITES_PEII.filter(site=>{
+    const designacao=normalizarCircuito(site[0]);
+    return designacao && textoNormalizado.includes(designacao);
+  });
+
+  if(!encontrados.length){
+    encontrados=SITES_PEII.filter(site=>{
+      const numero=numeroCircuito(site[0]);
+      return numero && new RegExp('(^|\\\\D)'+numero+'(\\\\D|$)').test(texto);
+    });
+  }
+
+  const unicos=[...new Map(encontrados.map(site=>[site[0],site])).values()];
+  if(unicos.length===1){
+    const site=preencherSite(unicos[0]);
+    el('c-pr').value=site[0];
+    if(el('c-de') && !el('c-de').value.trim()) el('c-de').value=texto;
+    status.textContent='✓ Designação localizada: '+site[0]+' — dados preenchidos automaticamente.';
+    status.style.color='var(--g)';
+    return site;
+  }
+  if(unicos.length>1){
+    opcoes.innerHTML='<option value="">Mais de um circuito encontrado. Selecione...</option>'+
+      unicos.map(site=>`<option value="${esc(site[0])}">${esc(site[0])} — ${esc(site[1])} (${esc(site[2])})</option>`).join('');
+    opcoes.classList.remove('hidden');
+    status.textContent='Foram encontradas várias designações no texto. Selecione o circuito correto.';
+    status.style.color='var(--y)';
+    return null;
+  }
+
+  status.textContent='Nenhuma designação de circuito da base foi localizada no texto colado.';
+  status.style.color='var(--r)';
+  return null;
+}
+
+function selecionarCircuitoDaDescricao(valor){
+  const site=SITE_INDEX.get(normalizarCircuito(valor));
+  if(!site) return;
+  preencherSite(site);
+  el('c-pr').value=site[0];
+  if(el('c-de') && !el('c-de').value.trim()) el('c-de').value=el('c-descricao-colada').value.trim();
+  el('c-status').textContent='✓ Designação selecionada: '+site[0]+' — dados preenchidos automaticamente.';
+  el('c-status').style.color='var(--g)';
+}
+
 function dadosSite(c) {
   return `<div class="os-r"><b>Circuito:</b> ${valorInfo(c.ci)}</div>
      <div class="os-r"><b>SDM:</b> ${valorInfo(c.sdm)}</div>
@@ -1346,12 +1408,12 @@ function addCh() {
     cr: ag(), ae: null, am: null, cc: null
   });
   sv();
-  el('c-pr').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; limparSite();
+  el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; limparSite();
   el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
   el('c-de').value = ''; el('c-dtexec').value = '';
   el('c-sk').value = ''; el('c-area').value = '';
   el('c-tecnico').innerHTML = '<option value="">Selecione primeiro a skill e a área...</option>'; el('c-liberar-area').checked = false;
-  el('c-status').textContent = 'Digite o circuito para carregar os dados do site.';
+  el('c-status').textContent = 'Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.';
   el('c-status').style.color = 'var(--gr)';
   rCh();
   alert('Chamado criado com sucesso!');
@@ -2309,12 +2371,13 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnAddMaterial=el('btn-add-material'); if(btnAddMaterial) btnAddMaterial.addEventListener('click',addMaterial);
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnSolic=el('btn-tm-solicitar'); if(btnSolic) btnSolic.addEventListener('click',solicitarMaterial);
-  el('c-ci').addEventListener('input', buscarCircuito);
-  el('c-ci').addEventListener('change', buscarCircuito);
-  el('c-opcoes').addEventListener('change', function() {
-    const site = SITE_INDEX.get(normalizarCircuito(this.value));
-    if (site) preencherSite(site);
+  let circuitoDescricaoTimer=null;
+  el('c-descricao-colada').addEventListener('input',function(){
+    clearTimeout(circuitoDescricaoTimer);
+    circuitoDescricaoTimer=setTimeout(buscarCircuitoNaDescricao,180);
   });
+  el('c-descricao-colada').addEventListener('change',buscarCircuitoNaDescricao);
+  el('c-opcoes').addEventListener('change',function(){ selecionarCircuitoDaDescricao(this.value); });
   el('t-r').addEventListener('change', atualizarCamposRegiao);
   el('t-multi').addEventListener('change', function() {
     document.querySelectorAll('input[name="t-sk"]').forEach(x => { x.checked = this.checked; });
