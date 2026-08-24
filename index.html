@@ -568,7 +568,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 <!-- MODAIS -->
 <div class="modal" id="m-senha"><div class="modal-box" style="max-width:430px"><div class="modal-hd"><h3>🔐 Meus dados de acesso</h3><button class="close" id="cls-senha">×</button></div><div class="modal-bd"><div class="form-group"><label class="label">E-mail para recuperação</label><input type="email" id="ms-email" class="input"></div><div class="form-group"><label class="label">Senha atual</label><input type="password" id="ms-atual" class="input"></div><div class="form-group"><label class="label">Nova senha</label><input type="password" id="ms-nova" class="input" placeholder="Mínimo de 6 caracteres"></div><div class="form-group"><label class="label">Confirmar nova senha</label><input type="password" id="ms-conf" class="input"></div></div><div class="modal-ft"><button class="btn btn-s" id="can-senha">Cancelar</button><button class="btn btn-p" id="cf-senha">Salvar dados</button></div></div></div>
 
-<div class="modal" id="m-rec"><div class="modal-box" style="max-width:430px"><div class="modal-hd"><h3>🔑 Recuperar acesso</h3><button class="close" id="cls-rec">×</button></div><div class="modal-bd"><div class="info">Informe o usuário e o e-mail cadastrado. Como este aplicativo é local, seu programa de e-mail será aberto com a recuperação pronta e será necessário confirmar o envio.</div><div class="form-group"><label class="label">Usuário</label><input type="text" id="rec-u" class="input"></div><div class="form-group"><label class="label">E-mail cadastrado</label><input type="email" id="rec-e" class="input"></div></div><div class="modal-ft"><button class="btn btn-s" id="can-rec">Cancelar</button><button class="btn btn-p" id="cf-rec">Gerar nova senha</button></div></div></div>
+<div class="modal" id="m-rec"><div class="modal-box" style="max-width:430px"><div class="modal-hd"><h3>🔑 Recuperar acesso</h3><button class="close" id="cls-rec">×</button></div><div class="modal-bd"><div class="info">Informe o e-mail cadastrado no sistema. Você receberá uma mensagem do Supabase com um link seguro para definir uma nova senha.</div><div class="form-group"><label class="label">E-mail cadastrado</label><input type="email" id="rec-e" class="input" placeholder="seuemail@exemplo.com" autocomplete="email"></div></div><div class="modal-ft"><button class="btn btn-s" id="can-rec">Cancelar</button><button class="btn btn-p" id="cf-rec">Enviar link de recuperação</button></div></div></div>
 
 <div class="modal" id="m-dp">
   <div class="modal-box">
@@ -2249,7 +2249,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnEsqueceu = el('btn-esqueceu');
   if(btnLogin) btnLogin.addEventListener('click', doLogin);
   if(btnVoltar) btnVoltar.addEventListener('click', goHome);
-  if(btnEsqueceu) btnEsqueceu.addEventListener('click', function() { el('rec-u').value = el('lu').value.trim(); el('rec-e').value = ''; el('m-rec').classList.add('a'); });
+  if(btnEsqueceu) btnEsqueceu.addEventListener('click', function() { const v=(el('lu')?.value||'').trim(); el('rec-e').value = v.includes('@') ? v : ''; el('m-rec').classList.add('a'); setTimeout(()=>el('rec-e')?.focus(),50); });
   el('lp').addEventListener('keypress', function(e) { if(e.key === 'Enter') doLogin(); });
 
   document.querySelectorAll('.btn-minha-senha').forEach(btn => btn.addEventListener('click', abrirMinhaSenha));
