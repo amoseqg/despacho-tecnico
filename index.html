@@ -959,6 +959,48 @@ function extrairCampoDaDescricao(texto,tipo){
   return candidatos.length ? candidatos[0].replace(/^[._\/-]+|[._\/-]+$/g,'').trim() : '';
 }
 
+function normalizarRotuloDescricao(v){
+  return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().trim();
+}
+
+function extrairTextoRotulado(texto,rotulos){
+  const linhas=String(texto||'').split(/\r?\n/);
+  const chaves=rotulos.map(normalizarRotuloDescricao);
+  const todosRotulos=['SITE','SITE/CLIENTE','SITE / CLIENTE','CLIENTE','ENDERECO','CIDADE','CONTATO','PROTOCOLO','SDM','CIRCUITO','DESIGNACAO'];
+  for(let i=0;i<linhas.length;i++){
+    const original=String(linhas[i]||'').trim();
+    const normal=normalizarRotuloDescricao(original);
+    for(const chave of chaves){
+      const pos=normal.indexOf(chave);
+      if(pos<0) continue;
+      const depoisOriginal=original.slice(pos+chave.length).replace(/^\s*[:=\-–—]\s*/,'').trim();
+      if(depoisOriginal && /[A-ZÀ-Ú0-9]/i.test(depoisOriginal)) return depoisOriginal;
+      for(let j=i+1;j<Math.min(linhas.length,i+5);j++){
+        const proxima=String(linhas[j]||'').trim();
+        if(!proxima || /^[>_\-=–—\s]+$/.test(proxima)) continue;
+        const proxNorm=normalizarRotuloDescricao(proxima);
+        if(todosRotulos.some(r=>proxNorm===r || proxNorm.startsWith(r+':') || proxNorm.startsWith(r+' -'))) break;
+        return proxima;
+      }
+    }
+  }
+  return '';
+}
+
+function preencherDadosDaDescricao(texto){
+  const dados={
+    site:extrairTextoRotulado(texto,['SITE / CLIENTE','SITE/CLIENTE','NOME DO SITE','SITE','CLIENTE']),
+    endereco:extrairTextoRotulado(texto,['ENDEREÇO','ENDERECO']),
+    cidade:extrairTextoRotulado(texto,['CIDADE','MUNICÍPIO','MUNICIPIO']),
+    contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL'])
+  };
+  if(dados.site) el('c-si').value=dados.site;
+  if(dados.endereco) el('c-en').value=dados.endereco;
+  if(dados.cidade) el('c-cd').value=dados.cidade;
+  if(dados.contato) el('c-co').value=dados.contato;
+  return dados;
+}
+
 function buscarCircuitoNaDescricao() {
   const campo=el('c-descricao-colada');
   const texto=String(campo?.value||'').trim();
@@ -975,6 +1017,7 @@ function buscarCircuitoNaDescricao() {
 
   el('c-pr').value=extrairCampoDaDescricao(texto,'protocolo');
   el('c-sdm').value=extrairCampoDaDescricao(texto,'sdm');
+  const dadosDescricao=preencherDadosDaDescricao(texto);
 
   const textoNormalizado=normalizarCircuito(texto);
   let encontrados=SITES_PEII.filter(site=>{
@@ -1006,8 +1049,11 @@ function buscarCircuitoNaDescricao() {
     return null;
   }
 
-  status.textContent='Nenhuma designação de circuito da base foi localizada no texto colado.';
-  status.style.color='var(--r)';
+  const camposPreenchidos=[dadosDescricao.site,dadosDescricao.endereco,dadosDescricao.cidade,dadosDescricao.contato].filter(Boolean).length;
+  status.textContent=camposPreenchidos
+    ? 'Circuito não localizado na base — '+camposPreenchidos+' dado(s) preenchido(s) diretamente pela descrição.'
+    : 'Nenhuma designação ou dado de site foi localizado no texto colado.';
+  status.style.color=camposPreenchidos?'var(--y)':'var(--r)';
   return null;
 }
 
