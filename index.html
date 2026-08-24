@@ -3144,6 +3144,21 @@ async function sbRestoreSession(){
   }catch(err){ console.error(err); SB_PROFILE=null; S=null; lsRemove('ss'); sbSetConnectionBadge('Sessão inválida', false); }
 }
 
+let SB_REFRESHING=false;
+function sbRenderizarTelas(){
+  try{
+    if(S?.t==='adm'){rDb();rAt();rCh();rRl();rTc();rMl();}
+    else if(S?.t==='tec'){rTdb();rTdp();rTat();rTco();rTar();rTmat();}
+  }catch(e){console.error('Erro ao atualizar telas:',e);}
+}
+async function sbRecarregarDados(){
+  if(!SB_PROFILE || SB_SYNCING || SB_REFRESHING) return;
+  SB_REFRESHING=true;
+  try{await sbLoadAll();sbRenderizarTelas();}
+  catch(err){console.error('Erro ao recarregar dados:',err);sbSetConnectionBadge('Erro ao atualizar dados',false);}
+  finally{SB_REFRESHING=false;}
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
   // Remove eventual auto-login do cache antigo: a sessão válida agora é do Supabase Auth.
   S=null; lsRemove('ss');
@@ -3151,10 +3166,21 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // Realtime: recarrega os dados quando outro navegador altera tabelas operacionais.
   SB.channel('despacho-tecnico-realtime')
-    .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},()=>{ if(SB_PROFILE && !SB_SYNCING) sbLoadAll().then(()=>{try{rDb();rAt();rCh();rTdb();rTat();}catch(e){}}); })
-    .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},()=>{ if(SB_PROFILE && !SB_SYNCING) sbLoadAll().then(()=>{try{rMl();rTmat();}catch(e){}}); })
-    .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},()=>{ if(SB_PROFILE && !SB_SYNCING) sbLoadAll().then(()=>{try{rMl();rTmat();}catch(e){}}); })
+    .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'aprovacoes'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbRecarregarDados)
     .subscribe();
+
+  // Segurança adicional: o administrador confere o servidor a cada 10 segundos,
+  // mesmo quando o navegador não recebe um evento Realtime.
+  setInterval(()=>{
+    if(SB_PROFILE?.tipo==='admin' && document.visibilityState!=='hidden') sbRecarregarDados();
+  },10000);
+  document.addEventListener('visibilitychange',()=>{
+    if(document.visibilityState==='visible' && SB_PROFILE?.tipo==='admin') sbRecarregarDados();
+  });
 });
 
 </script>
