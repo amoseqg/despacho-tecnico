@@ -943,20 +943,20 @@ function buscarCircuito() {
 }
 
 function extrairCampoDaDescricao(texto,tipo){
-  const rotulo=tipo==='protocolo'
-    ? '(?:N[º°O.]?\\s*)?PROTOCOLO(?:\\s*N[º°O.]?)?'
-    : 'SDM(?:\\s*N[º°O.]?)?';
   const conteudo=String(texto||'');
-  const achadoRotulo=conteudo.match(new RegExp('\\b'+rotulo,'i'));
+  const regexRotulo=tipo==='protocolo'
+    ? /\b(?:N[º°O.]?\s*)?PROTOCOLO(?:\s*N[º°O.]?)?/i
+    : /\bSDM(?:\s*N[º°O.]?)?/i;
+  const achadoRotulo=conteudo.match(regexRotulo);
   if(!achadoRotulo) return '';
   const inicio=(achadoRotulo.index||0)+achadoRotulo[0].length;
-  let trecho=conteudo.slice(inicio,inicio+300);
+  let trecho=conteudo.slice(inicio,inicio+500);
   const proximoRotulo=tipo==='protocolo'
-    ? trecho.search(/\\bSDM\\b/i)
-    : trecho.search(/\\b(?:CIRCUITO|DESIGNA(?:ÇÃO|CAO)|SITE|CLIENTE|ENDEREÇO|ENDERECO|CIDADE|CONTATO)\\b/i);
+    ? trecho.search(/\bSDM\b/i)
+    : trecho.search(/\b(?:CIRCUITO|DESIGNA(?:ÇÃO|CAO)|SITE|CLIENTE|ENDEREÇO|ENDERECO|CIDADE|CONTATO)\b/i);
   if(proximoRotulo>0) trecho=trecho.slice(0,proximoRotulo);
-  const candidatos=trecho.match(/[A-Z0-9._\\/-]*\\d[A-Z0-9._\\/-]*/ig)||[];
-  return candidatos.length ? candidatos[0].replace(/^[._\\/-]+|[._\\/-]+$/g,'').trim() : '';
+  const candidatos=trecho.match(/[A-Z0-9._\/-]*\d[A-Z0-9._\/-]*/ig)||[];
+  return candidatos.length ? candidatos[0].replace(/^[._\/-]+|[._\/-]+$/g,'').trim() : '';
 }
 
 function buscarCircuitoNaDescricao() {
