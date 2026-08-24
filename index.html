@@ -1167,14 +1167,14 @@ function doLogin() {
 }
 
 function enterAdm() {
-  hide('t1'); show('pa');
+  hide('t0'); hide('t1'); hide('pt'); show('pa');
   el('an').textContent = S.n;
   admTab(el('nv').querySelector('[data-tab="db"]'), 'db');
   startLoop();
 }
 
 function enterTec() {
-  hide('t1'); show('pt');
+  hide('t0'); hide('t1'); hide('pa'); show('pt');
   el('tn').textContent = S.n;
   const b = S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>';
   el('tr').innerHTML = b;
