@@ -342,7 +342,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
           <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem"><label><input type="checkbox" id="t-multi" value="multi"> Multi-skill</label><label><input type="checkbox" name="t-sk" value="voz"> Voz</label><label><input type="checkbox" name="t-sk" value="dados"> Dados</label><label><input type="checkbox" name="t-sk" value="infra"> Infra</label></div>
         </div>
         <div class="form-group" id="t-areas-box"><label class="label">Áreas de atendimento</label>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem"><label><input type="checkbox" name="t-ar" value="norte"> Norte</label><label><input type="checkbox" name="t-ar" value="leste"> Leste</label><label><input type="checkbox" name="t-ar" value="sul"> Sul</label><label><input type="checkbox" name="t-ar" value="oeste"> Oeste</label><label><input type="checkbox" name="t-ar" value="interior"> Interior</label></div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem"><label><input type="checkbox" name="t-ar" value="norte"> Norte</label><label><input type="checkbox" name="t-ar" value="leste"> Leste</label><label><input type="checkbox" name="t-ar" value="sul"> Sul</label><label><input type="checkbox" name="t-ar" value="oeste"> Oeste</label><label><input type="checkbox" name="t-ar" value="interior"> Interior</label><label><input type="checkbox" name="t-ar" value="noronha"> Fernando de Noronha</label></div>
         </div>
         <button class="btn btn-p" id="btn-add-tec">👤 Criar conta e perfil</button>
       </div>
@@ -1087,7 +1087,7 @@ function adminGeral() { return !!(S && S.t === 'adm' && D.ad.some(a => a.u === S
 function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
 function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra' })[v] || 'Não definida'; }
-function nomeArea(v) { return ({ norte: 'Norte', leste: 'Leste', sul: 'Sul', oeste: 'Oeste', interior: 'Interior' })[v] || 'Não definida'; }
+function nomeArea(v) { return ({ norte: 'Norte', leste: 'Leste', sul: 'Sul', oeste: 'Oeste', interior: 'Interior', noronha: 'Fernando de Noronha' })[v] || 'Não definida'; }
 function skillsTec(t) { return t.sk && t.sk.length ? t.sk : ['voz','dados','infra']; }
 function areasTec(t) { return t.ar && t.ar.length ? t.ar : (t.r === 'interior' ? ['interior'] : ['norte','leste','sul','oeste']); }
 function tecnicoCompativel(t, c) {
@@ -1181,7 +1181,7 @@ function atualizarTecnicosChamado() {
 function atualizarCamposRegiao() {
   const capitalTec = el('t-r').value === 'capital';
   document.querySelectorAll('input[name="t-ar"]').forEach(x => {
-    const disponivel = capitalTec ? x.value !== 'interior' : x.value === 'interior';
+    const disponivel = capitalTec ? !['interior','noronha'].includes(x.value) : ['interior','noronha'].includes(x.value);
     x.disabled = !disponivel;
     if (!disponivel) x.checked = false;
   });
