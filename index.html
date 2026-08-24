@@ -2864,11 +2864,44 @@ async function sbPersistirFinalizacao(c){
   return data;
 }
 
+async function sbSyncTecnico(){
+  // O técnico nunca sincroniza cadastros ou registros administrativos.
+  for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario)){
+    const {error}=await SB.from('chamados').update({
+      status:c.st||'pendente',
+      motivo_recusa:c.mr||null,
+      aceito_em:sbIso(c.ae),
+      iniciado_em:sbIso(c.am),
+      concluido_em:sbIso(c.cc),
+      atualizado_em:new Date().toISOString()
+    }).eq('id',c.id).eq('tecnico_id',SB_PROFILE.id);
+    if(error) throw new Error('Chamado: '+error.message);
+  }
+  for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario && x.ex)){
+    const row={chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()};
+    const {error}=await SB.from('execucoes').upsert(row,{onConflict:'chamado_id'});
+    if(error) throw new Error('Execução: '+error.message);
+  }
+  for(const r of D.mr.filter(x=>!sbUUID(x.id) && x.tecnico===SB_PROFILE.usuario)){
+    const {data,error}=await SB.from('solicitacoes_material').insert({chamado_id:r.chamadoId,tecnico_id:SB_PROFILE.id,material_id:r.materialId,quantidade_solicitada:Number(r.qtdSolicitada||0),quantidade_separada:0,quantidade_entregue:0,status:'solicitado',observacao:r.obs||null,solicitado_em:sbIso(r.data)||new Date().toISOString()}).select('id').single();
+    if(error) throw new Error('Solicitação de material: '+error.message);
+    r.id=data.id;
+  }
+  SB_LOADED_CH=new Set(D.ch.filter(x=>sbUUID(x.id)).map(x=>x.id));
+  SB_LOADED_MR=new Set(D.mr.filter(x=>sbUUID(x.id)).map(x=>x.id));
+  lsSet('dd',D);
+  sbSetConnectionBadge('Supabase sincronizado',true);
+}
+
 async function sbSyncAll(){
   if(!SB_PROFILE) return;
   if(SB_SYNCING){ SB_SYNC_AGAIN=true; return; }
   SB_SYNCING=true;
   try{
+    if(SB_PROFILE.tipo==='tecnico'){
+      await sbSyncTecnico();
+      return;
+    }
     // Novos chamados com IDs locais -> INSERT e troca pelo UUID retornado.
     for(const c of D.ch.filter(x=>!sbUUID(x.id))){
       const old=c.id; const {data,error}=await SB.from('chamados').insert(sbChamadoRow(c)).select('id').single(); if(error) throw error; c.id=data.id;
@@ -2928,7 +2961,11 @@ async function sbSyncAll(){
 
     SB_LOADED_CH=new Set(D.ch.filter(x=>sbUUID(x.id)).map(x=>x.id)); SB_LOADED_MAT=new Set(D.mat.filter(x=>sbUUID(x.id)).map(x=>x.id)); SB_LOADED_MR=new Set(D.mr.filter(x=>sbUUID(x.id)).map(x=>x.id));
     lsSet('dd',D); sbSetConnectionBadge('Supabase sincronizado', true);
-  }catch(err){ console.error('Erro de sincronização Supabase:',err); sbSetConnectionBadge('Erro de sincronização', false); }
+  }catch(err){
+    console.error('Erro de sincronização Supabase:',err);
+    const detalhe=String(err?.message||'Falha desconhecida').slice(0,90);
+    sbSetConnectionBadge('Erro: '+detalhe,false);
+  }
   finally{ SB_SYNCING=false; if(SB_SYNC_AGAIN){SB_SYNC_AGAIN=false; sbSyncAll();} }
 }
 
