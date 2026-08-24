@@ -1768,19 +1768,29 @@ function opApv(tipo) {
   el('m-ap').classList.add('a');
 }
 
-function cfAp() {
+async function cfAp() {
   const obs = el('ap-obs').value.trim();
   if (APT === 'rejeitado' && !obs) { alert('Informe o motivo da rejeição'); return; }
-  D.ch.forEach(c => {
-    if (c.te === PLU && c.st === 'concluida' && (!c.ap || c.ap.status === 'pendente')) {
-      c.ap = { status: APT, obs: APT === 'rejeitado' ? obs : '', data: ag(), admin: S.n };
-    }
-  });
-  sv();
-  el('m-ap').classList.remove('a');
-  el('m-pl').classList.remove('a');
-  rRl();
-  alert(APT === 'aprovado' ? 'Planilha aprovada com sucesso!' : 'Planilha rejeitada.');
+  const alvos=D.ch.filter(c=>c.te===PLU && c.st==='concluida' && (!c.ap || c.ap.status==='pendente'));
+  if(!alvos.length){alert('Não há serviços pendentes para esta ação.');return;}
+  const btn=el('btn-cf-ap'),textoBtn=btn?.textContent;
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
+    const confirmadoEm=await sbPersistirAprovacoes(alvos,APT,APT==='rejeitado'?obs:'');
+    alvos.forEach(c=>{
+      c.ap={status:APT,obs:APT==='rejeitado'?obs:'',data:confirmadoEm,admin:S.n};
+    });
+    lsSet('dd',D);
+    el('m-ap').classList.remove('a');
+    el('m-pl').classList.remove('a');
+    rRl();rDb();
+    alert(APT==='aprovado'?'Planilha aprovada e confirmada no servidor!':'Planilha rejeitada e confirmada no servidor.');
+  }catch(err){
+    sbShowError('Não foi possível salvar a aprovação',err);
+    await sbRecarregarDados();
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=textoBtn||'Confirmar';}
+  }
 }
 
 function fmtDiff(a, b) {
@@ -2825,6 +2835,27 @@ function sbChamadoRow(c){
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:sbIso(c.cr)||new Date().toISOString(), aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
   };
+}
+
+async function sbPersistirAprovacoes(chamados,status,observacao){
+  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin') throw new Error('Somente administradores podem aprovar serviços.');
+  const ids=chamados.filter(c=>sbUUID(c.id)).map(c=>c.id);
+  if(!ids.length || ids.length!==chamados.length) throw new Error('Um ou mais serviços ainda não possuem identificação válida no servidor.');
+  const atualizadoEm=new Date().toISOString();
+  const rows=ids.map(id=>({
+    chamado_id:id,
+    status,
+    observacao:observacao||null,
+    administrador_id:SB_PROFILE.id,
+    reenviado:false,
+    atualizado_em:atualizadoEm
+  }));
+  const {data,error}=await SB.from('aprovacoes').upsert(rows,{onConflict:'chamado_id'}).select('chamado_id,status');
+  if(error) throw error;
+  const confirmados=new Set((data||[]).filter(x=>x.status===status).map(x=>x.chamado_id));
+  if(ids.some(id=>!confirmados.has(id))) throw new Error('O servidor não confirmou todos os serviços selecionados.');
+  sbSetConnectionBadge(status==='aprovado'?'Aprovação sincronizada':'Rejeição sincronizada',true);
+  return atualizadoEm;
 }
 
 async function sbPersistirFinalizacao(c){
