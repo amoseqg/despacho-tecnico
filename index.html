@@ -53,7 +53,8 @@ function fixarSelecaoMaterial(selectId, valor) {
       resultados.style.display = 'none';
       select.dispatchEvent(new Event('change', {bubbles:true}));
       select.dispatchEvent(new Event('input', {bubbles:true}));
-      const qtd = selectId === 'ml-estoque-material' ? document.getElementById('ml-estoque-qtd') : null;
+      const qtd = selectId === 'ml-estoque-material' ? document.getElementById('ml-estoque-qtd')
+        : (selectId === 'lg-estoque-material' ? document.getElementById('lg-estoque-qtd') : null);
       if(qtd && typeof D !== 'undefined' && typeof materialById === 'function'){
         const m = materialById(id);
         if(m) qtd.value = m.estoque || 0;
@@ -128,6 +129,7 @@ function fixarSelecaoMaterial(selectId, valor) {
   }
   document.addEventListener('DOMContentLoaded',function(){
     iniciarBuscaMaterial('busca-material-estoque','ml-estoque-material','resultados-busca-material-estoque');
+    iniciarBuscaMaterial('busca-material-logistica','lg-estoque-material','resultados-busca-material-logistica');
     iniciarBuscaMaterial('busca-material-tecnico','tm-material','resultados-busca-material-tecnico');
   });
 })();
@@ -595,6 +597,20 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
       <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">🚚 Trâmite dos materiais</h3>
       <div class="info">Capital: separação → aguardando aceite → entregue. Interior/Noronha: separação → em trânsito com rastreio e previsão → aceite do técnico → entregue.</div>
       <div id="lg-list"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">📦 Estoque Logístico</h3>
+      <div class="grid-3">
+        <div class="form-group"><label class="label">Material</label>
+          <div class="material-busca-rapida" style="margin:8px 0">
+            <input id="busca-material-logistica" type="text" class="input" placeholder="🔎 Digite o nome/modelo do material para localizar..." autocomplete="off">
+          </div>
+          <select id="lg-estoque-material" class="hidden" aria-hidden="true" tabindex="-1"></select>
+        </div>
+        <div class="form-group"><label class="label">Quantidade em estoque</label><input type="number" min="0" id="lg-estoque-qtd" class="input" placeholder="0"></div>
+        <div class="form-group" style="display:flex;align-items:flex-end"><button class="btn btn-p" id="btn-lg-ajuste" style="width:100%">💾 Salvar Quantidade</button></div>
+      </div>
+      <div id="lg-estoque-lista"></div>
     </div>
   </div>
 </div>
@@ -1509,6 +1525,26 @@ async function aceitarMaterial(id){
   try{await logAtualizarSolicitacao(r,{status:'entregue',quantidade_entregue:q,entregue_em:new Date().toISOString(),observacao:logObs(r,{...logMeta(r),etapa:'entregue'})});await sbRecarregarDados();alert('Recebimento confirmado. Status atualizado para entregue.');}
   catch(e){sbShowError('Não foi possível confirmar o recebimento',e);}
 }
+function rLogEstoque(){
+ const s=el('lg-estoque-material'),b=el('lg-estoque-lista');if(!s||!b)return;
+ const selecionado=s.value||'',q=el('lg-estoque-qtd'),qtdAtual=q?q.value:'';
+ s.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${m.id}">${escM(m.nome)} (${escM(m.unidade)})</option>`).join('');
+ if(selecionado&&D.mat.some(m=>String(m.id)===String(selecionado))){s.value=selecionado;if(q&&qtdAtual!=='')q.value=qtdAtual;}
+ b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Situação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td><b>${m.estoque||0}</b></td><td><span class="badge ${(m.estoque||0)>0?'b-concluida':'b-recusado'}">${(m.estoque||0)>0?'Disponível':'Sem estoque'}</span></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
+}
+async function ajusteEstoqueLogistica(){
+ const id=el('lg-estoque-material')?.value,q=Number(el('lg-estoque-qtd')?.value),m=materialById(id),btn=el('btn-lg-ajuste');
+ if(!m||!Number.isFinite(q)||q<0){alert('Selecione o material e informe uma quantidade válida');return;}
+ const texto=btn?.innerHTML;
+ try{
+   if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
+   const {data,error}=await SB.from('materiais').update({estoque:q,atualizado_em:new Date().toISOString()}).eq('id',m.id).select('id,estoque').single();
+   if(error)throw error;
+   m.estoque=Number(data.estoque||0);lsSet('dd',D);rLogEstoque();
+   alert('Quantidade do estoque confirmada no servidor.');
+ }catch(e){sbShowError('Não foi possível atualizar o estoque',e);await sbRecarregarDados();}
+ finally{if(btn){btn.disabled=false;btn.innerHTML=texto||'💾 Salvar Quantidade';}}
+}
 function rLog(){
  const box=el('lg-list');if(!box)return;
  const list=D.mr.slice().reverse();
@@ -1522,6 +1558,7 @@ function rLog(){
     <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
     ${logDetalhes(r)}<div style="margin-top:8px">${acao}</div></div>`;
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
+ rLogEstoque();
 }
 function rTmat(){
  const ps=el('tm-protocolo'),ms=el('tm-material'),box=el('tm-lista');if(!ps||!ms||!box)return;
@@ -2603,6 +2640,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
   const btnAddMaterial=el('btn-add-material'); if(btnAddMaterial) btnAddMaterial.addEventListener('click',addMaterial);
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
+  const btnLgAjuste=el('btn-lg-ajuste'); if(btnLgAjuste) btnLgAjuste.addEventListener('click',ajusteEstoqueLogistica); const selLgEst=el('lg-estoque-material'); if(selLgEst) selLgEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('lg-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnSolic=el('btn-tm-solicitar'); if(btnSolic) btnSolic.addEventListener('click',solicitarMaterial);
   let circuitoDescricaoTimer=null;
   el('c-descricao-colada').addEventListener('input',function(){
