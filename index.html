@@ -1255,7 +1255,11 @@ function showLogin(t) {
   if (t === 'adm') {
     el('li').textContent = '🛡️';
     el('lt').textContent = 'Área Administrador';
-    el('ls').textContent = 'Use admin / admin123';
+    el('ls').textContent = 'Use seu usuário e senha';
+  } else if (t === 'log') {
+    el('li').textContent = '🚚';
+    el('lt').textContent = 'Área Logística';
+    el('ls').textContent = 'Use o acesso criado pelo administrador';
   } else {
     el('li').textContent = '👷';
     el('lt').textContent = 'Área do Técnico';
@@ -1264,7 +1268,7 @@ function showLogin(t) {
 }
 
 function goHome() {
-  hide('t1'); hide('pa'); hide('pt');
+  hide('t1'); hide('pa'); hide('pt'); hide('plog');
   show('t0');
 }
 
@@ -1274,7 +1278,7 @@ function logout() {
 
 function usuarioAtual() {
   if (!S) return null;
-  return (S.t === 'adm' ? D.ad : D.tc).find(x => x.u === S.u) || null;
+  return ((S.t === 'adm' || S.t === 'log') ? D.ad : D.tc).find(x => x.u === S.u) || null;
 }
 
 function abrirMinhaSenha() {
@@ -1338,6 +1342,13 @@ function enterAdm() {
   startLoop();
 }
 
+function enterLog() {
+  hide('t0'); hide('t1'); hide('pa'); hide('pt'); show('plog');
+  el('ln').textContent = S.n;
+  rLog();
+  startLoop();
+}
+
 function enterTec() {
   hide('t0'); hide('t1'); hide('pa'); show('pt');
   el('tn').textContent = S.n;
@@ -1384,20 +1395,40 @@ function tecTab(btn, a) {
 // ========== MATERIAIS / LOGÍSTICA ==========
 function escM(v){ return esc(v); }
 function materialById(id){ return D.mat.find(m=>m.id===id); }
+const LOG_TAG='[[LOGISTICA]]';
+function logMeta(r){
+  const s=String(r?.obs||''), i=s.lastIndexOf(LOG_TAG);
+  if(i<0)return {};
+  try{return JSON.parse(s.slice(i+LOG_TAG.length).trim())||{};}catch(e){return {};}
+}
+function logObsBase(r){const s=String(r?.obs||''),i=s.lastIndexOf(LOG_TAG);return (i<0?s:s.slice(0,i)).trim();}
+function logObs(r,meta){const base=logObsBase(r);return (base?base+'\n':'')+LOG_TAG+JSON.stringify(meta);}
+function tecnicoMaterial(r){return D.tc.find(t=>t.u===r.tecnico);}
+function materialInterior(r){const t=tecnicoMaterial(r);return t && (t.r==='interior'||t.r==='noronha');}
+function logStatus(r){
+  const m=logMeta(r);
+  if(r.status==='entregue')return ['b-concluida','Entregue'];
+  if(m.etapa==='em_transito')return ['b-andamento','Em trânsito'];
+  if(m.etapa==='aguardando_aceite')return ['b-pendente','Aguardando aceite'];
+  return {solicitado:['b-pendente','Solicitado'],direcionado:['b-andamento','Na separação'],separado:['b-andamento','Separado'],cancelado:['b-recusado','Cancelado']}[r.status]||['b-pendente',r.status];
+}
+function logDetalhes(r){
+  const m=logMeta(r),base=logObsBase(r);
+  return `${base?`<div class="os-r"><b>Observação:</b> ${escM(base)}</div>`:''}
+    ${m.rastreamento?`<div class="os-r"><b>Código de rastreamento:</b> ${escM(m.rastreamento)}</div>`:''}
+    ${m.prazo?`<div class="os-r"><b>Previsão de entrega:</b> ${escM(new Date(m.prazo+'T12:00:00').toLocaleDateString('pt-BR'))}</div>`:''}`;
+}
 function rMl(){
   const box=el('ml-solicitacoes'); if(!box) return;
   const list=D.mr.slice().reverse();
   box.innerHTML=list.length?list.map(r=>{
-    const m=materialById(r.materialId); const c=D.ch.find(x=>x.id===r.chamadoId);
-    const st={solicitado:['b-pendente','Solicitado'],direcionado:['b-andamento','Na separação'],separado:['b-andamento','Separado'],entregue:['b-concluida','Entregue'],cancelado:['b-recusado','Cancelado']}[r.status]||['b-pendente',r.status];
-    const max=(r.status==='direcionado'||r.status==='solicitado')?'':`<span class="badge ${st[0]}">${st[1]}</span>`;
+    const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r);
     return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
       <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
-      <div class="os-r"><b>Chamado:</b> ${escM(c?c.de:r.infoChamado||'—')}</div>
-      <div class="os-r"><b>Solicitado em:</b> ${escM(r.data||'—')} &nbsp; <b>Entregue:</b> ${r.qtdEntregue||0}</div>
-      <div class="os-r"><b>Observação:</b> ${escM(r.obs||'—')}</div>
+      <div class="os-r"><b>Destino:</b> ${materialInterior(r)?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Separado:</b> ${r.qtdSeparada||0} &nbsp; <b>Entregue:</b> ${r.qtdEntregue||0}</div>
+      ${logDetalhes(r)}
       ${r.responsavel?`<div class="os-r"><b>Responsável logística:</b> ${escM(r.responsavel)}</div>`:''}
-      <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">${r.status==='solicitado'?`<button class="btn btn-y btn-mat-direcionar" data-id="${r.id}">➡️ Direcionar para separação</button>`:''}${r.status==='direcionado'?`<button class="btn btn-g btn-mat-separar" data-id="${r.id}">📦 Registrar separação</button>`:''}${r.status==='separado'?`<button class="btn btn-p btn-mat-entregar" data-id="${r.id}">🤝 Registrar entrega</button>`:''}</div></div>`;
+      <div style="margin-top:8px">${r.status==='solicitado'?`<button class="btn btn-y btn-mat-direcionar" data-id="${r.id}">➡️ Direcionar para separação</button>`:''}</div></div>`;
   }).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
   rMlEstoque(); rMateriaisCadastro();
 }
@@ -1442,8 +1473,56 @@ async function direcionarMaterial(id){
     if(btn&&document.body.contains(btn)){btn.disabled=false;btn.textContent=textoBtn||'➡️ Direcionar para separação';}
   }
 }
-function separarMaterial(id){const r=D.mr.find(x=>x.id===id),m=r&&materialById(r.materialId);if(!r||!m)return;const q=Number(prompt(`Quantidade a separar (solicitada: ${r.qtdSolicitada}; estoque: ${m.estoque||0})`,String(r.qtdSolicitada)));if(!q||q<1)return;if(q>(m.estoque||0)){alert('Quantidade superior ao estoque disponível.');return;}m.estoque-=q;r.qtdSeparada=q;r.status='separado';r.responsavel=S.n;r.separadoEm=ag();sv();rMl();alert('Material separado com sucesso.');}
-function entregarMaterial(id){const r=D.mr.find(x=>x.id===id);if(!r)return;const q=Number(prompt(`Quantidade entregue ao técnico (separada: ${r.qtdSeparada||0})`,String(r.qtdSeparada||r.qtdSolicitada)));if(!q||q<1||q>(r.qtdSeparada||0)){alert('Informe uma quantidade válida.');return;}r.qtdEntregue=q;r.status='entregue';r.entregueEm=ag();sv();rMl();alert('Entrega registrada. O material já está disponível na área do técnico.');}
+async function logAtualizarSolicitacao(r,campos){
+  const {data,error}=await SB.from('solicitacoes_material').update(campos).eq('id',r.id).select('*').single();
+  if(error)throw error; return data;
+}
+async function separarMaterial(id){
+  const r=D.mr.find(x=>x.id===id),m=r&&materialById(r.materialId);if(!r||!m)return;
+  const q=Number(prompt(`Quantidade a separar (solicitada: ${r.qtdSolicitada}; estoque: ${m.estoque||0})`,String(r.qtdSolicitada)));
+  if(!q||q<1)return;if(q>(m.estoque||0)){alert('Quantidade superior ao estoque disponível.');return;}
+  try{
+    const novoEstoque=(m.estoque||0)-q,obs=logObs(r,{...logMeta(r),etapa:'separado'});
+    const {error:me}=await SB.from('materiais').update({estoque:novoEstoque}).eq('id',m.id);if(me)throw me;
+    try{await logAtualizarSolicitacao(r,{status:'separado',quantidade_separada:q,separado_em:new Date().toISOString(),responsavel_id:SB_PROFILE.id,observacao:obs});}
+    catch(e){await SB.from('materiais').update({estoque:m.estoque||0}).eq('id',m.id);throw e;}
+    await sbRecarregarDados();alert('Material separado e confirmado no servidor.');
+  }catch(e){sbShowError('Não foi possível registrar a separação',e);await sbRecarregarDados();}
+}
+async function liberarMaterial(id){
+  const r=D.mr.find(x=>x.id===id);if(!r)return;
+  try{await logAtualizarSolicitacao(r,{observacao:logObs(r,{...logMeta(r),etapa:'aguardando_aceite'})});await sbRecarregarDados();alert('Material liberado para aceite do técnico.');}
+  catch(e){sbShowError('Não foi possível liberar o material',e);}
+}
+async function enviarMaterial(id){
+  const r=D.mr.find(x=>x.id===id);if(!r)return;
+  const rastreamento=prompt('Informe o código de rastreamento do envio:','');if(!rastreamento?.trim())return;
+  const prazo=prompt('Informe a previsão de entrega (AAAA-MM-DD):','');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(prazo||'')){alert('Informe a previsão no formato AAAA-MM-DD.');return;}
+  try{await logAtualizarSolicitacao(r,{observacao:logObs(r,{...logMeta(r),etapa:'em_transito',rastreamento:rastreamento.trim(),prazo})});await sbRecarregarDados();alert('Expedição e rastreamento registrados.');}
+  catch(e){sbShowError('Não foi possível registrar o envio',e);}
+}
+async function aceitarMaterial(id){
+  const r=D.mr.find(x=>x.id===id);if(!r||r.tecnico!==S.u)return;
+  const q=r.qtdSeparada||r.qtdSolicitada;
+  if(!confirm('Confirma que recebeu este material?'))return;
+  try{await logAtualizarSolicitacao(r,{status:'entregue',quantidade_entregue:q,entregue_em:new Date().toISOString(),observacao:logObs(r,{...logMeta(r),etapa:'entregue'})});await sbRecarregarDados();alert('Recebimento confirmado. Status atualizado para entregue.');}
+  catch(e){sbShowError('Não foi possível confirmar o recebimento',e);}
+}
+function rLog(){
+ const box=el('lg-list');if(!box)return;
+ const list=D.mr.slice().reverse();
+ box.innerHTML=list.length?list.map(r=>{
+   const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),interior=materialInterior(r);
+   let acao='';
+   if(r.status==='direcionado')acao=`<button class="btn btn-g btn-mat-separar" data-id="${r.id}">📦 Registrar separação</button>`;
+   else if(r.status==='separado'&&meta.etapa==='separado')acao=interior?`<button class="btn btn-p btn-log-enviar" data-id="${r.id}">🚚 Informar envio e rastreio</button>`:`<button class="btn btn-p btn-log-liberar" data-id="${r.id}">🤝 Liberar para aceite</button>`;
+   return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
+    <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
+    <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
+    ${logDetalhes(r)}<div style="margin-top:8px">${acao}</div></div>`;
+ }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
+}
 function rTmat(){
  const ps=el('tm-protocolo'),ms=el('tm-material'),box=el('tm-lista');if(!ps||!ms||!box)return;
  const protocoloSelecionado=ps.value||'',materialSelecionado=ms.value||'';
@@ -1452,7 +1531,7 @@ function rTmat(){
  if(meus.some(c=>String(c.id)===String(protocoloSelecionado))) ps.value=protocoloSelecionado;
  if(D.mat.some(m=>String(m.id)===String(materialSelecionado))) ms.value=materialSelecionado;
  const list=D.mr.filter(r=>r.tecnico===S.u).slice().reverse();
- box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st={solicitado:['b-pendente','Solicitado'],direcionado:['b-andamento','Em separação'],separado:['b-andamento','Separado'],entregue:['b-concluida','Entregue']}[r.status]||['b-pendente',r.status];return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Solicitado:</b> ${r.qtdSolicitada} ${m?m.unidade:''} &nbsp; <b>Separado:</b> ${r.qtdSeparada||0} &nbsp; <b>Entregue:</b> ${r.qtdEntregue||0}</div><div class="os-r"><b>Informações do chamado:</b> ${escM(c?`${c.si} — ${c.de}`:r.infoChamado)}</div><div class="os-r"><b>Observação:</b> ${escM(r.obs||'—')}</div></div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
+ box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Itens:</b> ${r.qtdSolicitada} ${m?m.unidade:''} &nbsp; <b>Separado:</b> ${r.qtdSeparada||0}</div>${logDetalhes(r)}${aceitar?`<div style="margin-top:8px"><button class="btn btn-g btn-tech-aceitar-material" data-id="${r.id}">✅ Confirmar recebimento</button></div>`:''}</div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
 }
 function solicitarMaterial(){const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid),m=materialById(mid);if(!cid||!mid||!q||q<1){alert('Preencha protocolo, material e quantidade');return;}if(D.mr.some(r=>r.chamadoId===cid&&r.materialId===mid&&['solicitado','direcionado','separado'].includes(r.status))){alert('Já existe uma solicitação pendente deste material para este chamado.');return;}D.mr.push({id:'MR-'+Date.now(),chamadoId:cid,tecnico:S.u,materialId:mid,qtdSolicitada:q,qtdSeparada:0,qtdEntregue:0,status:'solicitado',obs,data:ag(),protocolo:c?c.pr:'',infoChamado:c?`${c.si} — ${c.de}`:''});sv();el('tm-material').value='';el('busca-material-tecnico').value='';el('tm-qtd').value='';el('tm-obs').value='';rTmat();alert('Solicitação enviada ao administrador.');}
 
@@ -1563,7 +1642,7 @@ function rAd() {
   const tb = el('tb-ad');
   if(!tb) return;
   tb.innerHTML = D.ad.map(a =>
-    `<tr><td>${a.n}${a.p ? ' <span class="badge b-pendente">Geral</span>' : ''}</td><td>${a.u}</td><td>${a.e || 'Não cadastrado'}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-s btn-reset-senha" data-u="${a.u}" data-email="${a.e || ''}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${a.p ? '' : `<button class="btn btn-r btn-rm-adm" data-u="${a.u}" style="padding:4px 8px;font-size:.6rem" title="Excluir administrador">🗑️</button>`}</div></td></tr>`
+    `<tr><td>${a.n}${a.tipo==='logistica' ? ' <span class="badge b-andamento">Logística</span>' : (a.p ? ' <span class="badge b-pendente">Geral</span>' : '')}</td><td>${a.u}</td><td>${a.e || 'Não cadastrado'}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-s btn-reset-senha" data-u="${a.u}" data-email="${a.e || ''}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${a.p ? '' : `<button class="btn btn-r btn-rm-adm" data-u="${a.u}" style="padding:4px 8px;font-size:.6rem" title="Excluir administrador">🗑️</button>`}</div></td></tr>`
   ).join('');
 }
 
@@ -2473,8 +2552,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // Tela inicial
   const cardTec = el('card-tec');
   const cardAdm = el('card-adm');
+  const cardLog = el('card-log');
   if(cardTec) cardTec.addEventListener('click', function() { showLogin('tec'); });
   if(cardAdm) cardAdm.addEventListener('click', function() { showLogin('adm'); });
+  if(cardLog) cardLog.addEventListener('click', function() { showLogin('log'); });
 
   // Login
   const btnLogin = el('btn-login');
@@ -2496,8 +2577,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // Sair
   const btnSairAdm = el('btn-sair-adm');
   const btnSairTec = el('btn-sair-tec');
+  const btnSairLog = el('btn-sair-log');
   if(btnSairAdm) btnSairAdm.addEventListener('click', logout);
   if(btnSairTec) btnSairTec.addEventListener('click', logout);
+  if(btnSairLog) btnSairLog.addEventListener('click', logout);
 
   // Abas admin
   document.querySelectorAll('#nv button').forEach(btn => {
@@ -2512,9 +2595,11 @@ document.addEventListener('DOMContentLoaded', function() {
   // Cadastros
   const btnAddTec = el('btn-add-tec');
   const btnAddAdm = el('btn-add-adm');
+  const btnAddLog = el('btn-add-log');
   const btnAddCh = el('btn-add-ch');
   if(btnAddTec) btnAddTec.addEventListener('click', addTec);
   if(btnAddAdm) btnAddAdm.addEventListener('click', addAdm);
+  if(btnAddLog) btnAddLog.addEventListener('click', addLog);
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
   const btnAddMaterial=el('btn-add-material'); if(btnAddMaterial) btnAddMaterial.addEventListener('click',addMaterial);
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
@@ -2621,7 +2706,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
@@ -2637,6 +2722,9 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-mat-direcionar')) { direcionarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-mat-separar')) { separarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-mat-entregar')) { entregarMaterial(t.dataset.id); }
+    if(t.classList.contains('btn-log-enviar')) { enviarMaterial(t.dataset.id); }
+    if(t.classList.contains('btn-log-liberar')) { liberarMaterial(t.dataset.id); }
+    if(t.classList.contains('btn-tech-aceitar-material')) { aceitarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-rm-mat')) { const m=materialById(t.dataset.id); if(m && confirm('Excluir este material?')) { D.mat=D.mat.filter(x=>x.id!==m.id); sv(); rMl(); } }
   });
 
@@ -2830,8 +2918,8 @@ async function sbLoadAll(){
 
   D.tc=[]; D.ad=[];
   (pR.data||[]).forEach(p=>{
-    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],p:!!p.admin_geral,c:p.criado_em};
-    if(p.tipo==='admin') D.ad.push(x); else D.tc.push(x);
+    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],p:!!p.admin_geral,tipo:p.tipo,c:p.criado_em};
+    if(p.tipo==='admin'||p.tipo==='logistica') D.ad.push(x); else D.tc.push(x);
   });
 
   const exMap=new Map((eR.data||[]).map(x=>[x.chamado_id,x]));
@@ -2998,6 +3086,7 @@ async function sbSyncAll(){
       await sbSyncTecnico();
       return;
     }
+    if(SB_PROFILE.tipo==='logistica') return;
     // Novos chamados com IDs locais -> INSERT e troca pelo UUID retornado.
     for(const c of D.ch.filter(x=>!sbUUID(x.id))){
       const old=c.id; const {data,error}=await SB.from('chamados').insert(sbChamadoRow(c)).select('id').single(); if(error) throw error; c.id=data.id;
@@ -3086,13 +3175,13 @@ doLogin = async function(){
     const {data,error}=await SB.auth.signInWithPassword({email,password:senha}); if(error) throw error;
     const {data:p,error:pErr}=await SB.from('perfis').select('*').eq('id',data.user.id).single(); if(pErr) throw pErr;
     if(!p.ativo) throw new Error('Usuário desativado.');
-    if(loginType==='adm' && p.tipo!=='admin') throw new Error('Este usuário não possui perfil de administrador.');
+    const ehLog=p.tipo==='logistica';
+    if(loginType==='adm' && (p.tipo!=='admin'||ehLog)) throw new Error('Este usuário não possui perfil de administrador.');
+    if(loginType==='log' && !ehLog) throw new Error('Este usuário não possui perfil logístico.');
     if(loginType==='tec' && p.tipo!=='tecnico') throw new Error('Este usuário não possui perfil de técnico.');
-    SB_PROFILE=p;
-    await sbSeedMaterialsIfNeeded();
-    await sbLoadAll();
-    S=p.tipo==='admin'?{t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id}:{t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id}; ss();
-    if(p.tipo==='admin') enterAdm(); else enterTec();
+    SB_PROFILE=p;await sbSeedMaterialsIfNeeded();await sbLoadAll();
+    S=ehLog?{t:'log',n:p.nome,u:p.usuario,_id:p.id}:(p.tipo==='admin'?{t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id}:{t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id});ss();
+    if(ehLog)enterLog();else if(p.tipo==='admin')enterAdm();else enterTec();
   }catch(err){ await SB.auth.signOut().catch(()=>{}); SB_PROFILE=null; el('le').textContent=err?.message||'Falha no login'; el('le').style.display='block'; sbSetConnectionBadge('Não autenticado', false); }
   finally{ if(btn){btn.disabled=false;btn.textContent='Entrar';} }
 };
@@ -3163,7 +3252,7 @@ async function sbCriarContaPerfil({nome,usuario,email,senha,tipo,regiao=null,ski
       admin_geral:tipo==='admin' ? !!adminGeral : false,
       regiao:tipo==='tecnico' ? regiao : null,
       skills:tipo==='tecnico' ? skills : [],
-      areas:tipo==='tecnico' ? areas : [],
+      areas:(tipo==='tecnico'||(tipo==='admin'&&areas.includes('logistica'))) ? areas : [],
       ativo:true
     };
     const {error:reativarErr}=await SB.from('perfis').update(atualizacao).eq('id',perfilExcluido.id);
@@ -3197,7 +3286,7 @@ async function sbCriarContaPerfil({nome,usuario,email,senha,tipo,regiao=null,ski
     admin_geral:tipo==='admin' ? !!adminGeral : false,
     regiao:tipo==='tecnico' ? regiao : null,
     skills:tipo==='tecnico' ? skills : [],
-    areas:tipo==='tecnico' ? areas : [],
+    areas:(tipo==='tecnico'||(tipo==='admin'&&areas.includes('logistica'))) ? areas : [],
     ativo:true
   };
   const {error:perfilErr}=await SB.from('perfis').insert(perfil);
@@ -3255,15 +3344,26 @@ addAdm = async function(){
   finally{if(btn){btn.disabled=false;btn.innerHTML=txt||'🛡️ Criar conta e perfil';}}
 };
 
+addLog = async function(){
+  const n=el('l-n').value.trim(),u=el('l-u').value.trim(),e=el('l-e').value.trim().toLowerCase(),s=el('l-s').value,sc=el('l-sc').value;
+  if(!n||!u||!e||!s||!sc){alert('Preencha todos os campos do perfil logístico');return;}
+  if(!emailValido(e)){alert('Informe um e-mail válido');return;}if(s.length<6){alert('A senha deve ter pelo menos 6 caracteres');return;}if(s!==sc){alert('A confirmação da senha não confere');return;}
+  const btn=el('btn-add-log'),txt=btn?.innerHTML;if(btn){btn.disabled=true;btn.textContent='Criando perfil...';}
+  try{const res=await sbCriarContaPerfil({nome:n,usuario:u,email:e,senha:s,tipo:'logistica',areas:[],adminGeral:false});await sbLoadAll();rAd();['l-n','l-u','l-e','l-s','l-sc'].forEach(id=>el(id).value='');alert(res.reativado?'Perfil logístico reativado. Foi enviado um link para redefinir a senha.':'Perfil logístico criado com sucesso.');}
+  catch(err){sbShowError('Não foi possível criar o perfil logístico',err);}
+  finally{if(btn){btn.disabled=false;btn.innerHTML=txt||'🚚 Criar perfil logístico';}}
+};
+
 async function sbRestoreSession(){
   try{
     const {data:{session}}=await SB.auth.getSession();
     if(!session){ S=null; lsRemove('ss'); sbSetConnectionBadge('Aguardando login', true); return; }
     const {data:p,error}=await SB.from('perfis').select('*').eq('id',session.user.id).single(); if(error) throw error;
     SB_PROFILE=p; await sbLoadAll();
-    S=p.tipo==='admin'?{t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id}:{t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id}; ss();
+    const ehLog=p.tipo==='logistica';
+    S=ehLog?{t:'log',n:p.nome,u:p.usuario,_id:p.id}:(p.tipo==='admin'?{t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id}:{t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id}); ss();
     setTimeout(()=>{
-      if(p.tipo==='admin') enterAdm(); else enterTec();
+      if(ehLog) enterLog(); else if(p.tipo==='admin') enterAdm(); else enterTec();
       if(window.__DT_PASSWORD_RECOVERY){
         setTimeout(()=>{
           try{
@@ -3282,6 +3382,7 @@ function sbRenderizarTelas(){
   try{
     if(S?.t==='adm'){rDb();rAt();rCh();rRl();rTc();rMl();}
     else if(S?.t==='tec'){rTdb();rTdp();rTat();rTco();rTar();rTmat();}
+    else if(S?.t==='log'){rLog();}
   }catch(e){console.error('Erro ao atualizar telas:',e);}
 }
 async function sbRecarregarDados(){
