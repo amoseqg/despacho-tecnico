@@ -452,6 +452,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
         <div id="ml-solicitacoes"></div>
       </div>
       <div class="card" style="margin-bottom:12px">
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">🚚 Rastreamento de Materiais do Interior</h3>
+        <div class="info">Acompanhe o trâmite completo: solicitação, direcionamento, separação, transporte para a localidade e entrega ao técnico.</div>
+        <div id="ml-rastreio-lista"></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📦 Estoque Logístico</h3>
         <div class="grid-3">
           <div class="form-group"><label class="label">Material</label>
@@ -597,6 +602,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
       <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">🚚 Trâmite dos materiais</h3>
       <div class="info">Capital: separação → aguardando aceite → entregue. Interior/Noronha: separação → em trânsito com rastreio e previsão → aceite do técnico → entregue.</div>
       <div id="lg-list"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">🚚 Rastreamento de Materiais do Interior</h3>
+      <div class="info">Trâmite: solicitado → direcionado → separado → em transporte → recebido pelo técnico.</div>
+      <div id="lg-rastreio-lista"></div>
     </div>
     <div class="card" style="margin-top:12px">
       <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">📦 Estoque Logístico</h3>
@@ -1446,6 +1456,7 @@ function rMl(){
       ${r.responsavel?`<div class="os-r"><b>Responsável logística:</b> ${escM(r.responsavel)}</div>`:''}
       <div style="margin-top:8px">${r.status==='solicitado'?`<button class="btn btn-y btn-mat-direcionar" data-id="${r.id}">➡️ Direcionar para separação</button>`:''}</div></div>`;
   }).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
+  rRastreioMateriais('ml-rastreio-lista');
   rMlEstoque(); rMateriaisCadastro();
 }
 function rMlEstoque(){
@@ -1512,11 +1523,14 @@ async function liberarMaterial(id){
 }
 async function enviarMaterial(id){
   const r=D.mr.find(x=>x.id===id);if(!r)return;
-  const rastreamento=prompt('Informe o código de rastreamento do envio:','');if(!rastreamento?.trim())return;
-  const prazo=prompt('Informe a previsão de entrega (AAAA-MM-DD):','');
+  const atual=logMeta(r);
+  const rastreamento=prompt('Informe o código de rastreamento do envio:',atual.rastreamento||'');if(!rastreamento?.trim())return;
+  const prazo=prompt('Informe a previsão de entrega (AAAA-MM-DD):',atual.prazo||'');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(prazo||'')){alert('Informe a previsão no formato AAAA-MM-DD.');return;}
-  try{await logAtualizarSolicitacao(r,{observacao:logObs(r,{...logMeta(r),etapa:'em_transito',rastreamento:rastreamento.trim(),prazo})});await sbRecarregarDados();alert('Expedição e rastreamento registrados.');}
-  catch(e){sbShowError('Não foi possível registrar o envio',e);}
+  try{
+    await logAtualizarSolicitacao(r,{observacao:logObs(r,{...atual,etapa:'em_transito',rastreamento:rastreamento.trim(),prazo,transitoEm:atual.transitoEm||new Date().toISOString()})});
+    await sbRecarregarDados();alert('Expedição e rastreamento confirmados no servidor.');
+  }catch(e){sbShowError('Não foi possível registrar o envio',e);}
 }
 async function aceitarMaterial(id){
   const r=D.mr.find(x=>x.id===id);if(!r||r.tecnico!==S.u)return;
@@ -1524,6 +1538,31 @@ async function aceitarMaterial(id){
   if(!confirm('Confirma que recebeu este material?'))return;
   try{await logAtualizarSolicitacao(r,{status:'entregue',quantidade_entregue:q,entregue_em:new Date().toISOString(),observacao:logObs(r,{...logMeta(r),etapa:'entregue'})});await sbRecarregarDados();alert('Recebimento confirmado. Status atualizado para entregue.');}
   catch(e){sbShowError('Não foi possível confirmar o recebimento',e);}
+}
+function rastreioData(v){if(!v)return '—';const d=new Date(v);return Number.isNaN(d.getTime())?escM(v):d.toLocaleString('pt-BR');}
+function rastreioTramite(r){
+ const meta=logMeta(r),direcionado=r.status!=='solicitado',separado=['separado','entregue'].includes(r.status),transito=!!meta.rastreamento,entregue=r.status==='entregue';
+ const passos=[
+  ['Solicitado',true,r.data],['Direcionado',direcionado,r.direcionadoEm],['Separado',separado,r.separadoEm],
+  ['Em transporte',transito,meta.transitoEm],['Entregue ao técnico',entregue,r.entregueEm]
+ ];
+ return '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">'+passos.map(p=>`<span class="badge ${p[1]?'b-concluida':'b-pendente'}" title="${p[2]?escM(rastreioData(p[2])):'Pendente'}">${p[1]?'✓':'○'} ${p[0]}</span>`).join('')+'</div>';
+}
+function rRastreioMateriais(targetId){
+ const box=el(targetId);if(!box)return;
+ const list=D.mr.filter(r=>materialInterior(r)&&r.status!=='cancelado').slice().reverse();
+ box.innerHTML=list.length?list.map(r=>{
+  const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),meta=logMeta(r),st=logStatus(r);
+  const podeRastrear=['separado'].includes(r.status);
+  return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSeparada||r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
+   <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
+   <div class="os-r"><b>Localidade:</b> ${tecnicoMaterial(r)?.r==='noronha'?'Fernando de Noronha':'Interior'}</div>
+   ${rastreioTramite(r)}
+   <div class="os-r"><b>Código de rastreamento:</b> ${escM(meta.rastreamento||'Ainda não informado')}</div>
+   <div class="os-r"><b>Previsão de entrega:</b> ${meta.prazo?escM(new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR')):'Ainda não informada'}</div>
+   ${podeRastrear?`<div style="margin-top:8px"><button class="btn btn-p btn-log-enviar" data-id="${r.id}">🚚 ${meta.rastreamento?'Atualizar rastreio':'Informar rastreio e previsão'}</button></div>`:''}
+  </div>`;
+ }).join(''):'<div class="empty"><h3>Nenhum material destinado ao interior</h3></div>';
 }
 function rLogEstoque(){
  const s=el('lg-estoque-material'),b=el('lg-estoque-lista');if(!s||!b)return;
@@ -1558,6 +1597,7 @@ function rLog(){
     <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
     ${logDetalhes(r)}<div style="margin-top:8px">${acao}</div></div>`;
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
+ rRastreioMateriais('lg-rastreio-lista');
  rLogEstoque();
 }
 function rTmat(){
