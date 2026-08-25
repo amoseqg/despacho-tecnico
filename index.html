@@ -252,7 +252,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
         <h1 style="color:#fff;font-size:1.4rem;font-weight:700">Despacho Técnico</h1>
         <p style="color:#94a3b8;font-size:.75rem">Sistema de Gestão de Chamados</p>
       </div>
-      <div class="grid-2">
+      <div class="grid-3">
         <div class="area-card" id="card-tec">
           <div class="icon">👷</div>
           <h3>Área do Técnico</h3>
@@ -262,6 +262,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
           <div class="icon">🛡️</div>
           <h3>Área Administrador</h3>
           <p>Painel de gestão, despacho e relatórios</p>
+        </div>
+        <div class="area-card" id="card-log">
+          <div class="icon">🚚</div>
+          <h3>Área Logística</h3>
+          <p>Separação, rastreamento e entrega de materiais</p>
         </div>
       </div>
     </div>
@@ -472,6 +477,16 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
     </div>
     <div id="v-ad" class="hidden">
       <div class="card" style="margin-bottom:12px">
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">🚚 Criar conta de Responsável Logístico</h3>
+        <div class="grid-2">
+          <div class="form-group"><label class="label">Nome</label><input type="text" id="l-n" class="input" placeholder="Responsável pela logística"></div>
+          <div class="form-group"><label class="label">Usuário</label><input type="text" id="l-u" class="input" placeholder="responsavel.logistica"></div>
+        </div>
+        <div class="form-group"><label class="label">E-mail</label><input type="email" id="l-e" class="input" placeholder="logistica@empresa.com"></div>
+        <div class="grid-2"><div class="form-group"><label class="label">Defina a senha</label><input type="password" id="l-s" class="input" placeholder="Mínimo de 6 caracteres"></div><div class="form-group"><label class="label">Confirme a senha</label><input type="password" id="l-sc" class="input" placeholder="Repita a senha"></div></div>
+        <button class="btn btn-p" id="btn-add-log">🚚 Criar perfil logístico</button>
+      </div>
+      <div class="card" style="margin-bottom:12px">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">➕ Criar conta de Administrador</h3>
         <div class="grid-2">
           <div class="form-group"><label class="label">Nome</label><input type="text" id="a-n" class="input" placeholder="Carlos Manager"></div>
@@ -567,6 +582,19 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
           <tbody id="tb-ar-body"></tbody>
         </table></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- LOGÍSTICA -->
+<div id="plog" class="hidden">
+  <div class="user-bar"><span>🚚 <b>Logística</b> — <span id="ln"></span></span><div style="display:flex;gap:5px"><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-log">Sair</button></div></div>
+  <div class="header"><h1>📦 Gestão Logística</h1><div class="sub">Separação, expedição, rastreamento e entrega</div></div>
+  <div class="content">
+    <div class="card">
+      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">🚚 Trâmite dos materiais</h3>
+      <div class="info">Capital: separação → aguardando aceite → entregue. Interior/Noronha: separação → em trânsito com rastreio e previsão → aceite do técnico → entregue.</div>
+      <div id="lg-list"></div>
     </div>
   </div>
 </div>
