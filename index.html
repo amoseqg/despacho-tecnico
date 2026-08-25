@@ -3175,18 +3175,21 @@ doLogin = async function(){
     const {data,error}=await SB.auth.signInWithPassword({email,password:senha}); if(error) throw error;
     const {data:p,error:pErr}=await SB.from('perfis').select('*').eq('id',data.user.id).single(); if(pErr) throw pErr;
     if(!p.ativo) throw new Error('Usuário desativado.');
-    const ehLog=p.tipo==='logistica';
-    if(loginType==='adm' && (p.tipo!=='admin'||ehLog)) throw new Error('Este usuário não possui perfil de administrador.');
-    if(loginType==='log' && !ehLog) throw new Error('Este usuário não possui perfil logístico.');
+    const temLogistica=p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
+    if(loginType==='adm' && p.tipo!=='admin') throw new Error('Este usuário não possui perfil de administrador.');
+    if(loginType==='log' && !temLogistica) throw new Error('Este usuário não possui acesso à área logística.');
     if(loginType==='tec' && p.tipo!=='tecnico') throw new Error('Este usuário não possui perfil de técnico.');
     SB_PROFILE=p;await sbSeedMaterialsIfNeeded();await sbLoadAll();
-    S=ehLog?{t:'log',n:p.nome,u:p.usuario,_id:p.id}:(p.tipo==='admin'?{t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id}:{t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id});ss();
-    if(ehLog)enterLog();else if(p.tipo==='admin')enterAdm();else enterTec();
+    if(loginType==='log') S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
+    else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
+    else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
+    localStorage.setItem('dt_portal',loginType);ss();
+    if(S.t==='log')enterLog();else if(S.t==='adm')enterAdm();else enterTec();
   }catch(err){ await SB.auth.signOut().catch(()=>{}); SB_PROFILE=null; el('le').textContent=err?.message||'Falha no login'; el('le').style.display='block'; sbSetConnectionBadge('Não autenticado', false); }
   finally{ if(btn){btn.disabled=false;btn.textContent='Entrar';} }
 };
 
-logout = async function(){ await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); goHome(); sbSetConnectionBadge('Desconectado', false); };
+logout = async function(){ await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
 
 salvarMinhaSenha = async function(){
   if(!SB_PROFILE) return;
@@ -3348,9 +3351,26 @@ addLog = async function(){
   const n=el('l-n').value.trim(),u=el('l-u').value.trim(),e=el('l-e').value.trim().toLowerCase(),s=el('l-s').value,sc=el('l-sc').value;
   if(!n||!u||!e||!s||!sc){alert('Preencha todos os campos do perfil logístico');return;}
   if(!emailValido(e)){alert('Informe um e-mail válido');return;}if(s.length<6){alert('A senha deve ter pelo menos 6 caracteres');return;}if(s!==sc){alert('A confirmação da senha não confere');return;}
-  const btn=el('btn-add-log'),txt=btn?.innerHTML;if(btn){btn.disabled=true;btn.textContent='Criando perfil...';}
-  try{const res=await sbCriarContaPerfil({nome:n,usuario:u,email:e,senha:s,tipo:'logistica',areas:[],adminGeral:false});await sbLoadAll();rAd();['l-n','l-u','l-e','l-s','l-sc'].forEach(id=>el(id).value='');alert(res.reativado?'Perfil logístico reativado. Foi enviado um link para redefinir a senha.':'Perfil logístico criado com sucesso.');}
-  catch(err){sbShowError('Não foi possível criar o perfil logístico',err);}
+  const btn=el('btn-add-log'),txt=btn?.innerHTML;if(btn){btn.disabled=true;btn.textContent='Configurando acesso...';}
+  try{
+    const {data:existente,error:buscaErr}=await SB.from('perfis').select('*').ilike('email',e).maybeSingle();
+    if(buscaErr)throw buscaErr;
+    if(existente){
+      if(existente.tipo==='admin'){
+        const areas=Array.from(new Set([...(existente.areas||[]),'logistica']));
+        const {error:updateErr}=await SB.from('perfis').update({areas,atualizado_em:new Date().toISOString()}).eq('id',existente.id);
+        if(updateErr)throw updateErr;
+        await sbLoadAll();rAd();['l-n','l-u','l-e','l-s','l-sc'].forEach(id=>el(id).value='');
+        alert('Acesso logístico adicionado à conta de administrador existente. Use o mesmo e-mail e a mesma senha na Área Logística.');
+        return;
+      }
+      if(existente.tipo==='logistica') throw new Error('Este e-mail já possui um perfil logístico. Entre na Área Logística com a senha já cadastrada.');
+      throw new Error('Este e-mail pertence a um técnico e não pode ser reutilizado como responsável logístico.');
+    }
+    const res=await sbCriarContaPerfil({nome:n,usuario:u,email:e,senha:s,tipo:'logistica',areas:[],adminGeral:false});
+    await sbLoadAll();rAd();['l-n','l-u','l-e','l-s','l-sc'].forEach(id=>el(id).value='');
+    alert(res.reativado?'Perfil logístico reativado. Foi enviado um link para redefinir a senha.':'Perfil logístico criado com sucesso.');
+  }catch(err){sbShowError('Não foi possível configurar o acesso logístico',err);}
   finally{if(btn){btn.disabled=false;btn.innerHTML=txt||'🚚 Criar perfil logístico';}}
 };
 
@@ -3360,10 +3380,15 @@ async function sbRestoreSession(){
     if(!session){ S=null; lsRemove('ss'); sbSetConnectionBadge('Aguardando login', true); return; }
     const {data:p,error}=await SB.from('perfis').select('*').eq('id',session.user.id).single(); if(error) throw error;
     SB_PROFILE=p; await sbLoadAll();
-    const ehLog=p.tipo==='logistica';
-    S=ehLog?{t:'log',n:p.nome,u:p.usuario,_id:p.id}:(p.tipo==='admin'?{t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id}:{t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id}); ss();
+    const temLogistica=p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
+    const portal=localStorage.getItem('dt_portal');
+    if(portal==='log'&&temLogistica) S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
+    else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
+    else if(p.tipo==='logistica') S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
+    else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
+    ss();
     setTimeout(()=>{
-      if(ehLog) enterLog(); else if(p.tipo==='admin') enterAdm(); else enterTec();
+      if(S.t==='log') enterLog(); else if(S.t==='adm') enterAdm(); else enterTec();
       if(window.__DT_PASSWORD_RECOVERY){
         setTimeout(()=>{
           try{
