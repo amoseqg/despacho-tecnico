@@ -966,6 +966,12 @@ function historicoAnteriorCircuito(c){
   return anteriores[0]||null;
 }
 function infoReincidencia(c){
+  if(Object.prototype.hasOwnProperty.call(c,'_reincidenciaServidor')){
+    const h=c._reincidenciaServidor;
+    if(!h)return {reincidente:false,html:'<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para este circuito nos últimos 30 dias.</div>'};
+    const data=new Date(h.concluido_em).toLocaleDateString('pt-BR');
+    return {reincidente:true,anterior:h,html:`<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Chamado anterior:</b> ${esc(h.protocolo_anterior||'Não informado')}<br><b>Último técnico:</b> ${esc(h.tecnico_anterior||'Não informado')}<br><b>Último atendimento:</b> ${data}<br><b>Ação realizada:</b> ${valorInfo(h.acao_realizada)}</div>`};
+  }
   const anterior=historicoAnteriorCircuito(c);
   if(!anterior)return {reincidente:false,html:'<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para este circuito nos últimos 30 dias.</div>'};
   const a=anterior.chamado,acao=a.ex?.atv||a.ex?.relatorio||a.ex?.obs||'Ação não informada';
@@ -2339,6 +2345,16 @@ async function sbLoadAll(){
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
     return legacy;
   });
+
+  // O RLS protege os chamados de outros técnicos. Para reincidência, o técnico
+  // recebe apenas o resumo seguro do último atendimento do mesmo circuito.
+  if(SB_PROFILE.tipo==='tecnico'){
+    await Promise.all(D.ch.filter(c=>c.st!=='concluida'&&sbUUID(c.id)).map(async c=>{
+      const {data,error}=await SB.rpc('obter_reincidencia_chamado',{p_chamado_id:c.id});
+      if(error) throw error;
+      c._reincidenciaServidor=(data&&data.length)?data[0]:null;
+    }));
+  }
 
   D.mat=(mR.data||[]).map(m=>({id:m.id,nome:m.nome,unidade:m.unidade,estoque:Number(m.estoque||0),c:m.criado_em}));
   D.mr=(sR.data||[]).map(r=>({id:r.id,chamadoId:r.chamado_id,tecnico:sbUserById(r.tecnico_id),materialId:r.material_id,qtdSolicitada:Number(r.quantidade_solicitada||0),qtdSeparada:Number(r.quantidade_separada||0),qtdEntregue:Number(r.quantidade_entregue||0),status:r.status,obs:r.observacao||'',data:r.solicitado_em,direcionadoEm:r.direcionado_em,separadoEm:r.separado_em,entregueEm:r.entregue_em,responsavel:sbNameById(r.responsavel_id)}));
