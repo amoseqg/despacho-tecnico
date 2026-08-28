@@ -831,7 +831,7 @@ function addAdm() {
   alert('Administrador cadastrado com sucesso!');
 }
 
-function addCh() {
+async function addCh() {
   const pr = el('c-pr').value.trim();
   const sdm = el('c-sdm').value.trim();
   const site = buscarCircuito();
@@ -853,7 +853,7 @@ function addCh() {
   if (re === 'capital' && !area) { alert('Selecione a área de atendimento da capital'); return; }
   if (!tecnico) { alert('Selecione o técnico que atenderá o chamado'); return; }
   const dtexec = el('c-dtexec').value;
-  D.ch.push({
+  const novoChamado = {
     id: 'CH-'+Date.now(), pr, sdm, si, ci, re, skill, area: re === 'capital' ? area : '', en, de, dtexec,
     abertura,
     regiaoOperacional: el('c-regiao-planilha').value, tecnicosIndicados: el('c-tecnicos-planilha').value,
@@ -861,17 +861,46 @@ function addCh() {
     velocidade: el('c-ve').value, prtm: el('c-pt').value, pvfTotal: el('c-pv').value,
     st: 'pendente', te: tecnico, mr: '', tr: [], dt: liberarArea ? { tipo: 'liberacao-area', admin: S.n, d: ag(), area, regiaoOperacional: el('c-regiao-planilha').value } : null, ex: null,
     cr: ag(), ae: null, am: null, cc: null
-  });
-  sv();
-  el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; limparSite();
-  el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
-  el('c-de').value = ''; el('c-dtexec').value = '';
-  el('c-sk').value = ''; el('c-area').value = '';
-  el('c-tecnico').innerHTML = '<option value="">Selecione primeiro a skill e a área...</option>'; el('c-liberar-area').checked = false;
-  el('c-status').textContent = 'Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.';
-  el('c-status').style.color = 'var(--gr)';
-  rCh();
-  alert('Chamado criado com sucesso!');
+  };
+
+  const btn=el('btn-add-ch');
+  const textoBtn=btn?.innerHTML;
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
+    const adminAtual=await sbExigirSessaoAdmin();
+    const linha=sbChamadoRow(novoChamado);
+    linha.criado_por=adminAtual.id;
+    const {data,error}=await SB.from('chamados').insert(linha)
+      .select('id,status,tecnico_id,criado_em,atualizado_em')
+      .single();
+    if(error) throw error;
+    if(!data?.id || data.status!=='pendente' || data.tecnico_id!==linha.tecnico_id){
+      throw new Error('O servidor não confirmou corretamente o chamado e o técnico selecionado.');
+    }
+
+    novoChamado.id=data.id;
+    novoChamado.st=data.status;
+    novoChamado.cr=data.criado_em||novoChamado.cr;
+    D.ch.push(novoChamado);
+    SB_LOADED_CH.add(data.id);
+    lsSet('dd',D);
+
+    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; limparSite();
+    el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
+    el('c-de').value = ''; el('c-dtexec').value = '';
+    el('c-sk').value = ''; el('c-area').value = '';
+    el('c-tecnico').innerHTML = '<option value="">Selecione primeiro a skill e a área...</option>'; el('c-liberar-area').checked = false;
+    el('c-status').textContent = 'Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.';
+    el('c-status').style.color = 'var(--gr)';
+    rCh();rDb();
+    sbSetConnectionBadge('Chamado confirmado no Supabase',true);
+    alert('Chamado criado e confirmado no servidor!');
+  }catch(err){
+    sbShowError('O chamado não foi salvo. Os dados foram mantidos para nova tentativa',err);
+    sbSetConnectionBadge('Falha ao salvar chamado',false);
+  }finally{
+    if(btn){btn.disabled=false;btn.innerHTML=textoBtn||'📞 Criar Chamado';}
+  }
 }
 
 // ========== RENDER ADMIN ==========
