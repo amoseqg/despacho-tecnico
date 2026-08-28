@@ -2208,7 +2208,15 @@ window.MATERIAIS_PLANILHA_V9 = ["ABRAÇADEIRA DE NYLON GRANDE 4,5 MM X 300 MM", 
 const SUPABASE_URL = 'https://hxbuoqxojwpsreakmfdc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_8TfOJdgLoppVWJWjpfQwkw_bzIFuRyW';
 const SB = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+  // Mantem cada aba com a propria sessao. Assim, entrar como tecnico em outra
+  // aba nao substitui silenciosamente a sessao do administrador desta aba.
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storage: window.sessionStorage,
+    storageKey: 'dt-supabase-auth-v12'
+  },
   db: { schema: 'public' }
 });
 window.SB = SB;
@@ -2231,6 +2239,22 @@ function sbIdByUser(u){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x.u===u); 
 function sbUserById(id){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x._id===id); return p?.u||''; }
 function sbNameById(id){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x._id===id); return p?.n||''; }
 function sbShowError(prefix, err){ console.error(prefix, err); alert(prefix + (err?.message ? ': '+err.message : '')); }
+
+async function sbExigirSessaoAdmin(){
+  const {data:{user},error:userErr}=await SB.auth.getUser();
+  if(userErr || !user) throw new Error('Sua sessao expirou. Entre novamente na area Administrador.');
+  if(!SB_PROFILE || SB_PROFILE.id!==user.id){
+    throw new Error('A sessao desta aba mudou. Entre novamente na area Administrador antes de aprovar.');
+  }
+  const {data:perfil,error:perfilErr}=await SB.from('perfis')
+    .select('id,nome,usuario,tipo,admin_geral,ativo')
+    .eq('id',user.id)
+    .single();
+  if(perfilErr || !perfil || perfil.tipo!=='admin' || !perfil.ativo){
+    throw new Error('O usuario conectado nao possui permissao ativa de administrador.');
+  }
+  return perfil;
+}
 
 function sbSetConnectionBadge(text, ok=true){
   let b=document.getElementById('supabase-status-badge');
@@ -2335,6 +2359,7 @@ async function sbDirecionarMaterial(solicitacao){
 
 async function sbPersistirAprovacoes(chamados,status,observacao){
   if(!SB_PROFILE || SB_PROFILE.tipo!=='admin') throw new Error('Somente administradores podem aprovar serviços.');
+  const adminAtual=await sbExigirSessaoAdmin();
   const ids=chamados.filter(c=>sbUUID(c.id)).map(c=>c.id);
   if(!ids.length || ids.length!==chamados.length) throw new Error('Um ou mais serviços ainda não possuem identificação válida no servidor.');
   const atualizadoEm=new Date().toISOString();
@@ -2342,7 +2367,7 @@ async function sbPersistirAprovacoes(chamados,status,observacao){
     chamado_id:id,
     status,
     observacao:observacao||null,
-    administrador_id:SB_PROFILE.id,
+    administrador_id:adminAtual.id,
     reenviado:false,
     atualizado_em:atualizadoEm
   }));
