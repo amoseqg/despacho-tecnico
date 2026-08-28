@@ -875,7 +875,8 @@ function addCh() {
 }
 
 // ========== RENDER ADMIN ==========
-function rTc() {
+let TC_CARREGANDO=false;
+function renderTc() {
   const tb = el('tb-tc');
   if(!tb) return;
   tb.innerHTML = D.tc.map(t => {
@@ -887,6 +888,26 @@ function rTc() {
     const end=enderecoEntregaTexto(t)||((t.r==='interior'||t.r==='noronha')?'Não cadastrado':'Não se aplica');
     return `<tr><td>${escM(t.n)}</td><td>${escM(t.u)}</td><td>${escM(t.e || 'Não cadastrado')}</td><td>${r}</td><td>${escM(end)}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-endereco-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Cadastrar ou alterar endereço de entrega">📍 Endereço</button><button class="btn btn-s btn-reset-senha" data-u="${escM(t.u)}" data-email="${escM(t.e || '')}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button><button class="btn btn-r btn-rm-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Excluir técnico">🗑️</button></div></td></tr>`;
   }).join('') || '<tr><td colspan="9" class="empty">Nenhum técnico cadastrado</td></tr>';
+}
+async function rTc() {
+  const tb=el('tb-tc');
+  if(!tb)return;
+  renderTc();
+  if(!window.SB||!SB_PROFILE||SB_PROFILE.tipo!=='admin'||TC_CARREGANDO)return;
+  TC_CARREGANDO=true;
+  if(!D.tc.length)tb.innerHTML='<tr><td colspan="9" class="empty">Carregando técnicos do Supabase...</td></tr>';
+  try{
+    const {data,error}=await SB.from('perfis').select('*').eq('tipo','tecnico').eq('ativo',true).order('nome');
+    if(error)throw error;
+    D.tc=(data||[]).map(p=>({_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],p:!!p.admin_geral,tipo:p.tipo,c:p.criado_em}));
+    lsSet('dd',D);
+    renderTc();
+    if(!D.tc.length)tb.innerHTML='<tr><td colspan="9" class="empty">Nenhum técnico ativo foi retornado pelo Supabase.</td></tr>';
+  }catch(err){
+    console.error('Erro ao carregar técnicos:',err);
+    tb.innerHTML=`<tr><td colspan="9" class="empty" style="color:var(--r)">Não foi possível carregar os técnicos: ${escM(err?.message||'erro desconhecido')}</td></tr>`;
+    sbSetConnectionBadge('Erro ao carregar técnicos',false);
+  }finally{TC_CARREGANDO=false;}
 }
 
 function rAd() {
