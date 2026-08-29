@@ -756,6 +756,16 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
         <div class="form-group"><label class="label">Cidade Destino</label><select id="ex-cd" class="select"></select></div>
         <div class="form-group"><label class="label">Cidade Retorno</label><select id="ex-cr" class="select"></select></div>
       </div>
+      <div id="ex-escolas-box" class="card hidden" style="margin:0 0 10px;background:#f8fafc;border:1px solid #cbd5e1">
+        <div style="font-size:.65rem;font-weight:700;margin-bottom:8px">🏫 Procurar endereço de escola</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="label">Escola na origem</label><input id="ex-esc-o" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola"><small id="ex-esc-o-info"></small></div>
+          <div class="form-group"><label class="label">Escola no destino</label><input id="ex-esc-d" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola"><small id="ex-esc-d-info"></small></div>
+          <div class="form-group"><label class="label">Escola no retorno</label><input id="ex-esc-r" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola"><small id="ex-esc-r-info"></small></div>
+        </div>
+        <datalist id="lista-escolas-pe"></datalist>
+        <small>Ao selecionar a escola, a cidade é preenchida automaticamente. Endereço e CEP ficam registrados na atividade.</small>
+      </div>
       <button class="btn btn-p" id="btn-calc-dist" style="padding:6px 10px;font-size:.7rem;margin-bottom:8px">🧮 Calcular Distâncias</button>
       <div class="info-dist hidden" id="ex-dist-info"></div>
       <div class="grid-2">
@@ -791,6 +801,12 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
       <div style="font-size:.6rem;color:var(--gr);margin:10px 0 8px;text-transform:uppercase;letter-spacing:.5px">📋 Relatório de Encerramento</div>
       <div class="form-group"><label class="label">Máscara de encerramento</label><textarea id="ex-relatorio" class="input" rows="13" style="font-family:monospace;line-height:1.45" placeholder="Preencha o relatório de encerramento..."></textarea></div>
       <div class="form-group"><label class="label">Observações adicionais</label><textarea id="ex-obs" class="input" rows="2" placeholder="Informações adicionais..."></textarea></div>
+      <div class="form-group">
+        <label class="label">📷 Fotos da execução</label>
+        <input type="file" id="ex-fotos" class="input" accept="image/jpeg,image/png,image/webp" capture="environment" multiple>
+        <small>Até 8 fotos (JPG, PNG ou WebP), máximo de 8 MB por foto.</small>
+        <div id="ex-fotos-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:8px"></div>
+      </div>
       <div class="total-box">
         <strong>VALOR TOTAL DO SERVIÇO: <span id="ex-total" style="font-size:1.1rem">R$ 0,00</span></strong>
       </div>
