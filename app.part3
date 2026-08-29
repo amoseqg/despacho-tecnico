@@ -108,8 +108,8 @@ function buscarCircuito() {
 function extrairCampoDaDescricao(texto,tipo){
   const conteudo=String(texto||'');
   const regexRotulo=tipo==='protocolo'
-    ? /\b(?:N[º°O.]?\s*)?PROTOCOLO(?:\s*N[º°O.]?)?/i
-    : /\bSDM(?:\s*N[º°O.]?)?/i;
+    ? /\b(?:N[º°O.]?\s*)?(?:PROTOCOLO|PROTOC\.?|PROT\.?|TICKET|CHAMADO)(?:\s+(?:DO\s+)?(?:CHAMADO|ATENDIMENTO|M[EÉ]TODO))?(?:\s*N[º°O.]?)?/i
+    : /\b(?:N[º°O.]?\s*)?SDM(?:\s*N[º°O.]?)?/i;
   const achadoRotulo=conteudo.match(regexRotulo);
   if(!achadoRotulo) return '';
   const inicio=(achadoRotulo.index||0)+achadoRotulo[0].length;
@@ -168,18 +168,41 @@ function buscarCircuitoNaDescricao() {
   const campo=el('c-descricao-colada');
   const texto=String(campo?.value||'').trim();
   const status=el('c-status'), opcoes=el('c-opcoes');
-  el('c-pr').value=''; el('c-sdm').value=''; el('c-ci').value='';
+  const campoProtocolo=el('c-pr'), campoSdm=el('c-sdm');
+  el('c-ci').value='';
   limparSite();
   opcoes.classList.add('hidden');
 
   if(!texto){
+    if(campoProtocolo.dataset.preenchimento==='automatico'){
+      campoProtocolo.value='';
+      delete campoProtocolo.dataset.preenchimento;
+    }
+    if(campoSdm.dataset.preenchimento==='automatico'){
+      campoSdm.value='';
+      delete campoSdm.dataset.preenchimento;
+    }
     status.textContent='Cole a descrição para localizar automaticamente protocolo, SDM e circuito.';
     status.style.color='var(--gr)';
     return null;
   }
 
-  el('c-pr').value=extrairCampoDaDescricao(texto,'protocolo');
-  el('c-sdm').value=extrairCampoDaDescricao(texto,'sdm');
+  const protocoloExtraido=extrairCampoDaDescricao(texto,'protocolo');
+  const sdmExtraido=extrairCampoDaDescricao(texto,'sdm');
+  if(protocoloExtraido){
+    campoProtocolo.value=protocoloExtraido;
+    campoProtocolo.dataset.preenchimento='automatico';
+  }else if(campoProtocolo.dataset.preenchimento==='automatico'){
+    campoProtocolo.value='';
+    delete campoProtocolo.dataset.preenchimento;
+  }
+  if(sdmExtraido){
+    campoSdm.value=sdmExtraido;
+    campoSdm.dataset.preenchimento='automatico';
+  }else if(campoSdm.dataset.preenchimento==='automatico'){
+    campoSdm.value='';
+    delete campoSdm.dataset.preenchimento;
+  }
   const dadosDescricao=preencherDadosDaDescricao(texto);
 
   const textoNormalizado=normalizarCircuito(texto);
@@ -846,7 +869,7 @@ async function addCh() {
   const liberarArea = el('c-liberar-area').checked;
   const en = el('c-en').value.trim();
   const de = el('c-de').value.trim();
-  if (!pr) { alert('Protocolo não localizado na descrição colada. Verifique se o texto contém a palavra “Protocolo” seguida do número.'); return; }
+  if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
   if (!site) { alert('Informe um circuito válido da base de dados'); return; }
   if (!skill) { alert('Selecione a skill necessária para o chamado'); return; }
@@ -2038,6 +2061,9 @@ document.addEventListener('DOMContentLoaded', function() {
     circuitoDescricaoTimer=setTimeout(buscarCircuitoNaDescricao,180);
   });
   el('c-descricao-colada').addEventListener('change',buscarCircuitoNaDescricao);
+  ['c-pr','c-sdm'].forEach(id=>el(id).addEventListener('input',function(){
+    this.dataset.preenchimento='manual';
+  }));
   el('c-opcoes').addEventListener('change',function(){ selecionarCircuitoDaDescricao(this.value); });
   el('t-r').addEventListener('change', atualizarCamposRegiao);
   if(el('t-cep')){el('t-cep').addEventListener('input',function(){this.value=formatarCEP(this.value);});el('t-cep').addEventListener('blur',buscarCEPFormulario);}

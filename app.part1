@@ -385,8 +385,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
           <input type="hidden" id="c-ci">
         </div>
         <div class="grid-2">
-          <div class="form-group"><label class="label">Protocolo identificado</label><input type="text" id="c-pr" class="input" readonly placeholder="Será preenchido pela descrição"></div>
-          <div class="form-group"><label class="label">SDM identificado</label><input type="text" id="c-sdm" class="input" readonly placeholder="Será preenchido pela descrição"></div>
+          <div class="form-group"><label class="label">Protocolo</label><input type="text" id="c-pr" class="input" autocomplete="off" placeholder="Preenchido pela descrição ou digitado manualmente"></div>
+          <div class="form-group"><label class="label">SDM</label><input type="text" id="c-sdm" class="input" autocomplete="off" placeholder="Preenchido pela descrição ou digitado manualmente"></div>
         </div>
         <div class="grid-2">
           <div class="form-group"><label class="label">Quem abriu o chamado</label><select id="c-abertura" class="select"><option value="">Selecione...</option><option value="Vectra">Vectra</option><option value="Método">Método</option><option value="Umtelecom">Umtelecom</option></select></div>
