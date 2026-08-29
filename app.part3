@@ -1719,16 +1719,16 @@ function prepararBuscaEscolas(anterior,c){
   box.classList.toggle('hidden',c.re!=='interior');
   const dl=el('lista-escolas-pe');
   dl.innerHTML=SB_ESCOLAS.map(e=>`<option value="${esc(textoEscola(e))}" data-id="${e.id}">${esc(detalheEscola(e))}</option>`).join('');
-  [['o','esco','co'],['d','escd','cd'],['r','escr','cr']].forEach(([s,k,cid])=>{
-    const inp=el('ex-esc-'+s),info=el('ex-esc-'+s+'-info'),e=escolaPorId(anterior[k]);
-    inp.value=textoEscola(e);inp.dataset.id=e?.id||'';info.textContent=detalheEscola(e);
-    if(e)preencherRotaComEscola('ex-'+cid,e);
-    inp.onchange=()=>{
-      const achada=SB_ESCOLAS.find(x=>textoEscola(x)===inp.value);
-      inp.dataset.id=achada?.id||'';info.textContent=detalheEscola(achada);
-      if(achada)preencherRotaComEscola('ex-'+cid,achada);
-    };
-  });
+  el('ex-esc-o').value='';el('ex-esc-o').dataset.id='';
+  el('ex-esc-r').value='';el('ex-esc-r').dataset.id='';
+  const inp=el('ex-esc-d'),info=el('ex-esc-d-info'),e=escolaPorId(anterior.escd);
+  inp.value=textoEscola(e);inp.dataset.id=e?.id||'';info.textContent=detalheEscola(e);
+  if(e)preencherRotaComEscola('ex-cd',e);
+  inp.onchange=()=>{
+    const achada=SB_ESCOLAS.find(x=>textoEscola(x)===inp.value);
+    inp.dataset.id=achada?.id||'';info.textContent=detalheEscola(achada);
+    if(achada)preencherRotaComEscola('ex-cd',achada);
+  };
 }
 function prepararFotos(){
   EX_FOTOS_NOVAS=[];el('ex-fotos').value='';el('ex-fotos-preview').innerHTML='';

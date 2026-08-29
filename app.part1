@@ -757,14 +757,16 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
         <div class="form-group"><label class="label">Retorno</label><select id="ex-cr" class="select"></select></div>
       </div>
       <div id="ex-escolas-box" class="card hidden" style="margin:0 0 10px;background:#f8fafc;border:1px solid #cbd5e1">
-        <div style="font-size:.65rem;font-weight:700;margin-bottom:8px">🏫 Procurar endereço de escola</div>
-        <div class="grid-3">
-          <div class="form-group"><label class="label">Escola na origem</label><input id="ex-esc-o" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola"><small id="ex-esc-o-info"></small></div>
-          <div class="form-group"><label class="label">Escola no destino</label><input id="ex-esc-d" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola"><small id="ex-esc-d-info"></small></div>
-          <div class="form-group"><label class="label">Escola no retorno</label><input id="ex-esc-r" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola"><small id="ex-esc-r-info"></small></div>
+        <div style="font-size:.65rem;font-weight:700;margin-bottom:8px">🏫 Procurar escola do destino</div>
+        <div class="form-group">
+          <label class="label">Nome da escola</label>
+          <input id="ex-esc-d" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola de destino">
+          <small id="ex-esc-d-info"></small>
         </div>
+        <input type="hidden" id="ex-esc-o"><input type="hidden" id="ex-esc-r">
+        <span id="ex-esc-o-info" class="hidden"></span><span id="ex-esc-r-info" class="hidden"></span>
         <datalist id="lista-escolas-pe"></datalist>
-        <small>Ao selecionar a escola, o endereço completo aparece automaticamente no campo correspondente de Origem, Destino ou Retorno e é usado no cálculo pela cidade da escola.</small>
+        <small>Ao selecionar a escola, o endereço completo aparece automaticamente no campo Destino. Escolha normalmente a Origem e o Retorno para calcular a rota completa.</small>
       </div>
       <button class="btn btn-p" id="btn-calc-dist" style="padding:6px 10px;font-size:.7rem;margin-bottom:8px">🧮 Calcular Distâncias</button>
       <div class="info-dist hidden" id="ex-dist-info"></div>
