@@ -1469,6 +1469,7 @@ function rTco() {
     <div class="os-r"><b>Site:</b> ${c.si}</div>
     <div class="os-r"><b>Valor Total:</b> ${c.ex && c.ex.total ? c.ex.total : '—'}</div>
     <div class="os-r"><b>Data:</b> ${c.cc || '—'}</div>
+    ${(SB_FOTOS_MAP.get(c.id)||[]).length?`<button class="btn btn-p btn-fotos" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">📷 Ver fotos (${(SB_FOTOS_MAP.get(c.id)||[]).length})</button>`:''}
     ${rejeitado ? `<div class="trava" style="margin-top:8px"><b>Motivo da rejeição:</b><br>${valorInfo(c.ap.obs)}</div><button class="btn btn-y btn-ajustar" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🔄 Reabrir e ajustar</button>` : ''}</div>`;
   }
   ).join('') : '<div class="empty"><h3>Nenhum chamado concluído</h3></div>';
@@ -1533,7 +1534,8 @@ function rTar(dt1, dt2) {
       const v = parseFloat(ex.total.replace('R$ ', '').replace('.', '').replace(',', '.'));
       if (!isNaN(v)) totalGeral += v;
     }
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td>${valorInfo(ex.relatorio || ex.obs)}</td><td>${apBadge}</td></tr>`;
+    const nf=(SB_FOTOS_MAP.get(c.id)||[]).length;
+    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td>${valorInfo(ex.relatorio || ex.obs)}${nf?`<br><button class="btn btn-p btn-fotos" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">📷 ${nf} foto(s)</button>`:''}</td><td>${apBadge}</td></tr>`;
   }).join('');
   const totalStr = 'R$ ' + totalGeral.toFixed(2).replace('.', ',');
   tb.innerHTML = rows + `<tr style="background:#e8f5e9;font-weight:700"><td colspan="14" style="text-align:right">VALOR TOTAL:</td><td>${totalStr}</td><td colspan="2"></td></tr>`;
@@ -1651,6 +1653,56 @@ function finalizarMascaraEncerramento() {
 }
 
 // ========== MODAL EXECUÇÃO ==========
+function escolaPorId(id){return SB_ESCOLAS.find(e=>String(e.id)===String(id));}
+function textoEscola(e){return e?`${e.nome} — ${e.municipio}`:'';}
+function detalheEscola(e){return e?[e.endereco,e.cep?`CEP ${e.cep}`:'CEP não informado'].filter(Boolean).join(' — '):'';}
+function prepararBuscaEscolas(anterior,c){
+  const box=el('ex-escolas-box');
+  box.classList.toggle('hidden',c.re!=='interior');
+  const dl=el('lista-escolas-pe');
+  dl.innerHTML=SB_ESCOLAS.map(e=>`<option value="${esc(textoEscola(e))}" data-id="${e.id}">${esc(detalheEscola(e))}</option>`).join('');
+  [['o','esco','co'],['d','escd','cd'],['r','escr','cr']].forEach(([s,k,cid])=>{
+    const inp=el('ex-esc-'+s),info=el('ex-esc-'+s+'-info'),e=escolaPorId(anterior[k]);
+    inp.value=textoEscola(e);inp.dataset.id=e?.id||'';info.textContent=detalheEscola(e);
+    inp.onchange=()=>{
+      const achada=SB_ESCOLAS.find(x=>textoEscola(x)===inp.value);
+      inp.dataset.id=achada?.id||'';info.textContent=detalheEscola(achada);
+      if(achada){el('ex-'+cid).value=achada.municipio||'';}
+    };
+  });
+}
+function prepararFotos(){
+  EX_FOTOS_NOVAS=[];el('ex-fotos').value='';el('ex-fotos-preview').innerHTML='';
+}
+function atualizarPreviewFotos(){
+  el('ex-fotos-preview').innerHTML=EX_FOTOS_NOVAS.map((f,i)=>`<div style="position:relative"><img src="${URL.createObjectURL(f)}" alt="Foto selecionada" style="width:100%;height:82px;object-fit:cover;border-radius:7px"><button type="button" data-i="${i}" class="rm-foto" style="position:absolute;right:3px;top:3px;border:0;border-radius:50%;background:#b91c1c;color:white;width:24px;height:24px">×</button></div>`).join('');
+  el('ex-fotos-preview').querySelectorAll('.rm-foto').forEach(b=>b.onclick=()=>{EX_FOTOS_NOVAS.splice(Number(b.dataset.i),1);atualizarPreviewFotos();});
+}
+async function sbEnviarFotos(c){
+  if(!EX_FOTOS_NOVAS.length)return [];
+  if(EX_FOTOS_NOVAS.length>8)throw new Error('Selecione no máximo 8 fotos.');
+  const enviadas=[];
+  for(const f of EX_FOTOS_NOVAS){
+    if(f.size>8*1024*1024)throw new Error(`A foto ${f.name} ultrapassa 8 MB.`);
+    if(!['image/jpeg','image/png','image/webp'].includes(f.type))throw new Error(`Formato não permitido: ${f.name}`);
+    const ext=(f.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
+    const caminho=`${SB_PROFILE.id}/${c.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+    const {error:upErr}=await SB.storage.from('fotos-atividades').upload(caminho,f,{contentType:f.type,upsert:false});
+    if(upErr)throw upErr;
+    const {data,error}=await SB.from('fotos_atividade').insert({chamado_id:c.id,tecnico_id:SB_PROFILE.id,caminho,nome_original:f.name,tipo_mime:f.type,tamanho_bytes:f.size}).select('*').single();
+    if(error){await SB.storage.from('fotos-atividades').remove([caminho]);throw error;}
+    enviadas.push(data);
+  }
+  SB_FOTOS_MAP.set(c.id,[...(SB_FOTOS_MAP.get(c.id)||[]),...enviadas]);
+  return enviadas;
+}
+async function abrirFotosChamado(id){
+  const fotos=SB_FOTOS_MAP.get(id)||[];
+  if(!fotos.length){alert('Este chamado não possui fotos anexadas.');return;}
+  const urls=[];for(const f of fotos){const {data,error}=await SB.storage.from('fotos-atividades').createSignedUrl(f.caminho,600);if(!error&&data?.signedUrl)urls.push(data.signedUrl);}
+  let m=el('m-fotos-atividade');if(!m){m=document.createElement('div');m.id='m-fotos-atividade';m.className='modal';m.innerHTML='<div class="modal-box" style="max-width:850px"><div class="modal-hd"><h3>📷 Fotos da atividade</h3><button class="close" id="cls-fotos-atividade">×</button></div><div class="modal-bd" id="fotos-atividade-grid"></div></div>';document.body.appendChild(m);el('cls-fotos-atividade').onclick=()=>m.classList.remove('a');}
+  el('fotos-atividade-grid').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${urls.map(u=>`<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Evidência da atividade" style="width:100%;height:180px;object-fit:cover;border-radius:8px"></a>`).join('')}</div>`;m.classList.add('a');
+}
 function opEx(id) {
   EID = id;
   const c = D.ch.find(x => x.id === id);
@@ -1672,6 +1724,8 @@ function opEx(id) {
   el('ex-cr').innerHTML = opts;
 
   el('ex-co').value = anterior.co || ''; el('ex-cd').value = anterior.cd || ''; el('ex-cr').value = anterior.cr || '';
+  prepararBuscaEscolas(anterior,c);
+  prepararFotos();
   el('ex-km').value = anterior.km || ''; el('ex-vkm').value = anterior.vkm || '';
   el('ex-atv').value = anterior.atv || ''; el('ex-vatv').value = anterior.vatv || '';
   el('ex-avulso').value = anterior.avulso || '';
@@ -1713,6 +1767,7 @@ async function cfEx() {
 
   c.ex = {
     co: el('ex-co').value, cd: el('ex-cd').value, cr: el('ex-cr').value,
+    esco: el('ex-esc-o').dataset.id||'', escd: el('ex-esc-d').dataset.id||'', escr: el('ex-esc-r').dataset.id||'',
     km: el('ex-km').value, vkm: el('ex-vkm').value,
     atv: el('ex-atv').value, vatv: el('ex-vatv').value,
     avulso: el('ex-avulso').value,
@@ -1728,6 +1783,8 @@ async function cfEx() {
   }
   try{
     if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
+    const fotos=await sbEnviarFotos(c);
+    c.ex.fotos=[...(c.ex.fotos||[]),...fotos];
     await sbPersistirFinalizacao(c);
     lsSet('dd',D);
     clsEx();
@@ -2030,6 +2087,7 @@ document.addEventListener('DOMContentLoaded', function() {
   el('ex-utp').addEventListener('input', calcMat);
   el('ex-cci').addEventListener('input', calcMat);
   el('ex-can').addEventListener('input', calcMat);
+  el('ex-fotos').addEventListener('change',e=>{EX_FOTOS_NOVAS=[...e.target.files];if(EX_FOTOS_NOVAS.length>8){alert('Selecione no máximo 8 fotos.');EX_FOTOS_NOVAS=EX_FOTOS_NOVAS.slice(0,8);}atualizarPreviewFotos();});
   el('btn-calc-dist').addEventListener('click', calcDist);
 
   // Exportar CSV
@@ -2082,7 +2140,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
@@ -2092,6 +2150,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-rc')) { opRc(t.dataset.id); }
     if(t.classList.contains('btn-ex')) { opEx(t.dataset.id); }
     if(t.classList.contains('btn-ajustar')) { reabrirAjuste(t.dataset.id); }
+    if(t.classList.contains('btn-fotos')) { abrirFotosChamado(t.dataset.id).catch(err=>sbShowError('Não foi possível abrir as fotos',err)); }
     if(t.classList.contains('btn-reset-senha')) { enviarRedefinicaoSenhaAdmin(t.dataset.u, t.dataset.email); }
     if(t.classList.contains('btn-rm-tec')) { rmTc(t.dataset.u); }
     if(t.classList.contains('btn-endereco-tec')) { editarEnderecoTecnico(t.dataset.u); }
@@ -2266,6 +2325,9 @@ let SB_SYNC_AGAIN = false;
 let SB_LOADED_CH = new Set();
 let SB_LOADED_MAT = new Set();
 let SB_LOADED_MR = new Set();
+let SB_ESCOLAS = [];
+let SB_FOTOS_MAP = new Map();
+let EX_FOTOS_NOVAS = [];
 
 function sbUUID(v){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||'')); }
 function sbNum(v){ if(v===null||v===undefined||v==='') return 0; const s=String(v).replace(/R\$\s?/g,'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''); return Number(s)||0; }
@@ -2307,16 +2369,21 @@ inicializarMateriaisPlanilha = function(){ return; };
 async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
-  const [pR,cR,eR,aR,tR,mR,sR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     SB.from('chamados').select('*').order('criado_em',{ascending:true}),
     SB.from('execucoes').select('*'),
     SB.from('aprovacoes').select('*'),
     SB.from('chamado_transferencias').select('*').order('criado_em',{ascending:true}),
     SB.from('materiais').select('*').eq('ativo',true).order('nome'),
-    SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true})
+    SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true}),
+    SB.from('escolas').select('id,codigo_inep,nome,municipio,endereco,cep,zona').eq('ativo',true).order('nome'),
+    SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true})
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR]) if(r.error) throw r.error;
+  SB_ESCOLAS=escR.data||[];
+  SB_FOTOS_MAP=new Map();
+  (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
 
   D.tc=[]; D.ad=[];
   (pR.data||[]).forEach(p=>{
@@ -2341,7 +2408,7 @@ async function sbLoadAll(){
       ex:null, ap:null
     };
     legacy._trLoadedCount=legacy.tr.length;
-    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',total:'R$ '+Number(ex.valor_total||0).toFixed(2).replace('.',',')};
+    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',total:'R$ '+Number(ex.valor_total||0).toFixed(2).replace('.',','),fotos:SB_FOTOS_MAP.get(c.id)||[]};
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
     return legacy;
   });
@@ -2372,6 +2439,19 @@ async function sbSeedMaterialsIfNeeded(){
   const rows=MATERIAIS_PLANILHA.map((nome,i)=>({codigo:'MAT-PLAN-'+String(i+1).padStart(3,'0'),nome,unidade:'UN',estoque:0}));
   const {error:insErr}=await SB.from('materiais').insert(rows);
   if(insErr) throw insErr;
+}
+
+async function sbSeedSchoolsIfNeeded(){
+  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin' || !Array.isArray(SITES_PEII)) return;
+  const {count,error}=await SB.from('escolas').select('*',{count:'exact',head:true});
+  if(error) throw error;
+  if((count||0)>0) return;
+  const escolas=SITES_PEII.filter(x=>/\b(ESCOLA|EREM|ETE|COL[EÉ]GIO)\b/i.test(x?.[1]||'')).map((x,i)=>{
+    const partes=String(x[1]).split('|'),codigo=/^\d{8}$/.test(partes[0])?partes.shift():'LEGACY-'+String(i+1).padStart(5,'0');
+    const endereco=String(x[3]||''),cep=(endereco.match(/\b\d{5}[-.]?\d{3}\b/)||[])[0]||null;
+    return {codigo_inep:codigo,nome:partes.join(' | ').trim(),municipio:String(x[2]||''),endereco:endereco||null,cep,zona:/zona rural|\bs[ií]tio\b|\bfazenda\b/i.test(endereco)?'rural':'nao_informada',rede:'estadual',ativo:true};
+  });
+  for(let i=0;i<escolas.length;i+=300){const {error:e}=await SB.from('escolas').upsert(escolas.slice(i,i+300),{onConflict:'codigo_inep'});if(e)throw e;}
 }
 
 function sbChamadoRow(c){
@@ -2434,6 +2514,9 @@ async function sbPersistirFinalizacao(c){
     cidade_origem:c.ex?.co||null,
     cidade_destino:c.ex?.cd||null,
     cidade_retorno:c.ex?.cr||null,
+    origem_escola_id:c.ex?.esco||null,
+    destino_escola_id:c.ex?.escd||null,
+    retorno_escola_id:c.ex?.escr||null,
     km_total:sbNum(c.ex?.km),
     valor_km:sbNum(c.ex?.vkm),
     atividade:c.ex?.atv||null,
@@ -2475,7 +2558,7 @@ async function sbSyncTecnico(){
     if(error) throw new Error('Chamado: '+error.message);
   }
   for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario && x.ex)){
-    const row={chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()};
+    const row={chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()};
     const {error}=await SB.from('execucoes').upsert(row,{onConflict:'chamado_id'});
     if(error) throw new Error('Execução: '+error.message);
   }
@@ -2530,7 +2613,7 @@ async function sbSyncAll(){
     const exRows=[]; const apRows=[];
     for(const c of D.ch){
       if(!sbUUID(c.id)) continue;
-      if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
+      if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
       if(c.ap) apRows.push({chamado_id:c.id,status:c.ap.status||'pendente',observacao:c.ap.obs||null,administrador_id:SB_PROFILE.tipo==='admin'?SB_PROFILE.id:null,reenviado:!!c.ap.reenviado,atualizado_em:sbIso(c.ap.data)||new Date().toISOString()});
       const start=Number(c._trLoadedCount||0); const novos=(c.tr||[]).slice(start);
       for(const tr of novos){ const {error}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:sbIdByUser(tr.de),para_tecnico_id:sbIdByUser(tr.para),motivo:tr.m||null,realizado_por:SB_PROFILE.id,criado_em:sbIso(tr.d)||new Date().toISOString()}); if(error) throw error; }
@@ -2592,7 +2675,7 @@ doLogin = async function(){
     if(loginType==='adm' && p.tipo!=='admin') throw new Error('Este usuário não possui perfil de administrador.');
     if(loginType==='log' && !temLogistica) throw new Error('Este usuário não possui acesso à área logística.');
     if(loginType==='tec' && p.tipo!=='tecnico') throw new Error('Este usuário não possui perfil de técnico.');
-    SB_PROFILE=p;await sbSeedMaterialsIfNeeded();await sbLoadAll();
+    SB_PROFILE=p;await sbSeedMaterialsIfNeeded();await sbSeedSchoolsIfNeeded();await sbLoadAll();
     if(loginType==='log') S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
     else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
