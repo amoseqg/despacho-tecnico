@@ -1604,6 +1604,7 @@ function buscarDist(a, b) {
 }
 
 function calcDist() {
+  aplicarEscolaDestino();
   const oExibido = el('ex-co').value;
   const dExibido = el('ex-cd').value;
   const rExibido = el('ex-cr').value;
@@ -1714,6 +1715,30 @@ function cidadeRota(campoId,escolaId){
   if(escola && campo?.value===enderecoRotaEscola(escola))return escola.municipio||'';
   return opcao?.dataset.cidade||campo?.value||'';
 }
+function normalizarBuscaEscola(valor){
+  return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
+}
+function localizarEscolaDigitada(valor){
+  const busca=normalizarBuscaEscola(valor);
+  if(!busca)return null;
+  const exatas=SB_ESCOLAS.filter(e=>{
+    const nome=normalizarBuscaEscola(nomeEscola(e));
+    const completo=normalizarBuscaEscola(textoEscola(e));
+    return nome===busca||completo===busca;
+  });
+  if(exatas.length===1)return exatas[0];
+  const aproximadas=SB_ESCOLAS.filter(e=>normalizarBuscaEscola(nomeEscola(e)).includes(busca));
+  return aproximadas.length===1?aproximadas[0]:null;
+}
+function aplicarEscolaDestino(){
+  const inp=el('ex-esc-d'),info=el('ex-esc-d-info');
+  if(!inp)return null;
+  const achada=localizarEscolaDigitada(inp.value);
+  inp.dataset.id=achada?.id||'';
+  if(info)info.textContent=achada?detalheEscola(achada):'';
+  if(achada)preencherRotaComEscola('ex-cd',achada);
+  return achada;
+}
 function prepararBuscaEscolas(anterior,c){
   const box=el('ex-escolas-box');
   box.classList.toggle('hidden',c.re!=='interior');
@@ -1724,11 +1749,8 @@ function prepararBuscaEscolas(anterior,c){
   const inp=el('ex-esc-d'),info=el('ex-esc-d-info'),e=escolaPorId(anterior.escd);
   inp.value=textoEscola(e);inp.dataset.id=e?.id||'';info.textContent=detalheEscola(e);
   if(e)preencherRotaComEscola('ex-cd',e);
-  inp.onchange=()=>{
-    const achada=SB_ESCOLAS.find(x=>textoEscola(x)===inp.value);
-    inp.dataset.id=achada?.id||'';info.textContent=detalheEscola(achada);
-    if(achada)preencherRotaComEscola('ex-cd',achada);
-  };
+  inp.oninput=aplicarEscolaDestino;
+  inp.onchange=aplicarEscolaDestino;
 }
 function prepararFotos(){
   EX_FOTOS_NOVAS=[];el('ex-fotos').value='';el('ex-fotos-preview').innerHTML='';
