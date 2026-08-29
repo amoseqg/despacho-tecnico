@@ -47,4 +47,16 @@ for (const [texto, tipo, esperado] of casos) {
   assert.equal(contexto.extrairCampoDaDescricao(texto, tipo), esperado, `Falha ao extrair ${tipo} de: ${texto}`);
 }
 
-console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} blocos JavaScript e ${casos.length} formatos de protocolo/SDM.`);
+const consultasEscola = [
+  ['26184710|ESCOLA ESTADUAL INDIGENA VO SALU', '26184710', 'ESCOLA ESTADUAL INDIGENA VO SALU'],
+  ['26184710 | ESCOLA ESTADUAL INDÍGENA VO SALU | GRE 13', '26184710', 'ESCOLA ESTADUAL INDÍGENA VO SALU'],
+  ['ESCOLA ESTADUAL INDIGENA VO SALU', '', 'ESCOLA ESTADUAL INDIGENA VO SALU']
+];
+for(const [entrada,codigoEsperado,nomeEsperado] of consultasEscola){
+  const codigo=(entrada.match(/(?:^|\D)(\d{8})(?:\D|$)/)||[])[1]||'';
+  const nome=entrada.replace(/^\d{8}\s*[|;:\-–—]?\s*/,'').replace(/\s*\|\s*GRE\s*\d+.*$/i,'').trim();
+  assert.equal(codigo,codigoEsperado,`Falha ao identificar INEP em: ${entrada}`);
+  assert.equal(nome,nomeEsperado,`Falha ao limpar o nome da escola em: ${entrada}`);
+}
+
+console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} blocos JavaScript, ${casos.length} formatos de protocolo/SDM e ${consultasEscola.length} formatos de escola.`);

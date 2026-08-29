@@ -1767,8 +1767,16 @@ function aplicarEscolaDestino(){
   if(!inp)return null;
   const achada=localizarEscolaDigitada(inp.value);
   inp.dataset.id=achada?.id||'';
-  if(info)info.textContent=achada?detalheEscola(achada):'';
-  if(achada)preencherRotaComEscola('ex-cd',achada);
+  if(info){
+    info.textContent=achada?detalheEscola(achada):(inp.value.trim()?'Continue digitando ou selecione uma escola apresentada na lista.':'');
+    info.style.color=achada?'var(--g)':'var(--gr)';
+  }
+  if(achada){
+    preencherRotaComEscola('ex-cd',achada);
+    inp.setAttribute('aria-invalid','false');
+  }else{
+    inp.setAttribute('aria-invalid',inp.value.trim()?'true':'false');
+  }
   return achada;
 }
 function prepararBuscaEscolas(anterior,c){
@@ -1785,7 +1793,11 @@ function prepararBuscaEscolas(anterior,c){
   inp.onchange=aplicarEscolaDestino;
   el('btn-aplicar-escola-destino').onclick=()=>{
     const achada=aplicarEscolaDestino();
-    if(!achada){alert('Escola não localizada. Selecione um nome apresentado na lista.');inp.focus();}
+    if(!achada){
+      info.textContent='Escola não localizada. Digite o código INEP ou selecione um nome apresentado na lista.';
+      info.style.color='var(--r)';
+      inp.focus();
+    }
   };
 }
 function prepararFotos(){
