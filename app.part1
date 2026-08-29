@@ -752,9 +752,9 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
       </div>
       <div style="font-size:.6rem;color:var(--gr);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">🚗 Distância - Origem / Destino / Retorno</div>
       <div class="grid-3">
-        <div class="form-group"><label class="label">Cidade Origem</label><select id="ex-co" class="select"></select></div>
-        <div class="form-group"><label class="label">Cidade Destino</label><select id="ex-cd" class="select"></select></div>
-        <div class="form-group"><label class="label">Cidade Retorno</label><select id="ex-cr" class="select"></select></div>
+        <div class="form-group"><label class="label">Origem</label><select id="ex-co" class="select"></select></div>
+        <div class="form-group"><label class="label">Destino</label><select id="ex-cd" class="select"></select></div>
+        <div class="form-group"><label class="label">Retorno</label><select id="ex-cr" class="select"></select></div>
       </div>
       <div id="ex-escolas-box" class="card hidden" style="margin:0 0 10px;background:#f8fafc;border:1px solid #cbd5e1">
         <div style="font-size:.65rem;font-weight:700;margin-bottom:8px">🏫 Procurar endereço de escola</div>
@@ -764,7 +764,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
           <div class="form-group"><label class="label">Escola no retorno</label><input id="ex-esc-r" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola"><small id="ex-esc-r-info"></small></div>
         </div>
         <datalist id="lista-escolas-pe"></datalist>
-        <small>Ao selecionar a escola, a cidade é preenchida automaticamente. Endereço e CEP ficam registrados na atividade.</small>
+        <small>Ao selecionar a escola, o endereço completo aparece automaticamente no campo correspondente de Origem, Destino ou Retorno e é usado no cálculo pela cidade da escola.</small>
       </div>
       <button class="btn btn-p" id="btn-calc-dist" style="padding:6px 10px;font-size:.7rem;margin-bottom:8px">🧮 Calcular Distâncias</button>
       <div class="info-dist hidden" id="ex-dist-info"></div>

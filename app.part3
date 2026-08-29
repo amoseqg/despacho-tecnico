@@ -1604,9 +1604,12 @@ function buscarDist(a, b) {
 }
 
 function calcDist() {
-  const o = el('ex-co').value;
-  const d = el('ex-cd').value;
-  const r = el('ex-cr').value;
+  const oExibido = el('ex-co').value;
+  const dExibido = el('ex-cd').value;
+  const rExibido = el('ex-cr').value;
+  const o = cidadeRota('ex-co','ex-esc-o');
+  const d = cidadeRota('ex-cd','ex-esc-d');
+  const r = cidadeRota('ex-cr','ex-esc-r');
   const k1 = buscarDist(o, d);
   const k2 = buscarDist(d, r);
   if (k1 === null || k2 === null) { alert('Distância não cadastrada entre essas cidades!'); return; }
@@ -1615,7 +1618,7 @@ function calcDist() {
   el('ex-km').value = total.toFixed(1);
   el('ex-vkm').value = 'R$ ' + exc.toFixed(2).replace('.', ',');
   const info = el('ex-dist-info');
-  info.innerHTML = `${o} → ${d}: <b>${k1} km</b><br>${d} → ${r}: <b>${k2} km</b><br><strong>TOTAL: ${total} km</strong> (excedente: ${exc} km)`;
+  info.innerHTML = `${esc(oExibido)} → ${esc(dExibido)}: <b>${k1} km</b><br>${esc(dExibido)} → ${esc(rExibido)}: <b>${k2} km</b><br><strong>TOTAL: ${total} km</strong> (excedente: ${exc} km)`;
   info.classList.remove('hidden');
   calcTotal();
 }
@@ -1677,8 +1680,40 @@ function finalizarMascaraEncerramento() {
 
 // ========== MODAL EXECUÇÃO ==========
 function escolaPorId(id){return SB_ESCOLAS.find(e=>String(e.id)===String(id));}
-function textoEscola(e){return e?`${e.nome} — ${e.municipio}`:'';}
+function nomeEscola(e){
+  const partes=String(e?.nome||'').split('|').map(v=>v.trim()).filter(Boolean);
+  return partes.length>1 && /^\d+$/.test(partes[0]) ? partes[1] : (partes[0]||'');
+}
+function textoEscola(e){return e?`${nomeEscola(e)} — ${e.municipio}`:'';}
 function detalheEscola(e){return e?[e.endereco,e.cep?`CEP ${e.cep}`:'CEP não informado'].filter(Boolean).join(' — '):'';}
+function enderecoRotaEscola(e){
+  if(!e)return '';
+  const endereco=String(e.endereco||'').trim();
+  const municipio=String(e.municipio||'').trim();
+  const cep=String(e.cep||'').trim();
+  return [endereco,municipio?`${municipio} - PE`:'',cep?`CEP ${cep}`:''].filter(Boolean).join(', ');
+}
+function preencherRotaComEscola(campoId,e){
+  const campo=el(campoId);
+  if(!campo||!e)return;
+  const endereco=enderecoRotaEscola(e);
+  let opcao=Array.from(campo.options).find(o=>o.value===endereco);
+  if(!opcao){
+    opcao=document.createElement('option');
+    opcao.value=endereco;
+    campo.appendChild(opcao);
+  }
+  opcao.textContent=endereco;
+  opcao.dataset.cidade=e.municipio||'';
+  campo.value=endereco;
+  campo.dataset.cidade=e.municipio||'';
+}
+function cidadeRota(campoId,escolaId){
+  const campo=el(campoId),opcao=campo?.selectedOptions?.[0];
+  const escola=escolaPorId(el(escolaId)?.dataset.id);
+  if(escola && campo?.value===enderecoRotaEscola(escola))return escola.municipio||'';
+  return opcao?.dataset.cidade||campo?.value||'';
+}
 function prepararBuscaEscolas(anterior,c){
   const box=el('ex-escolas-box');
   box.classList.toggle('hidden',c.re!=='interior');
@@ -1687,10 +1722,11 @@ function prepararBuscaEscolas(anterior,c){
   [['o','esco','co'],['d','escd','cd'],['r','escr','cr']].forEach(([s,k,cid])=>{
     const inp=el('ex-esc-'+s),info=el('ex-esc-'+s+'-info'),e=escolaPorId(anterior[k]);
     inp.value=textoEscola(e);inp.dataset.id=e?.id||'';info.textContent=detalheEscola(e);
+    if(e)preencherRotaComEscola('ex-'+cid,e);
     inp.onchange=()=>{
       const achada=SB_ESCOLAS.find(x=>textoEscola(x)===inp.value);
       inp.dataset.id=achada?.id||'';info.textContent=detalheEscola(achada);
-      if(achada){el('ex-'+cid).value=achada.municipio||'';}
+      if(achada)preencherRotaComEscola('ex-'+cid,achada);
     };
   });
 }
