@@ -2450,6 +2450,20 @@ function sbSetConnectionBadge(text, ok=true){
 // Impede que o carregamento inicial volte a semear o localStorage.
 inicializarMateriaisPlanilha = function(){ return; };
 
+async function sbCarregarTodasEscolas(){
+  const todas=[];
+  const pagina=1000;
+  for(let inicio=0;;inicio+=pagina){
+    const {data,error}=await SB.from('escolas')
+      .select('id,codigo_inep,nome,municipio,endereco,cep,zona')
+      .eq('ativo',true).order('nome').range(inicio,inicio+pagina-1);
+    if(error)return {data:null,error};
+    todas.push(...(data||[]));
+    if(!data||data.length<pagina)break;
+  }
+  return {data:todas,error:null};
+}
+
 async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
@@ -2461,7 +2475,7 @@ async function sbLoadAll(){
     SB.from('chamado_transferencias').select('*').order('criado_em',{ascending:true}),
     SB.from('materiais').select('*').eq('ativo',true).order('nome'),
     SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true}),
-    SB.from('escolas').select('id,codigo_inep,nome,municipio,endereco,cep,zona').eq('ativo',true).order('nome'),
+    sbCarregarTodasEscolas(),
     SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true})
   ]);
   for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR]) if(r.error) throw r.error;
@@ -2527,15 +2541,19 @@ async function sbSeedMaterialsIfNeeded(){
 
 async function sbSeedSchoolsIfNeeded(){
   if(!SB_PROFILE || SB_PROFILE.tipo!=='admin' || !Array.isArray(SITES_PEII)) return;
-  const {count,error}=await SB.from('escolas').select('*',{count:'exact',head:true});
-  if(error) throw error;
-  if((count||0)>0) return;
-  const escolas=SITES_PEII.filter(x=>/\b(ESCOLA|EREM|ETE|COL[EÉ]GIO)\b/i.test(x?.[1]||'')).map((x,i)=>{
+  const extraidas=SITES_PEII.filter(x=>/\b(ESCOLA|EREM|ETE|COL[EÉ]GIO)\b/i.test(x?.[1]||'')).map((x,i)=>{
     const partes=String(x[1]).split('|'),codigo=/^\d{8}$/.test(partes[0])?partes.shift():'LEGACY-'+String(i+1).padStart(5,'0');
     const endereco=String(x[3]||''),cep=(endereco.match(/\b\d{5}[-.]?\d{3}\b/)||[])[0]||null;
     return {codigo_inep:codigo,nome:partes.join(' | ').trim(),municipio:String(x[2]||''),endereco:endereco||null,cep,zona:/zona rural|\bs[ií]tio\b|\bfazenda\b/i.test(endereco)?'rural':'nao_informada',rede:'estadual',ativo:true};
   });
-  for(let i=0;i<escolas.length;i+=300){const {error:e}=await SB.from('escolas').upsert(escolas.slice(i,i+300),{onConflict:'codigo_inep'});if(e)throw e;}
+  const escolas=[...new Map(extraidas.map(e=>[e.codigo_inep,e])).values()];
+  const {count,error}=await SB.from('escolas').select('*',{count:'exact',head:true});
+  if(error) throw error;
+  if((count||0)>=escolas.length) return;
+  for(let i=0;i<escolas.length;i+=300){
+    const {error:e}=await SB.from('escolas').upsert(escolas.slice(i,i+300),{onConflict:'codigo_inep',ignoreDuplicates:true});
+    if(e)throw e;
+  }
 }
 
 function sbChamadoRow(c){
