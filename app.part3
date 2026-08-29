@@ -1723,16 +1723,34 @@ function cidadeRota(campoId,escolaId){
 function normalizarBuscaEscola(valor){
   return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
 }
+let ESCOLAS_SITES_CACHE=null;
+function escolasDaBaseInterna(){
+  if(ESCOLAS_SITES_CACHE)return ESCOLAS_SITES_CACHE;
+  ESCOLAS_SITES_CACHE=(Array.isArray(SITES_PEII)?SITES_PEII:[])
+    .filter(x=>/\b(ESCOLA|EREM|ETE|COL[EÉ]GIO)\b/i.test(x?.[1]||''))
+    .map((x,i)=>{
+      const partes=String(x[1]||'').split('|');
+      const codigo=/^\d{8}$/.test(partes[0])?partes.shift():'';
+      const endereco=String(x[3]||'').trim();
+      return {id:'',codigo_inep:codigo||`INTERNA-${i}`,nome:partes.join(' | ').trim(),municipio:String(x[2]||''),endereco:endereco||null,cep:(endereco.match(/\b\d{5}[-.]?\d{3}\b/)||[])[0]||null};
+    });
+  return ESCOLAS_SITES_CACHE;
+}
+function catalogoCompletoEscolas(){
+  const catalogo=[...SB_ESCOLAS];
+  const codigos=new Set(catalogo.map(e=>String(e.codigo_inep||'')));
+  escolasDaBaseInterna().forEach(e=>{if(!codigos.has(String(e.codigo_inep||'')))catalogo.push(e);});
+  return catalogo;
+}
 function localizarEscolaDigitada(valor){
   const busca=normalizarBuscaEscola(valor);
   if(!busca)return null;
-  const exatas=SB_ESCOLAS.filter(e=>{
-    const nome=normalizarBuscaEscola(nomeEscola(e));
-    const completo=normalizarBuscaEscola(textoEscola(e));
-    return nome===busca||completo===busca;
-  });
-  if(exatas.length===1)return exatas[0];
-  const aproximadas=SB_ESCOLAS.filter(e=>normalizarBuscaEscola(nomeEscola(e)).includes(busca));
+  const catalogo=catalogoCompletoEscolas();
+  const completa=catalogo.find(e=>normalizarBuscaEscola(textoEscola(e))===busca);
+  if(completa)return completa;
+  const exatas=catalogo.filter(e=>normalizarBuscaEscola(nomeEscola(e))===busca);
+  if(exatas.length)return exatas[0];
+  const aproximadas=catalogo.filter(e=>normalizarBuscaEscola(nomeEscola(e)).includes(busca));
   return aproximadas.length===1?aproximadas[0]:null;
 }
 function aplicarEscolaDestino(){
@@ -1748,7 +1766,7 @@ function prepararBuscaEscolas(anterior,c){
   const box=el('ex-escolas-box');
   box.classList.toggle('hidden',c.re!=='interior');
   const dl=el('lista-escolas-pe');
-  dl.innerHTML=SB_ESCOLAS.map(e=>`<option value="${esc(textoEscola(e))}" data-id="${e.id}">${esc(detalheEscola(e))}</option>`).join('');
+  dl.innerHTML=catalogoCompletoEscolas().map(e=>`<option value="${esc(textoEscola(e))}" data-id="${e.id||''}">${esc(detalheEscola(e))}</option>`).join('');
   el('ex-esc-o').value='';el('ex-esc-o').dataset.id='';
   el('ex-esc-r').value='';el('ex-esc-r').dataset.id='';
   const inp=el('ex-esc-d'),info=el('ex-esc-d-info'),e=escolaPorId(anterior.escd);
@@ -1756,6 +1774,10 @@ function prepararBuscaEscolas(anterior,c){
   if(e)preencherRotaComEscola('ex-cd',e);
   inp.oninput=aplicarEscolaDestino;
   inp.onchange=aplicarEscolaDestino;
+  el('btn-aplicar-escola-destino').onclick=()=>{
+    const achada=aplicarEscolaDestino();
+    if(!achada){alert('Escola não localizada. Selecione um nome apresentado na lista.');inp.focus();}
+  };
 }
 function prepararFotos(){
   EX_FOTOS_NOVAS=[];el('ex-fotos').value='';el('ex-fotos-preview').innerHTML='';

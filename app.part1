@@ -763,6 +763,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
           <label class="label">Nome da escola</label>
           <input id="ex-esc-d" class="input" list="lista-escolas-pe" placeholder="Digite o nome da escola de destino">
           <small id="ex-esc-d-info"></small>
+          <button type="button" class="btn btn-p" id="btn-aplicar-escola-destino" style="margin-top:7px;padding:6px 10px;font-size:.7rem">📍 Carregar endereço no Destino</button>
         </div>
         <input type="hidden" id="ex-esc-o"><input type="hidden" id="ex-esc-r">
         <span id="ex-esc-o-info" class="hidden"></span><span id="ex-esc-r-info" class="hidden"></span>
