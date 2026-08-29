@@ -1743,9 +1743,18 @@ function catalogoCompletoEscolas(){
   return catalogo;
 }
 function localizarEscolaDigitada(valor){
-  const busca=normalizarBuscaEscola(valor);
-  if(!busca)return null;
   const catalogo=catalogoCompletoEscolas();
+  const original=String(valor||'').trim();
+  const codigo=(original.match(/(?:^|\D)(\d{8})(?:\D|$)/)||[])[1];
+  if(codigo){
+    const peloCodigo=catalogo.find(e=>String(e.codigo_inep||'')===codigo);
+    if(peloCodigo)return peloCodigo;
+  }
+  const busca=normalizarBuscaEscola(original)
+    .replace(/^\d{8}\s*[|;:\-–—]?\s*/,'')
+    .replace(/\s*\|\s*GRE\s*\d+.*$/,'')
+    .trim();
+  if(!busca)return null;
   const completa=catalogo.find(e=>normalizarBuscaEscola(textoEscola(e))===busca);
   if(completa)return completa;
   const exatas=catalogo.filter(e=>normalizarBuscaEscola(nomeEscola(e))===busca);
