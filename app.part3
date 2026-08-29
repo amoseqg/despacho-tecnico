@@ -1698,6 +1698,11 @@ function preencherRotaComEscola(campoId,e){
   const campo=el(campoId);
   if(!campo||!e)return;
   const endereco=enderecoRotaEscola(e);
+  if(campo.tagName!=='SELECT'){
+    campo.value=endereco;
+    campo.dataset.cidade=e.municipio||'';
+    return;
+  }
   let opcao=Array.from(campo.options).find(o=>o.value===endereco);
   if(!opcao){
     opcao=document.createElement('option');
@@ -1713,7 +1718,7 @@ function cidadeRota(campoId,escolaId){
   const campo=el(campoId),opcao=campo?.selectedOptions?.[0];
   const escola=escolaPorId(el(escolaId)?.dataset.id);
   if(escola && campo?.value===enderecoRotaEscola(escola))return escola.municipio||'';
-  return opcao?.dataset.cidade||campo?.value||'';
+  return opcao?.dataset.cidade||campo?.dataset.cidade||campo?.value||'';
 }
 function normalizarBuscaEscola(valor){
   return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/\s+/g,' ').trim();
@@ -1801,10 +1806,11 @@ function opEx(id) {
 
   const opts = '<option value="">Selecione...</option>' + cidades.map(ci => `<option>${ci}</option>`).join('');
   el('ex-co').innerHTML = opts;
-  el('ex-cd').innerHTML = opts;
   el('ex-cr').innerHTML = opts;
+  el('lista-cidades-rota').innerHTML=cidades.map(ci=>`<option value="${esc(ci)}"></option>`).join('');
 
   el('ex-co').value = anterior.co || ''; el('ex-cd').value = anterior.cd || ''; el('ex-cr').value = anterior.cr || '';
+  el('ex-cd').dataset.cidade='';
   prepararBuscaEscolas(anterior,c);
   prepararFotos();
   el('ex-km').value = anterior.km || ''; el('ex-vkm').value = anterior.vkm || '';
