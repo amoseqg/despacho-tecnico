@@ -728,6 +728,40 @@ function rLogEstoque(){
  s.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${m.id}">${escM(m.nome)} (${escM(m.unidade)})</option>`).join('');
  if(selecionado&&D.mat.some(m=>String(m.id)===String(selecionado))){s.value=selecionado;if(q&&qtdAtual!=='')q.value=qtdAtual;}
  b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Situação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td><b>${m.estoque||0}</b></td><td><span class="badge ${(m.estoque||0)>0?'b-concluida':'b-recusado'}">${(m.estoque||0)>0?'Disponível':'Sem estoque'}</span></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
+ rLogCadastroMateriais();
+}
+function rLogCadastroMateriais(){
+ const b=el('lg-mat-cadastro-lista');if(!b)return;
+ b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Ação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td>${m.estoque||0}</td><td><button class="btn btn-r btn-rm-mat" data-id="${m.id}">Remover</button></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
+}
+async function addMaterialLogistica(){
+ const nome=el('lg-mat-nome')?.value.trim(),un=el('lg-mat-un')?.value||'UN',btn=el('btn-lg-add-material');
+ if(!nome){alert('Informe o material');return;}
+ if(D.mat.some(m=>m.nome.toLowerCase()===nome.toLowerCase())){alert('Material já cadastrado');return;}
+ const texto=btn?.innerHTML;
+ try{
+   if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
+   const {data,error}=await SB.from('materiais').insert({nome,unidade:un,estoque:0,ativo:true}).select('*').single();
+   if(error)throw error;
+   D.mat.push({id:data.id,nome:data.nome,unidade:data.unidade,estoque:Number(data.estoque||0),c:data.criado_em});
+   SB_LOADED_MAT.add(data.id);lsSet('dd',D);el('lg-mat-nome').value='';rLogEstoque();
+   alert('Material cadastrado e confirmado no servidor.');
+ }catch(e){sbShowError('Não foi possível cadastrar o material',e);await sbRecarregarDados();}
+ finally{if(btn){btn.disabled=false;btn.innerHTML=texto||'➕ Cadastrar Material';}}
+}
+async function removerMaterial(id){
+ const m=materialById(id);if(!m||!confirm('Remover este material do estoque?'))return;
+ try{
+   if(S?.t==='log'){
+     const {data,error}=await SB.from('materiais').update({ativo:false,atualizado_em:new Date().toISOString()}).eq('id',m.id).select('id,ativo').single();
+     if(error)throw error;
+     if(!data||data.ativo!==false)throw new Error('O servidor não confirmou a remoção.');
+     D.mat=D.mat.filter(x=>x.id!==m.id);SB_LOADED_MAT.delete(m.id);lsSet('dd',D);rLog();
+     alert('Material removido e confirmado no servidor.');
+   }else{
+     D.mat=D.mat.filter(x=>x.id!==m.id);sv();rMl();
+   }
+ }catch(e){sbShowError('Não foi possível remover o material',e);await sbRecarregarDados();}
 }
 async function ajusteEstoqueLogistica(){
  const id=el('lg-estoque-material')?.value,q=Number(el('lg-estoque-qtd')?.value),m=materialById(id),btn=el('btn-lg-ajuste');
@@ -2168,6 +2202,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnAddMaterial=el('btn-add-material'); if(btnAddMaterial) btnAddMaterial.addEventListener('click',addMaterial);
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAjuste=el('btn-lg-ajuste'); if(btnLgAjuste) btnLgAjuste.addEventListener('click',ajusteEstoqueLogistica); const selLgEst=el('lg-estoque-material'); if(selLgEst) selLgEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('lg-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
+  const btnLgAddMaterial=el('btn-lg-add-material'); if(btnLgAddMaterial) btnLgAddMaterial.addEventListener('click',addMaterialLogistica);
   const btnSolic=el('btn-tm-solicitar'); if(btnSolic) btnSolic.addEventListener('click',solicitarMaterial);
   let circuitoDescricaoTimer=null;
   el('c-descricao-colada').addEventListener('input',function(){
@@ -2302,7 +2337,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-log-liberar')) { liberarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-tech-aceitar-material')) { aceitarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-correios')) { consultarCorreiosOficial(t.dataset.id); }
-    if(t.classList.contains('btn-rm-mat')) { const m=materialById(t.dataset.id); if(m && confirm('Excluir este material?')) { D.mat=D.mat.filter(x=>x.id!==m.id); sv(); rMl(); } }
+    if(t.classList.contains('btn-rm-mat')) { removerMaterial(t.dataset.id); }
   });
 
   // Auto login
