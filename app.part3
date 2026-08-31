@@ -1184,10 +1184,32 @@ function rAt() {
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
-function rRl(dt1, dt2) {
+let RL_DT1_ATUAL = '';
+let RL_DT2_ATUAL = '';
+let RL_CARDS_OCULTOS = localStorage.getItem('nf-rl-cards-ocultos') === '1';
+
+function limparCardsRelatorio() {
+  RL_CARDS_OCULTOS = true;
+  localStorage.setItem('nf-rl-cards-ocultos', '1');
+  const container = el('rl-cards');
+  if (container) container.innerHTML = '<div class="empty"><h3>Cards limpos da tela</h3><p>A base histórica permanece salva e disponível para filtros e relatórios. Clique em “Filtrar Período” para exibir os cards novamente.</p></div>';
+}
+
+function rRl(dt1, dt2, forcarExibicao) {
   const container = el('rl-cards');
   if(!container) return;
   renderRelatoriosQualidade();
+
+  RL_DT1_ATUAL = dt1 || '';
+  RL_DT2_ATUAL = dt2 || '';
+  if (forcarExibicao) {
+    RL_CARDS_OCULTOS = false;
+    localStorage.removeItem('nf-rl-cards-ocultos');
+  }
+  if (RL_CARDS_OCULTOS) {
+    container.innerHTML = '<div class="empty"><h3>Cards limpos da tela</h3><p>A base histórica permanece salva e disponível para filtros e relatórios. Clique em “Filtrar Período” para exibir os cards novamente.</p></div>';
+    return;
+  }
 
   let chamados = D.ch.filter(c => c.st === 'concluida');
   if (dt1) {
@@ -1284,7 +1306,15 @@ function opPl(u) {
   const nome = tec ? tec.n : nt(u);
   const regiao = tec ? tec.r : 'capital';
 
-  const chamados = D.ch.filter(c => c.te === u && c.st === 'concluida');
+  let chamados = D.ch.filter(c => c.te === u && c.st === 'concluida');
+  if (RL_DT1_ATUAL) {
+    const d1 = new Date(RL_DT1_ATUAL + 'T00:00:00');
+    chamados = chamados.filter(c => c.dtexec && new Date(c.dtexec) >= d1);
+  }
+  if (RL_DT2_ATUAL) {
+    const d2 = new Date(RL_DT2_ATUAL + 'T23:59:59');
+    chamados = chamados.filter(c => c.dtexec && new Date(c.dtexec) <= d2);
+  }
   if (chamados.length === 0) return;
 
   el('pl-tit').textContent = '📋 Planilha — ' + nome;
@@ -2058,6 +2088,102 @@ function atividadesDoTecnicoAtual(dt1, dt2) {
   return list;
 }
 
+const CABECALHOS_PAGAMENTO = ['O.S','SITE','ORIGEM','DESTINO','RETORNO','DATA','ATIVIDADE','MISCELANEA','QTD','KM TOTAL','VALOR KM','VALOR MATERIAL','TOTAL MATERIAL','VALOR ATIVIDADE','VALOR TOTAL','OBSERVAÇÃO'];
+
+function numeroExcel(v) {
+  if (typeof v === 'number') return isFinite(v) ? v : 0;
+  if (v === null || v === undefined || v === '') return 0;
+  let s = String(v).replace(/R\$|\s/g, '');
+  if (s.includes(',')) s = s.replace(/\./g, '').replace(',', '.');
+  const n = Number(s);
+  return isFinite(n) ? n : 0;
+}
+
+function nomeAbaExcel(nome, usadas) {
+  const base = (nome || 'TECNICO').toUpperCase().replace(/[\\\/?*\[\]:]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 31) || 'TECNICO';
+  let nomeFinal = base, i = 2;
+  while (usadas.has(nomeFinal)) {
+    const sufixo = ' ' + i++;
+    nomeFinal = base.slice(0, 31 - sufixo.length) + sufixo;
+  }
+  usadas.add(nomeFinal);
+  return nomeFinal;
+}
+
+function linhaPagamento(c) {
+  const ex = c.ex || {};
+  const materiais = [ex.utp && 'UTP ' + ex.utp + 'm', ex.cci && 'CCI ' + ex.cci + 'm', ex.can && 'Canaleta ' + ex.can + 'm'].filter(Boolean);
+  const quantidades = [ex.utp, ex.cci, ex.can].filter(Boolean);
+  const status = c.ap && c.ap.status ? c.ap.status.toUpperCase() : 'PENDENTE';
+  const observacao = [ex.relatorio || ex.obs, 'PAGAMENTO: ' + status].filter(Boolean).join(' | ');
+  return [
+    valorExcel(c.pr), valorExcel(c.si), valorExcel(ex.co), valorExcel(ex.cd), valorExcel(ex.cr),
+    c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '',
+    valorExcel(ex.atv ? ex.atv.split('|')[0] : ''), materiais.join(', '), quantidades.join(' / '),
+    numeroExcel(ex.km), numeroExcel(ex.vkm), '', numeroExcel(ex.tmat), numeroExcel(ex.vatv), numeroExcel(ex.total), valorExcel(observacao)
+  ];
+}
+
+function criarAbaPagamento(nome, list) {
+  const dados = [[String(nome || 'PARCEIRO').toUpperCase()], [], CABECALHOS_PAGAMENTO];
+  list.forEach(c => dados.push(linhaPagamento(c)));
+  dados.push([]);
+  dados.push(['','','','','','','','','','','','','','VALOR TOTAL', list.reduce((s,c)=>s+numeroExcel(c.ex && c.ex.total),0), '']);
+  const ws = XLSX.utils.aoa_to_sheet(dados);
+  ws['!merges'] = [{s:{r:0,c:0},e:{r:1,c:15}}];
+  ws['!cols'] = [12,42,18,18,18,13,30,24,10,12,14,16,16,18,16,45].map(wch=>({wch}));
+  ws['!rows'] = [{hpt:24},{hpt:10},{hpt:28}];
+  ws['!autofilter'] = {ref:'A3:P' + Math.max(3, list.length + 3)};
+  for (let r = 4; r <= list.length + 3; r++) {
+    ['K','L','M','N','O'].forEach(col => { if(ws[col+r]) ws[col+r].z = 'R$ #,##0.00'; });
+  }
+  const totalRow = list.length + 5;
+  if (ws['O'+totalRow]) ws['O'+totalRow].z = 'R$ #,##0.00';
+  return ws;
+}
+
+function chamadosPagamentoPeriodo(dt1, dt2) {
+  let list = D.ch.filter(c => c.st === 'concluida');
+  if (dt1) { const d1 = new Date(dt1 + 'T00:00:00'); list = list.filter(c => c.dtexec && new Date(c.dtexec) >= d1); }
+  if (dt2) { const d2 = new Date(dt2 + 'T23:59:59'); list = list.filter(c => c.dtexec && new Date(c.dtexec) <= d2); }
+  return list;
+}
+
+function exportarConsolidadoPagamentos() {
+  const dt1 = el('rl-dt1') ? el('rl-dt1').value : '';
+  const dt2 = el('rl-dt2') ? el('rl-dt2').value : '';
+  if (dt1 && dt2 && new Date(dt1) > new Date(dt2)) { alert('A data inicial não pode ser maior que a data final.'); return; }
+  const list = chamadosPagamentoPeriodo(dt1, dt2);
+  if (!list.length) { alert('Não existem serviços concluídos no período selecionado.'); return; }
+
+  const grupos = {};
+  list.forEach(c => { (grupos[c.te] ||= []).push(c); });
+  const usadas = new Set(['TOTAL','LPU']);
+  const abas = Object.keys(grupos).map(u => ({u, nome:nt(u) || u || 'Técnico', aba:nomeAbaExcel(nt(u) || u || 'Técnico', usadas), chamados:grupos[u]}));
+  const periodo = (dt1 && dt2) ? new Date(dt1+'T00:00:00').toLocaleDateString('pt-BR') + ' A ' + new Date(dt2+'T00:00:00').toLocaleDateString('pt-BR') : 'BASE COMPLETA';
+  const totalDados = [['TOTAL - PERÍODO ' + periodo],[],['PARCEIRO','VALOR TOTAL','QTDE OS','APROVADAS','PENDENTES','REJEITADAS']];
+  abas.forEach(a => totalDados.push([
+    a.nome,
+    a.chamados.reduce((s,c)=>s+numeroExcel(c.ex && c.ex.total),0),
+    a.chamados.length,
+    a.chamados.filter(c=>c.ap&&c.ap.status==='aprovado').length,
+    a.chamados.filter(c=>!c.ap||c.ap.status==='pendente').length,
+    a.chamados.filter(c=>c.ap&&c.ap.status==='rejeitado').length
+  ]));
+  totalDados.push([],['VALOR TOTAL',list.reduce((s,c)=>s+numeroExcel(c.ex&&c.ex.total),0),list.length]);
+  const wsTotal = XLSX.utils.aoa_to_sheet(totalDados);
+  wsTotal['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}];
+  wsTotal['!cols']=[{wch:38},{wch:18},{wch:12},{wch:12},{wch:12},{wch:12}];
+  for(let r=4;r<=abas.length+3;r++)if(wsTotal['B'+r])wsTotal['B'+r].z='R$ #,##0.00';
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,wsTotal,'TOTAL');
+  abas.forEach(a=>XLSX.utils.book_append_sheet(wb,criarAbaPagamento(a.nome,a.chamados),a.aba));
+  const lpu=[['LPU - PECONECTADO II','','','','','MATERIAIS - INCIDENTE',''],['LOCALIDADE','ATIVIDADE PADRONIZADA','VALOR','TIPO','','MATERIAL','VALOR POR METRO'],['RMR','INCIDENTE DE VOZ CAPITAL',100,'FIXO','','CABO UTP (INCIDENTE)',1.95],['RMR','INCIDENTE DE DADOS CAPITAL',120,'FIXO','','CABO CCI (INCIDENTE)',1],['INTERIOR','INCIDENTE VOZ INTERIOR',150,'FIXO'],['INTERIOR','INCIDENTE DE DADOS INTERIOR',150,'FIXO'],['GERAL','INSTALAÇÃO',150,'FIXO'],['GERAL','ALTERAÇÃO',150,'FIXO'],['GERAL','SERVIÇO DE ANALISTA CENTRAIS',200,'FIXO'],['GERAL','SERVIÇOS MAIORES','','A COMBINAR']];
+  const wsLpu=XLSX.utils.aoa_to_sheet(lpu);wsLpu['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}},{s:{r:0,c:5},e:{r:0,c:6}}];wsLpu['!cols']=[{wch:22},{wch:42},{wch:14},{wch:16},{wch:3},{wch:28},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,wsLpu,'LPU');
+  XLSX.writeFile(wb,'Consolidado_Pagamentos_'+(dt1||'inicio')+'_a_'+(dt2||'fim')+'.xlsx');
+}
+
 function exportarAtividadesExcel() {
   if (!S || S.t !== 'tec') return;
   const dt1 = el('ar-dt1') ? el('ar-dt1').value : '';
@@ -2068,42 +2194,13 @@ function exportarAtividadesExcel() {
     return;
   }
 
-  const rows = list.map(c => {
-    const ex = c.ex || {};
-    return {
-      'O.S': valorExcel(c.pr),
-      'Site': valorExcel(c.si),
-      'Circuito': valorExcel(c.ci),
-      'Cidade': valorExcel(c.cid),
-      'Endereço': valorExcel(c.en),
-      'Origem': valorExcel(ex.co),
-      'Destino': valorExcel(ex.cd),
-      'Retorno': valorExcel(ex.cr),
-      'Data da Execução': c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '',
-      'Atividade': valorExcel(ex.atv ? ex.atv.split('|')[0] : ''),
-      'Miscelânea': valorExcel(
-        [ex.utp && 'UTP ' + ex.utp + 'm', ex.cci && 'CCI ' + ex.cci + 'm', ex.can && 'Canaleta ' + ex.can + 'm']
-        .filter(Boolean).join(', ')
-      ),
-      'Quantidade': valorExcel([ex.utp, ex.cci, ex.can].filter(Boolean).join(' / ')),
-      'KM Total': valorExcel(ex.km),
-      'Valor KM': valorExcel(ex.vkm),
-      'Total Material': valorExcel(ex.tmat),
-      'Valor Atividade': valorExcel(ex.vatv),
-      'Valor Total': valorExcel(ex.total),
-      'Relatório / Observação': valorExcel(ex.relatorio || ex.obs),
-      'Status Pagamento': valorExcel(c.ap && c.ap.status ? c.ap.status : 'Pendente')
-    };
-  });
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.min(Math.max(k.length + 2, 14), 40) }));
+  const ws = criarAbaPagamento(S.n || 'Técnico', list);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Atividades Realizadas');
+  XLSX.utils.book_append_sheet(wb, ws, 'PAGAMENTOS');
 
   const nomeTec = (S.n || 'tecnico').replace(/[\\/:*?"<>|]/g, '_').trim();
   const periodo = (dt1 || 'inicio') + '_a_' + (dt2 || 'fim');
-  XLSX.writeFile(wb, 'Atividades_' + nomeTec + '_' + periodo + '.xlsx');
+  XLSX.writeFile(wb, 'Pagamentos_' + nomeTec + '_' + periodo + '.xlsx');
 }
 
 function exportarServicoAprovadoExcel() {
@@ -2124,41 +2221,9 @@ function exportarServicoAprovadoExcel() {
     return;
   }
 
-  const rows = list.map(c => {
-    const ex = c.ex || {};
-    return {
-      'Técnico': nomeTec,
-      'O.S': valorExcel(c.pr),
-      'Protocolo / Circuito': valorExcel(c.ci),
-      'Site': valorExcel(c.si),
-      'Cidade': valorExcel(c.cid),
-      'Endereço': valorExcel(c.en),
-      'Região': valorExcel(c.regiaoOperacional),
-      'Quem abriu': valorExcel(c.abertura),
-      'Data Execução': c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '',
-      'Atividade': valorExcel(ex.atv ? ex.atv.split('|')[0] : ''),
-      'Origem': valorExcel(ex.co),
-      'Destino': valorExcel(ex.cd),
-      'Retorno': valorExcel(ex.cr),
-      'KM Total': valorExcel(ex.km),
-      'Valor KM': valorExcel(ex.vkm),
-      'Material': valorExcel(
-        [ex.utp && 'UTP ' + ex.utp + 'm', ex.cci && 'CCI ' + ex.cci + 'm', ex.can && 'Canaleta ' + ex.can + 'm']
-        .filter(Boolean).join(', ')
-      ),
-      'Total Material': valorExcel(ex.tmat),
-      'Valor Atividade': valorExcel(ex.vatv),
-      'Valor Total': valorExcel(ex.total),
-      'Relatório do Serviço Executado': valorExcel(ex.relatorio || ex.obs),
-      'Aprovado em': valorExcel(c.ap.data),
-      'Aprovado por': valorExcel(c.ap.admin)
-    };
-  });
-
-  const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = Object.keys(rows[0]).map(k => ({ wch: Math.min(Math.max(k.length + 2, 14), 42) }));
+  const ws = criarAbaPagamento(nomeTec, list);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Serviço Aprovado');
+  XLSX.utils.book_append_sheet(wb, ws, 'PAGAMENTOS APROVADOS');
 
   const safe = nomeTec.replace(/[\\/:*?"<>|]/g, '_').trim();
   XLSX.writeFile(wb, 'Servico_Aprovado_' + safe + '.xlsx');
@@ -2337,6 +2402,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // Exportar CSV
   const btnExp = el('btn-exp-csv');
   if(btnExp) btnExp.addEventListener('click', expCSV);
+  const btnExpConsolidado = el('btn-exp-consolidado');
+  if(btnExpConsolidado) btnExpConsolidado.addEventListener('click', exportarConsolidadoPagamentos);
+  const btnLimparRlCards = el('btn-limpar-rl-cards');
+  if(btnLimparRlCards) btnLimparRlCards.addEventListener('click', limparCardsRelatorio);
   const btnExpPerdas=el('btn-exp-perdas');
   if(btnExpPerdas) btnExpPerdas.addEventListener('click',()=>exportarRelatorioQualidade('perdas'));
   const btnExpReinc=el('btn-exp-reincidencias');
@@ -2352,7 +2421,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if(btnFilRl) btnFilRl.addEventListener('click', function() {
     const dt1 = el('rl-dt1').value;
     const dt2 = el('rl-dt2').value;
-    rRl(dt1, dt2);
+    rRl(dt1, dt2, true);
   });
 
   // Filtros de período - Técnico

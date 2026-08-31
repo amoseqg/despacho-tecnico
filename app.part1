@@ -662,7 +662,11 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
           <h3 style="font-size:.85rem;color:var(--p)">📊 Planilhas de Pagamento por Técnico</h3>
-          <button class="btn btn-s" id="btn-exp-csv">📥 Exportar CSV</button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-p" id="btn-exp-consolidado">📊 Exportar Consolidado Excel</button>
+            <button class="btn btn-s" id="btn-exp-csv">📥 Exportar CSV</button>
+            <button class="btn btn-r" id="btn-limpar-rl-cards">🧹 Limpar Cards</button>
+          </div>
         </div>
         <div class="grid-3" style="gap:8px">
           <div class="form-group"><label class="label">Data Inicial</label><input type="date" id="rl-dt1" class="input"></div>
