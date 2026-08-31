@@ -401,6 +401,43 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
   .nf-dashboard-hero>div{left:18px;right:18px}.nf-dashboard-hero small{max-width:78%}
 }
 
+
+/* ===== NEXOFIELD IMAGE FRAMING FIX ===== */
+.role-photo{
+  height:auto;
+  aspect-ratio:1/1;
+  background-size:contain;
+  background-position:center;
+  background-repeat:no-repeat;
+  box-shadow:none;
+}
+.area-card{
+  min-height:0;
+  height:auto;
+  padding-bottom:24px;
+}
+.nf-dashboard-hero{
+  min-height:240px;
+  background-size:100% 100%,auto 100%;
+  background-position:center,right center;
+  background-repeat:no-repeat;
+}
+@media(max-width:760px){
+  .role-photo{
+    height:auto;
+    aspect-ratio:1/1;
+    background-size:contain;
+  }
+  .area-card{min-height:0}
+  .nf-dashboard-hero{
+    min-height:180px;
+    background-size:100% 100%,auto 100%;
+    background-position:center,right center;
+  }
+  .nf-dashboard-hero>div{max-width:62%}
+  .nf-dashboard-hero small{max-width:100%}
+}
+
 </style>
 <base target="_blank">
 <base target="_blank">
