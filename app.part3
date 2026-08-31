@@ -965,7 +965,20 @@ let TC_CARREGANDO=false;
 function renderTc() {
   const tb = el('tb-tc');
   if(!tb) return;
-  tb.innerHTML = D.tc.map(t => {
+  const pesquisa=el('tc-pesquisa');
+  const resultados=el('tc-resultados');
+  const status=el('tc-pesquisa-status');
+  const termo=String(pesquisa?.value||'').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  if(!termo){
+    if(resultados)resultados.classList.add('hidden');
+    if(status)status.textContent='A lista está oculta. Digite um nome para consultar o cadastro.';
+    tb.innerHTML='';
+    return;
+  }
+  const filtrados=D.tc.filter(t=>String(t.n||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'').includes(termo));
+  if(resultados)resultados.classList.remove('hidden');
+  if(status)status.textContent=filtrados.length?`${filtrados.length} técnico(s) encontrado(s).`:'Nenhum técnico cadastrado corresponde ao nome informado.';
+  tb.innerHTML = filtrados.map(t => {
     const a = D.ch.filter(c => c.te === t.u && c.st === 'andamento').length;
     const r = nomeRegiao(t.r);
     const skTec = skillsTec(t);
@@ -973,7 +986,7 @@ function renderTc() {
     const ar = areasTec(t).map(nomeArea).join(', ');
     const end=enderecoEntregaTexto(t)||((t.r==='interior'||t.r==='noronha')?'Não cadastrado':'Não se aplica');
     return `<tr><td>${escM(t.n)}</td><td>${escM(t.u)}</td><td>${escM(t.e || 'Não cadastrado')}</td><td>${r}</td><td>${escM(end)}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-endereco-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Cadastrar ou alterar endereço de entrega">📍 Endereço</button><button class="btn btn-s btn-reset-senha" data-u="${escM(t.u)}" data-email="${escM(t.e || '')}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button><button class="btn btn-r btn-rm-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Excluir técnico">🗑️</button></div></td></tr>`;
-  }).join('') || '<tr><td colspan="9" class="empty">Nenhum técnico cadastrado</td></tr>';
+  }).join('') || '<tr><td colspan="9" class="empty">Nenhum técnico encontrado</td></tr>';
 }
 async function rTc() {
   const tb=el('tb-tc');
@@ -1172,6 +1185,38 @@ function exportarChamadosEncerrados(dt1,dt2){
   if(!chamados.length){alert('Nenhum chamado encerrado no período informado.');return;}
   const rows=chamados.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Quem abriu o chamado':c.abertura||'Não informado','Circuito':c.ci||'','Site / Cliente':c.si||'','Cidade':c.cid||'','Região':nomeRegiao(c.re).replace(/^[^ ]+ /,''),'Técnico':nt(c.te)||'','Abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'','Encerramento':dataEncerramentoChamado(c)?new Date(dataEncerramentoChamado(c)).toLocaleString('pt-BR'):'','Atividade':c.ex?.atv||'','Relatório de encerramento':c.ex?.relatorio||c.ex?.obs||'','Valor total':c.ex?.total||''}));
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),50)}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Chamados encerrados');XLSX.writeFile(wb,`chamados_encerrados_${dt1}_a_${dt2}.xlsx`);
+}
+
+function exportarBaseChamadosFechados(dt1,dt2){
+  if(dt1&&dt2&&new Date(dt1)>new Date(dt2)){alert('A data inicial não pode ser maior que a data final.');return;}
+  let chamados=D.ch.filter(c=>c.st==='concluida'&&dataEncerramentoChamado(c));
+  if(dt1){const inicio=new Date(dt1+'T00:00:00');chamados=chamados.filter(c=>new Date(dataEncerramentoChamado(c))>=inicio);}
+  if(dt2){const fim=new Date(dt2+'T23:59:59');chamados=chamados.filter(c=>new Date(dataEncerramentoChamado(c))<=fim);}
+  chamados.sort((a,b)=>new Date(dataEncerramentoChamado(b))-new Date(dataEncerramentoChamado(a)));
+  if(!chamados.length){alert('Nenhum chamado fechado foi encontrado no período informado.');return;}
+  const rows=chamados.map(c=>({
+    'Protocolo':c.pr||'',
+    'SDM':c.sdm||'',
+    'OS Peconecta':c.osPeconecta||c.os||'',
+    'Quem abriu o chamado':c.abertura||'Não informado',
+    'Circuito':c.ci||'',
+    'Site / Cliente':c.si||'',
+    'Endereço':c.en||'',
+    'Cidade':c.cid||'',
+    'Região':nomeRegiao(c.re).replace(/^[^ ]+ /,''),
+    'Técnico responsável':nt(c.te)||'',
+    'Data de abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'',
+    'Data de fechamento':new Date(dataEncerramentoChamado(c)).toLocaleString('pt-BR'),
+    'Atividade executada':c.ex?.atv||'',
+    'Relatório de encerramento':c.ex?.relatorio||c.ex?.obs||'',
+    'Valor total':c.ex?.total||'',
+    'Encerrado por':c.tr?.slice().reverse().find(x=>String(x.m||'').toLowerCase().includes('encerrado pelo administrador'))?.admin||''
+  }));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),52)}));
+  ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length,c:Object.keys(rows[0]).length-1}})};
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Base chamados fechados');
+  XLSX.writeFile(wb,`base_chamados_fechados_${dt1||'inicio'}_a_${dt2||'atual'}.xlsx`);
 }
 
 function rAt() {
@@ -2333,6 +2378,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if(btnAddAdm) btnAddAdm.addEventListener('click', addAdm);
   if(btnAddLog) btnAddLog.addEventListener('click', addLog);
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
+  const pesquisaTec=el('tc-pesquisa');if(pesquisaTec)pesquisaTec.addEventListener('input',renderTc);
   const btnAddMaterial=el('btn-add-material'); if(btnAddMaterial) btnAddMaterial.addEventListener('click',addMaterial);
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAjuste=el('btn-lg-ajuste'); if(btnLgAjuste) btnLgAjuste.addEventListener('click',ajusteEstoqueLogistica); const selLgEst=el('lg-estoque-material'); if(selLgEst) selLgEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('lg-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
@@ -2414,6 +2460,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const limparIndicadores=el('btn-limpar-indicadores');if(limparIndicadores)limparIndicadores.addEventListener('click',limparIndicadoresDashboard);
   const fecharDb=el('btn-fechar-db-detalhes');if(fecharDb)fecharDb.addEventListener('click',()=>el('db-card-detalhes').classList.add('hidden'));
   const expDb=el('btn-db-exp-concluidos');if(expDb)expDb.addEventListener('click',()=>exportarChamadosEncerrados(el('db-dt1').value,el('db-dt2').value));
+  const expBaseFechados=el('btn-db-exp-base-fechados');if(expBaseFechados)expBaseFechados.addEventListener('click',()=>exportarBaseChamadosFechados(el('db-base-dt1').value,el('db-base-dt2').value));
   const expEnc=el('btn-rl-exp-encerrados');if(expEnc)expEnc.addEventListener('click',()=>exportarChamadosEncerrados(el('rl-enc-dt1').value,el('rl-enc-dt2').value));
 
   // Filtros de período - Admin

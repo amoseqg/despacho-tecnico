@@ -514,6 +514,10 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     </section>
     <div id="v-db">
       <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:.65rem;color:var(--gr)">Indicadores de qualidade referentes ao mês atual.</span><button type="button" class="btn btn-s" id="btn-limpar-indicadores">🧹 Limpar indicadores</button></div>
+      <div class="card" style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p)">📁 Base de chamados fechados</h3><span style="font-size:.65rem;color:var(--gr)">A exportação inclui quem abriu cada chamado.</span></div>
+        <div class="grid-3" style="gap:8px"><div class="form-group"><label class="label">Data inicial do fechamento (opcional)</label><input type="date" id="db-base-dt1" class="input"></div><div class="form-group"><label class="label">Data final do fechamento (opcional)</label><input type="date" id="db-base-dt2" class="input"></div><div class="form-group" style="display:flex;align-items:flex-end"><button type="button" class="btn btn-p" id="btn-db-exp-base-fechados" style="width:100%">📥 Extrair base fechada</button></div></div>
+      </div>
       <div class="grid-4" style="margin-bottom:14px">
         <button type="button" class="card stat" data-db-filter="pendente"><div class="l">Pendentes</div><div class="v" id="s-p">0</div></button>
         <button type="button" class="card stat y" data-db-filter="andamento"><div class="l">Andamento</div><div class="v" id="s-a">0</div></button>
@@ -579,7 +583,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       </div>
       <div class="card">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">👷 Técnicos Cadastrados</h3>
-        <div style="overflow-x:auto"><table class="table">
+        <div class="form-group" style="margin-bottom:10px"><label class="label">Pesquisar técnico cadastrado</label><input type="search" id="tc-pesquisa" class="input" autocomplete="off" placeholder="Digite o nome do técnico..."><div id="tc-pesquisa-status" style="font-size:.65rem;color:var(--gr);margin-top:5px">A lista está oculta. Digite um nome para consultar o cadastro.</div></div>
+        <div id="tc-resultados" class="hidden" style="overflow-x:auto"><table class="table">
           <thead><tr><th>Nome</th><th>Usuário</th><th>E-mail</th><th>Região</th><th>Endereço de entrega</th><th>Skills</th><th>Áreas</th><th>Ativas</th><th></th></tr></thead>
           <tbody id="tb-tc"></tbody>
         </table></div>
