@@ -60,3 +60,6 @@ for(const [entrada,codigoEsperado,nomeEsperado] of consultasEscola){
 }
 
 console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} blocos JavaScript, ${casos.length} formatos de protocolo/SDM e ${consultasEscola.length} formatos de escola.`);
+
+assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
+assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
