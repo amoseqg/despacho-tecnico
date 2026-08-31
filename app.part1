@@ -513,6 +513,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div><span>Central de operações</span><strong>Gestão em tempo real</strong><small>Chamados, equipes, prazos e indicadores em um só lugar.</small></div>
     </section>
     <div id="v-db">
+      <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:.65rem;color:var(--gr)">Indicadores de qualidade referentes ao mês atual.</span><button type="button" class="btn btn-s" id="btn-limpar-indicadores">🧹 Limpar indicadores</button></div>
       <div class="grid-4" style="margin-bottom:14px">
         <button type="button" class="card stat" data-db-filter="pendente"><div class="l">Pendentes</div><div class="v" id="s-p">0</div></button>
         <button type="button" class="card stat y" data-db-filter="andamento"><div class="l">Andamento</div><div class="v" id="s-a">0</div></button>
@@ -657,16 +658,6 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p)">✅ Extrair chamados encerrados por período</h3><button type="button" class="btn btn-p" id="btn-rl-exp-encerrados">📥 Exportar Excel</button></div>
         <div class="grid-2" style="gap:8px"><div class="form-group"><label class="label">Data inicial do encerramento</label><input type="date" id="rl-enc-dt1" class="input"></div><div class="form-group"><label class="label">Data final do encerramento</label><input type="date" id="rl-enc-dt2" class="input"></div></div>
-      </div>
-      <div class="grid-2" style="margin-bottom:12px">
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p)">⏱️ Relatório — Perda de prazo</h3><button class="btn btn-s" id="btn-exp-perdas">📥 Excel</button></div>
-          <div id="rl-perdas"></div>
-        </div>
-        <div class="card">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p)">🔁 Relatório — Reincidências em até 30 dias</h3><button class="btn btn-s" id="btn-exp-reincidencias">📥 Excel</button></div>
-          <div id="rl-reincidencias"></div>
-        </div>
       </div>
       <div class="card" style="margin-bottom:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
