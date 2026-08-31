@@ -852,6 +852,16 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       </div>
       <div id="lg-estoque-lista"></div>
     </div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">➕ Cadastro de Materiais</h3>
+      <div class="info">Cadastre novos itens ou remova materiais que não devem mais aparecer no estoque.</div>
+      <div class="grid-3">
+        <div class="form-group"><label class="label">Modelo / Material</label><input id="lg-mat-nome" class="input" placeholder="Ex.: FortiAP, cabo UTP..."></div>
+        <div class="form-group"><label class="label">Unidade</label><select id="lg-mat-un" class="select"><option value="UN">UN</option><option value="M">M</option><option value="KIT">KIT</option><option value="CX">CX</option><option value="OUTRO">OUTRO</option></select></div>
+        <div class="form-group" style="display:flex;align-items:flex-end"><button class="btn btn-g" id="btn-lg-add-material" style="width:100%">➕ Cadastrar Material</button></div>
+      </div>
+      <div id="lg-mat-cadastro-lista"></div>
+    </div>
   </div>
 </div>
 
