@@ -488,7 +488,7 @@ function recuperarSenha() {
   const conta = lista.find(x => x.u === usuario && x.e && x.e.toLowerCase() === email);
   if (!conta) { alert('Usuário e e-mail não correspondem a uma conta cadastrada'); return; }
   const nova = gerarSenha(); conta.s = nova; sv();
-  const assunto = encodeURIComponent('Nova senha — Despacho Técnico');
+  const assunto = encodeURIComponent('Nova senha — NexoField');
   const corpo = encodeURIComponent(`Olá, ${conta.n}.\n\nSua nova senha temporária é: ${nova}\n\nEntre no sistema e altere-a em “Alterar senha”.`);
   el('m-rec').classList.remove('a');
   window.location.href = `mailto:${encodeURIComponent(conta.e)}?subject=${assunto}&body=${corpo}`;
