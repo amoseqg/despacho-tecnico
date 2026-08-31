@@ -1154,7 +1154,7 @@ function chamadosEncerradosPorPeriodo(dt1,dt2){
 function exportarChamadosEncerrados(dt1,dt2){
   let chamados;try{chamados=chamadosEncerradosPorPeriodo(dt1,dt2);}catch(err){alert(err.message);return;}
   if(!chamados.length){alert('Nenhum chamado encerrado no período informado.');return;}
-  const rows=chamados.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Circuito':c.ci||'','Site / Cliente':c.si||'','Cidade':c.cid||'','Região':nomeRegiao(c.re).replace(/^[^ ]+ /,''),'Técnico':nt(c.te)||'','Abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'','Encerramento':dataEncerramentoChamado(c)?new Date(dataEncerramentoChamado(c)).toLocaleString('pt-BR'):'','Atividade':c.ex?.atv||'','Relatório de encerramento':c.ex?.relatorio||c.ex?.obs||'','Valor total':c.ex?.total||''}));
+  const rows=chamados.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Quem abriu o chamado':c.abertura||'Não informado','Circuito':c.ci||'','Site / Cliente':c.si||'','Cidade':c.cid||'','Região':nomeRegiao(c.re).replace(/^[^ ]+ /,''),'Técnico':nt(c.te)||'','Abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'','Encerramento':dataEncerramentoChamado(c)?new Date(dataEncerramentoChamado(c)).toLocaleString('pt-BR'):'','Atividade':c.ex?.atv||'','Relatório de encerramento':c.ex?.relatorio||c.ex?.obs||'','Valor total':c.ex?.total||''}));
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),50)}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Chamados encerrados');XLSX.writeFile(wb,`chamados_encerrados_${dt1}_a_${dt2}.xlsx`);
 }
 
@@ -1461,16 +1461,22 @@ function cfDp() {
 async function encerrarChamadoAdmin(id){
   const c=D.ch.find(x=>x.id===id);if(!c)return;
   if(!SB_PROFILE||SB_PROFILE.tipo!=='admin'){alert('Somente administradores podem encerrar chamados.');return;}
-  if(!confirm(`Encerrar o chamado ${c.pr} como administrador?`))return;
+  const encerramento=prompt(`Informe obrigatoriamente o encerramento/solução do chamado ${c.pr}:`,c.ex?.relatorio||'');
+  if(encerramento===null)return;
+  if(!encerramento.trim()){alert('Preencha a informação de encerramento antes de concluir o chamado.');return;}
+  if(!confirm(`Confirmar o encerramento do chamado ${c.pr}?`))return;
   const btn=document.querySelector('.btn-encerrar-admin[data-id="'+CSS.escape(String(id))+'"]'),texto=btn?.textContent;
   try{
     if(btn){btn.disabled=true;btn.textContent='Encerrando...';}
     const admin=await sbExigirSessaoAdmin(),agora=new Date().toISOString();
+    const tecnicoId=sbIdByUser(c.te);
+    if(!tecnicoId)throw new Error('O chamado precisa ter um técnico atribuído para ser encerrado.');
+    const {error:execErr}=await SB.from('execucoes').upsert({chamado_id:c.id,tecnico_id:tecnicoId,relatorio_encerramento:encerramento.trim(),observacao:'Encerrado administrativamente por '+admin.nome,atualizado_em:agora},{onConflict:'chamado_id'});
+    if(execErr)throw execErr;
     const {data,error}=await SB.from('chamados').update({status:'concluida',concluido_em:agora,atualizado_em:agora}).eq('id',c.id).select('id,status,concluido_em').single();
     if(error)throw error;if(!data||data.status!=='concluida')throw new Error('O servidor não confirmou o encerramento.');
-    const tecnicoId=sbIdByUser(c.te);
     if(tecnicoId){const {error:auditErr}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:tecnicoId,para_tecnico_id:tecnicoId,motivo:'Encerrado pelo administrador '+admin.nome,realizado_por:admin.id,criado_em:agora});if(auditErr)console.warn('Encerramento concluído; histórico adicional não gravado:',auditErr);}
-    c.st='concluida';c.cc=agora;c.tr.push({de:c.te,para:c.te,m:'Encerrado pelo administrador '+admin.nome,admin:admin.nome,d:agora});c._trLoadedCount=c.tr.length;lsSet('dd',D);rAt();rDb();rRl();sbSetConnectionBadge('Chamado encerrado pelo administrador',true);alert('Chamado encerrado com sucesso por '+admin.nome+'.');
+    c.ex={...(c.ex||{}),relatorio:encerramento.trim(),obs:'Encerrado administrativamente por '+admin.nome};c.st='concluida';c.cc=agora;c.tr.push({de:c.te,para:c.te,m:'Encerrado pelo administrador '+admin.nome,admin:admin.nome,d:agora});c._trLoadedCount=c.tr.length;lsSet('dd',D);rAt();rDb();rRl();sbSetConnectionBadge('Chamado encerrado pelo administrador',true);alert('Chamado encerrado com sucesso por '+admin.nome+'.');
   }catch(err){sbShowError('Não foi possível encerrar o chamado',err);await sbRecarregarDados();}
   finally{if(btn&&document.body.contains(btn)){btn.disabled=false;btn.textContent=texto||'✅ Encerrar';}}
 }
