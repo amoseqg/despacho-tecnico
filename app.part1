@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Despacho Técnico</title>
+<title>NexoField</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -239,6 +239,13 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 .b-aprovado{background:#dcfce7;color:#166534}
 .b-rejeitado{background:#fee2e2;color:#991b1b}
 .b-pag-pendente{background:#fef3c7;color:#92400e}
+
+/* Identidade NexoField mantida diretamente no código-fonte. */
+.nf-logo{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2563eb,#60a5fa);color:#fff;font-weight:800;font-size:.72rem;letter-spacing:-.03em;box-shadow:0 6px 16px rgba(37,99,235,.28);vertical-align:middle}
+.header h1 .nf-brand-name{font-weight:800;letter-spacing:-.02em}
+#t0 .nf-login-brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:7px}
+#t0 .nf-login-brand .nf-logo{width:44px;height:44px;border-radius:13px;font-size:.9rem}
+#t0 .nf-login-brand .nf-brand-name{color:#fff;font-size:1.55rem;font-weight:800;letter-spacing:-.035em}
 </style>
 <base target="_blank">
 <base target="_blank">
@@ -250,9 +257,8 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
   <div class="login-screen">
     <div style="width:100%;max-width:700px">
       <div style="text-align:center;margin-bottom:24px">
-        <div style="font-size:2.5rem;margin-bottom:4px">🔧</div>
-        <h1 style="color:#fff;font-size:1.4rem;font-weight:700">Despacho Técnico</h1>
-        <p style="color:#94a3b8;font-size:.75rem">Sistema de Gestão de Chamados</p>
+        <div class="nf-login-brand"><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></div>
+        <p style="color:#94a3b8;font-size:.75rem">Gestão Inteligente de Operações de Campo</p>
       </div>
       <div class="grid-3">
         <div class="area-card" id="card-tec" role="button" tabindex="0" onclick="showLogin('tec')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showLogin('tec')}">
@@ -297,7 +303,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 <!-- ADMIN -->
 <div id="pa" class="hidden">
   <div class="user-bar"><span>🛡️ <b>Admin</b> — <span id="an"></span></span><div style="display:flex;gap:5px"><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-adm">Sair</button></div></div>
-  <div class="header"><h1>🔧 Despacho Técnico</h1><div class="sub">Painel Administrativo</div></div>
+  <div class="header"><h1><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></h1><div class="sub">Painel Administrativo</div></div>
   <div class="nav" id="nv">
     <button class="a" data-tab="db">📊 Dashboard</button>
     <button data-tab="tc">👷 Técnicos</button>
@@ -540,7 +546,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 <!-- TÉCNICO -->
 <div id="pt" class="hidden">
   <div class="user-bar"><span>👷 <b>Técnico</b> — <span id="tn"></span> <span id="tr"></span></span><div style="display:flex;gap:5px"><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-tec">Sair</button></div></div>
-  <div class="header"><h1>🔧 Despacho Técnico</h1><div class="sub">Área do Técnico</div></div>
+  <div class="header"><h1><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></h1><div class="sub">Área do Técnico</div></div>
   <div class="nav" id="nv2">
     <button class="a" data-tab="db">📊 Dashboard</button>
     <button data-tab="dp">📥 Despachados</button>
