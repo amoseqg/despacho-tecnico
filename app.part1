@@ -683,7 +683,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     </div>
     <div id="v-ml" class="hidden">
       <div class="card" style="margin-bottom:12px">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📦 Material Logístico — Solicitações</h3>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p)">📦 Material Logístico — Solicitações</h3><button type="button" class="btn btn-p btn-exp-materiais-liberados">📥 Exportar materiais liberados</button></div>
         <div class="info">Materiais disponíveis para solicitação: lista importada da planilha <b>MATERIAL LOGISTICO.xlsx</b>. Estoque inicial dos itens importados: 0.</div>
         <div class="info">Os técnicos solicitam materiais vinculados a um protocolo. O administrador analisa a solicitação e a direciona para a separação no estoque.</div>
         <div id="ml-solicitacoes"></div>
@@ -842,7 +842,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div><span>Fluxo logístico</span><strong>Materiais sob controle</strong><small>Separação, rastreamento e entrega com visão operacional completa.</small></div>
     </section>
     <div class="card">
-      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">🚚 Trâmite dos materiais</h3>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h3 style="font-size:.9rem;color:var(--p)">🚚 Trâmite dos materiais</h3><button type="button" class="btn btn-p btn-exp-materiais-liberados">📥 Exportar materiais liberados</button></div>
       <div class="info">Capital: separação → aguardando aceite → entregue. Interior/Noronha: separação → em trânsito com rastreio e previsão → aceite do técnico → entregue.</div>
       <div id="lg-list"></div>
     </div>

@@ -776,6 +776,49 @@ async function ajusteEstoqueLogistica(){
  }catch(e){sbShowError('Não foi possível atualizar o estoque',e);await sbRecarregarDados();}
  finally{if(btn){btn.disabled=false;btn.innerHTML=texto||'💾 Salvar Quantidade';}}
 }
+function materiaisLiberadosTecnicos(){
+ return D.mr.filter(r=>{
+   const etapa=logMeta(r).etapa;
+   return r.status==='entregue'||(r.status==='separado'&&['aguardando_aceite','em_transito','entregue'].includes(etapa));
+ });
+}
+function exportarMateriaisLiberados(){
+ const list=materiaisLiberadosTecnicos().slice().sort((a,b)=>new Date(b.entregueEm||logMeta(b).transitoEm||b.separadoEm||b.data||0)-new Date(a.entregueEm||logMeta(a).transitoEm||a.separadoEm||a.data||0));
+ if(!list.length){alert('Ainda não existem materiais liberados para técnicos.');return;}
+ const rows=list.map(r=>{
+   const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),meta=logMeta(r),tec=tecnicoMaterial(r),st=logStatus(r);
+   return {
+     'Material':m?.nome||r.materialNome||'',
+     'Unidade':m?.unidade||'',
+     'Quantidade solicitada':r.qtdSolicitada||0,
+     'Quantidade liberada':r.qtdEntregue||r.qtdSeparada||0,
+     'Técnico':nt(r.tecnico)||r.tecnico||'',
+     'Região':nomeRegiao(tec?.r||c?.re||'').replace(/^[^ ]+ /,''),
+     'Protocolo':c?.pr||r.protocolo||'',
+     'SDM':c?.sdm||'',
+     'Site / Cliente':c?.si||'',
+     'Status':st[1],
+     'Solicitado em':rastreioData(r.data),
+     'Separado em':rastreioData(r.separadoEm),
+     'Liberado / enviado em':rastreioData(meta.transitoEm||r.separadoEm),
+     'Entregue em':rastreioData(r.entregueEm),
+     'Responsável logística':r.responsavel||'',
+     'Código de rastreamento':meta.rastreamento||'',
+     'Previsão de entrega':meta.prazo?new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR'):'',
+     'Observação':logObsBase(r)
+   };
+ });
+ const ws=XLSX.utils.json_to_sheet(rows);
+ ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),46)}));
+ ws['!autofilter']={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:rows.length,c:Object.keys(rows[0]).length-1}})};
+ const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Materiais liberados');
+ XLSX.writeFile(wb,'base_materiais_liberados_tecnicos.xlsx');
+}
+function alternarDetalhesTramite(id,botao){
+ const detalhes=el('lg-tramite-detalhes-'+id);if(!detalhes)return;
+ const abrir=detalhes.classList.contains('hidden');detalhes.classList.toggle('hidden',!abrir);
+ if(botao){botao.setAttribute('aria-expanded',abrir?'true':'false');const seta=botao.querySelector('.tramite-seta');if(seta)seta.textContent=abrir?'▲':'▼';}
+}
 function rLog(){
  const box=el('lg-list');if(!box)return;
  const list=D.mr.slice().reverse();
@@ -784,11 +827,13 @@ function rLog(){
    let acao='';
    if(r.status==='direcionado')acao=`<button class="btn btn-g btn-mat-separar" data-id="${r.id}">📦 Registrar separação</button>`;
    else if(r.status==='separado'&&meta.etapa==='separado')acao=interior?`<button class="btn btn-p btn-log-enviar" data-id="${r.id}">🚚 Informar envio e rastreio</button>`:`<button class="btn btn-p btn-log-liberar" data-id="${r.id}">🤝 Liberar para aceite</button>`;
-   return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
-    <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
-    <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
-    ${interior?`<div class="os-r"><b>Entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Endereço não cadastrado')}${destino.contato?' — Contato: '+escM(destino.contato):''}</div>`:''}
-    ${logDetalhes(r)}<div style="margin-top:8px">${acao}</div></div>`;
+   return `<div class="os"><button type="button" class="btn-toggle-tramite" data-id="${escM(r.id)}" aria-expanded="false" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;padding:0;text-align:left;cursor:pointer"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span style="display:flex;align-items:center;gap:8px"><span class="badge ${st[0]}">${st[1]}</span><span class="tramite-seta" aria-hidden="true">▼</span></span></button>
+    <div id="lg-tramite-detalhes-${escM(r.id)}" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--b)">
+      <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
+      <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
+      ${interior?`<div class="os-r"><b>Entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Endereço não cadastrado')}${destino.contato?' — Contato: '+escM(destino.contato):''}</div>`:''}
+      ${logDetalhes(r)}<div style="margin-top:8px">${acao}</div>
+    </div></div>`;
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
  rRastreioMateriais('lg-rastreio-lista');
  rLogEstoque();
@@ -2383,6 +2428,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAjuste=el('btn-lg-ajuste'); if(btnLgAjuste) btnLgAjuste.addEventListener('click',ajusteEstoqueLogistica); const selLgEst=el('lg-estoque-material'); if(selLgEst) selLgEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('lg-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAddMaterial=el('btn-lg-add-material'); if(btnLgAddMaterial) btnLgAddMaterial.addEventListener('click',addMaterialLogistica);
+  document.querySelectorAll('.btn-exp-materiais-liberados').forEach(btn=>btn.addEventListener('click',exportarMateriaisLiberados));
   const btnSolic=el('btn-tm-solicitar'); if(btnSolic) btnSolic.addEventListener('click',solicitarMaterial);
   let circuitoDescricaoTimer=null;
   el('c-descricao-colada').addEventListener('input',function(){
@@ -2505,7 +2551,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat, .btn-toggle-tramite') || e.target;
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
@@ -2529,6 +2575,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-tech-aceitar-material')) { aceitarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-correios')) { consultarCorreiosOficial(t.dataset.id); }
     if(t.classList.contains('btn-rm-mat')) { removerMaterial(t.dataset.id); }
+    if(t.classList.contains('btn-toggle-tramite')) { alternarDetalhesTramite(t.dataset.id,t); }
   });
 
   // Auto login
