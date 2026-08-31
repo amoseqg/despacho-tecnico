@@ -1278,7 +1278,7 @@ function opApv(tipo) {
   const t = D.tc.find(x => x.u === PLU);
   const nome = t ? t.n : nt(PLU);
   el('ap-tit').textContent = tipo === 'aprovado' ? '✅ Aprovar Planilha' : '❌ Rejeitar Planilha';
-  el('ap-in').innerHTML = '<b>' + nome + '</b><br>Todos os chamados pendentes serão ' + (tipo === 'aprovado' ? 'aprovados' : 'rejeitados') + ' para pagamento.';
+  el('ap-in').innerHTML = '<b>' + nome + '</b><br>Todos os serviços que ainda não estão ' + (tipo === 'aprovado' ? 'aprovados serão aprovados' : 'rejeitados serão rejeitados') + ' para pagamento.';
   const obsBox = el('ap-obs-box');
   if (tipo === 'rejeitado') { obsBox.classList.remove('hidden'); el('ap-obs').value = ''; }
   else { obsBox.classList.add('hidden'); }
@@ -1288,8 +1288,15 @@ function opApv(tipo) {
 async function cfAp() {
   const obs = el('ap-obs').value.trim();
   if (APT === 'rejeitado' && !obs) { alert('Informe o motivo da rejeição'); return; }
-  const alvos=D.ch.filter(c=>c.te===PLU && c.st==='concluida' && (!c.ap || c.ap.status==='pendente'));
-  if(!alvos.length){alert('Não há serviços pendentes para esta ação.');return;}
+  // A tela oferece "Aprovar" também quando há itens rejeitados e "Rejeitar"
+  // quando há itens aprovados. A confirmação deve seguir a mesma regra visual,
+  // permitindo corrigir a decisão anterior sem deixar o modal travado.
+  const alvos=D.ch.filter(c=>{
+    if(c.te!==PLU || c.st!=='concluida') return false;
+    const status=c.ap?.status||'pendente';
+    return APT==='aprovado' ? status!=='aprovado' : status!=='rejeitado';
+  });
+  if(!alvos.length){alert(APT==='aprovado'?'Todos os serviços já estão aprovados.':'Todos os serviços já estão rejeitados.');return;}
   const btn=el('btn-cf-ap'),textoBtn=btn?.textContent;
   try{
     if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
