@@ -1035,11 +1035,19 @@ function infoReincidencia(c){
   const data=new Date(anterior.data).toLocaleDateString('pt-BR');
   return {reincidente:true,anterior:a,html:`<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Último técnico:</b> ${esc(nt(a.te)||'Não informado')}<br><b>Último atendimento:</b> ${data}<br><b>Ação realizada:</b> ${valorInfo(acao)}</div>`};
 }
+function inicioMesPainel(){const agora=new Date();return new Date(agora.getFullYear(),agora.getMonth(),1).getTime();}
+function chaveMesPainel(){const agora=new Date();return `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;}
+function inicioIndicadoresPainel(){
+  const inicioMes=inicioMesPainel();
+  try{const salvo=JSON.parse(localStorage.getItem('nf-indicadores-limpos')||'null');if(salvo?.mes===chaveMesPainel()&&Number(salvo?.em)>inicioMes)return Number(salvo.em);}catch(e){}
+  return inicioMes;
+}
 function dadosIndicadoresTecnicos(){
+  const inicioPainel=inicioIndicadoresPainel();
   const perdas=[];
-  D.ch.forEach(c=>{if(c.st!=='concluida'||!c.am||!c.cc)return;const inicio=new Date(c.am).getTime(),fim=new Date(c.cc).getTime();if(Number.isFinite(inicio)&&Number.isFinite(fim)&&fim-inicio>LIMITE_PRAZO_MS)perdas.push({chamado:c,duracao:fim-inicio});});
+  D.ch.forEach(c=>{if(c.st!=='concluida'||!c.am||!c.cc)return;const inicio=new Date(c.am).getTime(),fim=new Date(c.cc).getTime();if(Number.isFinite(inicio)&&Number.isFinite(fim)&&fim>=inicioPainel&&fim-inicio>LIMITE_PRAZO_MS)perdas.push({chamado:c,duracao:fim-inicio});});
   const reincidencias=[];
-  D.ch.forEach(c=>{const anterior=historicoAnteriorCircuito(c);if(anterior)reincidencias.push({chamado:c,anterior:anterior.chamado,intervalo:dataChamadoMs(c)-anterior.data});});
+  D.ch.forEach(c=>{if(dataChamadoMs(c)<inicioPainel)return;const anterior=historicoAnteriorCircuito(c);if(anterior)reincidencias.push({chamado:c,anterior:anterior.chamado,intervalo:dataChamadoMs(c)-anterior.data});});
   return {perdas,reincidencias};
 }
 function agruparRanking(itens,usuarioFn){
@@ -1096,11 +1104,12 @@ function rDb() {
 
   const limitePrazo = LIMITE_PRAZO_MS;
   const agora = Date.now();
+  const inicioPainel=inicioIndicadoresPainel();
   const avaliados = D.ch.map(c => {
     if(!c.am || !['andamento','concluida'].includes(c.st)) return null;
     const inicio = new Date(c.am).getTime();
     const fim = c.st === 'concluida' && c.cc ? new Date(c.cc).getTime() : agora;
-    if(!Number.isFinite(inicio) || !Number.isFinite(fim) || fim < inicio) return null;
+    if(!Number.isFinite(inicio) || !Number.isFinite(fim) || fim < inicio || fim < inicioPainel) return null;
     return { chamado:c, duracao:fim-inicio, perda:fim-inicio>limitePrazo };
   }).filter(Boolean);
   const dentroPrazo = avaliados.filter(x => x.chamado.st === 'concluida' && !x.perda);
@@ -1127,8 +1136,9 @@ function dataEncerramentoChamado(c){return c.cc||c.dtexec||'';}
 function chamadosDoCardDashboard(tipo){
   const agora=Date.now();
   if(['pendente','andamento','concluida','recusado'].includes(tipo))return D.ch.filter(c=>c.st===tipo);
-  if(tipo==='dentro-prazo')return D.ch.filter(c=>c.st==='concluida'&&c.am&&c.cc&&(new Date(c.cc)-new Date(c.am))<=LIMITE_PRAZO_MS);
-  if(tipo==='perda-prazo')return D.ch.filter(c=>['andamento','concluida'].includes(c.st)&&c.am&&(((c.st==='concluida'&&c.cc)?new Date(c.cc).getTime():agora)-new Date(c.am).getTime())>LIMITE_PRAZO_MS);
+  const inicioPainel=inicioIndicadoresPainel();
+  if(tipo==='dentro-prazo')return D.ch.filter(c=>c.st==='concluida'&&c.am&&c.cc&&new Date(c.cc).getTime()>=inicioPainel&&(new Date(c.cc)-new Date(c.am))<=LIMITE_PRAZO_MS);
+  if(tipo==='perda-prazo')return D.ch.filter(c=>['andamento','concluida'].includes(c.st)&&c.am&&((c.st==='concluida'&&c.cc)?new Date(c.cc).getTime():agora)>=inicioPainel&&(((c.st==='concluida'&&c.cc)?new Date(c.cc).getTime():agora)-new Date(c.am).getTime())>LIMITE_PRAZO_MS);
   if(tipo==='reincidencia')return dadosIndicadoresTecnicos().reincidencias.map(x=>x.chamado);
   return [];
 }
@@ -1144,6 +1154,12 @@ function abrirCardDashboard(tipo){
   const itens=chamadosDoCardDashboard(tipo).slice().sort((a,b)=>new Date(b.cc||b.cr||0)-new Date(a.cc||a.cr||0));
   lista.innerHTML=itens.map(c=>{const status={aberto:'Aberto',pendente:'Pendente',andamento:'Andamento',concluida:'Concluído',recusado:'Recusado'}[c.st]||c.st;return `<div class="os"><div class="os-h"><span class="os-id">${esc(c.pr||'Sem protocolo')}</span><span class="badge b-${c.st==='concluida'?'concluida':c.st==='andamento'?'andamento':c.st==='recusado'?'recusado':'pendente'}">${esc(status)}</span></div><div class="os-r"><b>Site:</b> ${esc(c.si||'—')}</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||'—')}</div><div class="os-r"><b>Técnico:</b> ${esc(c.te?nt(c.te):'—')}</div>${c.cc?`<div class="os-r"><b>Encerrado em:</b> ${new Date(c.cc).toLocaleString('pt-BR')}</div>`:''}${c.ex?.relatorio?`<div class="os-r"><b>Relatório:</b> ${esc(c.ex.relatorio)}</div>`:''}${historicoTransferenciasHtml(c)}</div>`;}).join('')||'<div class="empty">Nenhum chamado encontrado neste card.</div>';
   box.scrollIntoView({behavior:'smooth',block:'start'});
+}
+function limparIndicadoresDashboard(){
+  if(!confirm('Limpar os indicadores de prazo, reincidência e os Top 5 do mês atual? Os chamados não serão excluídos.'))return;
+  localStorage.setItem('nf-indicadores-limpos',JSON.stringify({mes:chaveMesPainel(),em:Date.now()}));
+  const detalhe=el('db-card-detalhes');if(detalhe)detalhe.classList.add('hidden');
+  rDb();alert('Indicadores do painel limpos. Os chamados permanecem registrados.');
 }
 function chamadosEncerradosPorPeriodo(dt1,dt2){
   if(!dt1||!dt2)throw new Error('Informe a data inicial e a data final.');
@@ -2326,6 +2342,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnExpReinc=el('btn-exp-reincidencias');
   if(btnExpReinc) btnExpReinc.addEventListener('click',()=>exportarRelatorioQualidade('reincidencias'));
   document.querySelectorAll('[data-db-filter]').forEach(card=>card.addEventListener('click',()=>abrirCardDashboard(card.dataset.dbFilter)));
+  const limparIndicadores=el('btn-limpar-indicadores');if(limparIndicadores)limparIndicadores.addEventListener('click',limparIndicadoresDashboard);
   const fecharDb=el('btn-fechar-db-detalhes');if(fecharDb)fecharDb.addEventListener('click',()=>el('db-card-detalhes').classList.add('hidden'));
   const expDb=el('btn-db-exp-concluidos');if(expDb)expDb.addEventListener('click',()=>exportarChamadosEncerrados(el('db-dt1').value,el('db-dt2').value));
   const expEnc=el('btn-rl-exp-encerrados');if(expEnc)expEnc.addEventListener('click',()=>exportarChamadosEncerrados(el('rl-enc-dt1').value,el('rl-enc-dt2').value));
