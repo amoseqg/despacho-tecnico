@@ -814,21 +814,45 @@ function exportarMateriaisLiberados(){
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Materiais liberados');
  XLSX.writeFile(wb,'base_materiais_liberados_tecnicos.xlsx');
 }
-function alternarDetalhesTramite(id,botao){
- const detalhes=el('lg-tramite-detalhes-'+id);if(!detalhes)return;
- const abrir=detalhes.classList.contains('hidden');detalhes.classList.toggle('hidden',!abrir);
- if(botao){botao.setAttribute('aria-expanded',abrir?'true':'false');const seta=botao.querySelector('.tramite-seta');if(seta)seta.textContent=abrir?'▲':'▼';}
+function materialEntregueArquivado(r){return r.status==='entregue'&&!!logMeta(r).arquivadoEm;}
+let limpezaEntreguesEmCurso=false;
+async function limparMateriaisEntregues(){
+ if(limpezaEntreguesEmCurso)return;
+ if(!SB_PROFILE||!S||!['adm','log'].includes(S.t)){alert('Acesse como administrador ou logística.');return;}
+ const list=D.mr.filter(r=>r.status==='entregue'&&!materialEntregueArquivado(r));
+ if(!list.length){alert('Não há itens entregues para limpar.');return;}
+ if(!confirm(`Limpar ${list.length} item(ns) entregue(s) da lista? O histórico continuará disponível na exportação.`))return;
+ limpezaEntreguesEmCurso=true;
+ const btn=el('btn-limpar-entregues');if(btn)btn.disabled=true;
+ let total=0;
+ try{
+   for(const r of list){
+     const obs=logObs(r,{...logMeta(r),arquivadoEm:new Date().toISOString(),arquivadoPor:SB_PROFILE.id});
+     let query=SB.from('solicitacoes_material').update({observacao:obs}).eq('id',r.id).eq('status','entregue');
+     query=r.obs?query.eq('observacao',r.obs):query.or('observacao.is.null,observacao.eq.');
+     const {data,error}=await query.select('id,observacao').single();
+     if(error)throw error;
+     if(!data||data.id!==r.id)throw new Error('O servidor não confirmou a limpeza. Atualize e tente novamente.');
+     r.obs=data.observacao;total++;
+   }
+   lsSet('dd',D);rLog();
+   alert(`${total} item(ns) entregue(s) removido(s) da lista. Histórico preservado para exportação.`);
+ }catch(e){
+   rLog();sbShowError(`${total} item(ns) limpo(s). Não foi possível concluir a limpeza`,e);
+ }finally{
+   limpezaEntreguesEmCurso=false;if(btn)btn.disabled=false;await sbRecarregarDados();
+ }
 }
 function rLog(){
  const box=el('lg-list');if(!box)return;
- const list=D.mr.slice().reverse();
+ const list=D.mr.filter(r=>!materialEntregueArquivado(r)).slice().reverse();
  box.innerHTML=list.length?list.map(r=>{
    const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),interior=materialInterior(r),tec=tecnicoMaterial(r),destino=enderecoEntregaTec(tec);
    let acao='';
    if(r.status==='direcionado')acao=`<button class="btn btn-g btn-mat-separar" data-id="${r.id}">📦 Registrar separação</button>`;
    else if(r.status==='separado'&&meta.etapa==='separado')acao=interior?`<button class="btn btn-p btn-log-enviar" data-id="${r.id}">🚚 Informar envio e rastreio</button>`:`<button class="btn btn-p btn-log-liberar" data-id="${r.id}">🤝 Liberar para aceite</button>`;
-   return `<div class="os"><button type="button" class="btn-toggle-tramite" data-id="${escM(r.id)}" aria-expanded="false" style="display:flex;width:100%;align-items:center;justify-content:space-between;gap:10px;border:0;background:transparent;padding:0;text-align:left;cursor:pointer"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span style="display:flex;align-items:center;gap:8px"><span class="badge ${st[0]}">${st[1]}</span><span class="tramite-seta" aria-hidden="true">▼</span></span></button>
-    <div id="lg-tramite-detalhes-${escM(r.id)}" class="hidden" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--b)">
+   return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
+    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--b)">
       <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
       <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
       ${interior?`<div class="os-r"><b>Entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Endereço não cadastrado')}${destino.contato?' — Contato: '+escM(destino.contato):''}</div>`:''}
@@ -2428,6 +2452,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAjuste=el('btn-lg-ajuste'); if(btnLgAjuste) btnLgAjuste.addEventListener('click',ajusteEstoqueLogistica); const selLgEst=el('lg-estoque-material'); if(selLgEst) selLgEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('lg-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAddMaterial=el('btn-lg-add-material'); if(btnLgAddMaterial) btnLgAddMaterial.addEventListener('click',addMaterialLogistica);
+  el('btn-limpar-entregues')?.addEventListener('click',limparMateriaisEntregues);
   document.querySelectorAll('.btn-exp-materiais-liberados').forEach(btn=>btn.addEventListener('click',exportarMateriaisLiberados));
   const btnSolic=el('btn-tm-solicitar'); if(btnSolic) btnSolic.addEventListener('click',solicitarMaterial);
   let circuitoDescricaoTimer=null;
@@ -2551,7 +2576,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat, .btn-toggle-tramite') || e.target;
+    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
@@ -2575,7 +2600,6 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-tech-aceitar-material')) { aceitarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-correios')) { consultarCorreiosOficial(t.dataset.id); }
     if(t.classList.contains('btn-rm-mat')) { removerMaterial(t.dataset.id); }
-    if(t.classList.contains('btn-toggle-tramite')) { alternarDetalhesTramite(t.dataset.id,t); }
   });
 
   // Auto login
@@ -2743,7 +2767,16 @@ let SB_FOTOS_MAP = new Map();
 let EX_FOTOS_NOVAS = [];
 
 function sbUUID(v){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||'')); }
-function sbNum(v){ if(v===null||v===undefined||v==='') return 0; const s=String(v).replace(/R\$\s?/g,'').replace(/\./g,'').replace(',','.').replace(/[^0-9.-]/g,''); return Number(s)||0; }
+function sbNum(v){
+ if(v===null||v===undefined||v==='')return 0;
+ if(typeof v==='number')return Number.isFinite(v)?v:0;
+ const texto=String(v).trim();
+ let s=texto.replace(/R\$\s?/g,'').replace(/\s/g,'');
+ if(s.includes(','))s=s.replace(/\./g,'').replace(',','.');
+ else if(texto.includes('R$'))s=s.replace(/\./g,'');
+ const n=Number(s);return Number.isFinite(n)?n:0;
+}
+
 function sbIso(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null:d.toISOString(); }
 function sbIdByUser(u){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x.u===u); return p?._id||null; }
 function sbUserById(id){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x._id===id); return p?.u||''; }
@@ -3341,7 +3374,7 @@ function sbRenderizarTelas(){
   }catch(e){console.error('Erro ao atualizar telas:',e);}
 }
 async function sbRecarregarDados(){
-  if(!SB_PROFILE || SB_SYNCING || SB_REFRESHING) return;
+  if(!SB_PROFILE || SB_SYNCING || SB_REFRESHING || limpezaEntreguesEmCurso) return;
   SB_REFRESHING=true;
   try{await sbLoadAll();sbRenderizarTelas();}
   catch(err){console.error('Erro ao recarregar dados:',err);sbSetConnectionBadge('Erro ao atualizar dados',false);}
@@ -3355,6 +3388,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
   // Realtime: recarrega os dados quando outro navegador altera tabelas operacionais.
   SB.channel('despacho-tecnico-realtime')
+    .on('postgres_changes',{event:'*',schema:'public',table:'perfis'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'aprovacoes'},sbRecarregarDados)
@@ -3362,13 +3396,13 @@ document.addEventListener('DOMContentLoaded',()=>{
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbRecarregarDados)
     .subscribe();
 
-  // Segurança adicional: o administrador confere o servidor a cada 10 segundos,
+  // Segurança adicional: os três perfis conferem o servidor a cada 10 segundos,
   // mesmo quando o navegador não recebe um evento Realtime.
   setInterval(()=>{
-    if(SB_PROFILE?.tipo==='admin' && document.visibilityState!=='hidden') sbRecarregarDados();
+    if(SB_PROFILE && document.visibilityState!=='hidden') sbRecarregarDados();
   },10000);
   document.addEventListener('visibilitychange',()=>{
-    if(document.visibilityState==='visible' && SB_PROFILE?.tipo==='admin') sbRecarregarDados();
+    if(document.visibilityState==='visible' && SB_PROFILE) sbRecarregarDados();
   });
 });
 
