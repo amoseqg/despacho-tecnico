@@ -2800,6 +2800,7 @@ async function sbExigirSessaoAdmin(){
 }
 
 function sbSetConnectionBadge(text, ok=true){
+  document.dispatchEvent(new CustomEvent('nf-connection',{detail:{ok}}));
   let b=document.getElementById('supabase-status-badge');
   if(!b){
     b=document.createElement('div'); b.id='supabase-status-badge';
@@ -2889,6 +2890,7 @@ async function sbLoadAll(){
   SB_LOADED_CH=new Set(D.ch.map(x=>x.id)); SB_LOADED_MAT=new Set(D.mat.map(x=>x.id)); SB_LOADED_MR=new Set(D.mr.map(x=>x.id));
   lsSet('dd',D);
   sbSetConnectionBadge('Supabase conectado', true);
+  document.dispatchEvent(new Event('nf-data-ready'));
 }
 
 async function sbSeedMaterialsIfNeeded(){
@@ -3408,5 +3410,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/appearance.js?v=1"></script>
+<script src="/admin-alerts.js?v=1"></script>
 </body>
 </html>

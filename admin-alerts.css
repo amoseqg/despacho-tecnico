@@ -1,0 +1,7 @@
+.nf-alert-center{margin:14px clamp(12px,3vw,30px);padding:14px 18px;background:#fff;border:1px solid #cbd5e1;border-radius:12px;color:#14233b;font-size:13px}
+.nf-alert-center summary{cursor:pointer;font-weight:750;padding:6px 0;font-size:15px}
+.nf-alert-center .nf-alert-help{color:#52627a;margin:10px 0;line-height:1.5}
+.nf-alert-body{max-height:420px;overflow:auto;line-height:1.55}
+.nf-alert-body h3{font-size:14px;margin:14px 0 6px}.nf-alert-body ul{padding-left:22px}.nf-alert-body li{padding:7px 0;border-bottom:1px solid #e2e8f0;overflow-wrap:anywhere}
+.nf-alert-banner{background:#e0f2fe;border-left:4px solid #0369a1;padding:10px;margin-bottom:8px;border-radius:6px}.nf-alert-danger{color:#b91c1c;font-weight:700}
+@media(max-width:600px){.nf-alert-center{margin:10px;padding:12px}.nf-alert-body{max-height:50vh}}

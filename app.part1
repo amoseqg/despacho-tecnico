@@ -445,6 +445,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 <base target="_blank">
 <base target="_blank">
 <link rel="stylesheet" href="/appearance.css?v=1">
+<link rel="stylesheet" href="/admin-alerts.css?v=1">
 </head>
 <body>
 
