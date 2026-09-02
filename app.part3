@@ -3407,5 +3407,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 </script>
+<script src="/appearance.js?v=1"></script>
 </body>
 </html>

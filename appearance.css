@@ -1,0 +1,19 @@
+/* Preferências visuais locais por conta. As cores de status não são alteradas. */
+:root { --theme-accent:#2563eb; --theme-deep:#173f77; --theme-header:#0b172a; --theme-end:#15345e; --theme-bg:#eef3f9; --theme-soft:#edf4ff; --theme-ink:#fff; --theme-sub:#bbcee4; }
+:root[data-appearance="petroleo"] { --theme-accent:#087f83; --theme-deep:#07585c; --theme-header:#063b40; --theme-end:#08646b; --theme-bg:#eaf4f3; --theme-soft:#dff1ef; --theme-ink:#fff; --theme-sub:#c4e5e3; --a:#087f83; --nf-ring:rgba(8,127,131,.22); }
+:root[data-appearance="branco"] { --theme-accent:#334155; --theme-deep:#1e293b; --theme-header:#fff; --theme-end:#f8fafc; --theme-bg:#fff; --theme-soft:#f1f5f9; --theme-ink:#14233b; --theme-sub:#52627a; --a:#334155; --nf-ring:rgba(51,65,85,.22); }
+html[data-appearance] body { background:var(--theme-bg); }
+html[data-appearance] .header,html[data-appearance] .login-screen { background:linear-gradient(120deg,var(--theme-header),var(--theme-end));color:var(--theme-ink); }
+html[data-appearance] .header .sub { color:var(--theme-sub); }
+html[data-appearance] .user-bar { background:var(--theme-header);color:var(--theme-ink);border-bottom:1px solid var(--b);flex-wrap:wrap;gap:8px; }
+html[data-appearance] .user-bar button { color:var(--theme-ink);border-color:var(--theme-sub); }
+html[data-appearance] .nav button.a,html[data-appearance] .btn-p,html[data-appearance] .nf-logo,html[data-appearance] .nf-login-brand .nf-logo { background:linear-gradient(135deg,var(--theme-deep),var(--theme-accent))!important;color:#fff; }
+html[data-appearance] .nav button:hover:not(.a) { background:var(--theme-soft);color:var(--theme-deep); }
+html[data-appearance] .header:after,html[data-appearance] .area-card:before { background:var(--theme-accent); }
+html[data-appearance] .input:focus,html[data-appearance] .select:focus { border-color:var(--theme-accent); }
+html[data-appearance="branco"] #t0 .nf-brand-name { color:var(--theme-ink)!important; }
+html[data-appearance="branco"] #t0 .nf-login-brand+p { color:var(--theme-sub)!important; }
+.nf-appearance { display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;flex-wrap:wrap; }
+.nf-appearance select { background:#fff;color:#14233b;border:1px solid #94a3b8;border-radius:8px;padding:6px 8px;min-height:34px;max-width:160px;font:inherit; }
+.nf-appearance-note { font-size:11px;font-weight:400; }
+@media(max-width:600px) { .nf-appearance { flex-basis:100%; } }
