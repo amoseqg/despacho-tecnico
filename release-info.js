@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.1.1',date:'2026-09-03',title:'Correções restauradas e cache atualizado',
+  changes:['Número Método e SDM mantidos nos campos corretos.','Campos obrigatórios e opções de causa raiz restaurados.','Arquivos versionados para impedir que o navegador reutilize uma edição antiga.']
+ },{
   version:'1.1.0',date:'2026-09-03',title:'Campos obrigatórios no encerramento',
   changes:['Causa raiz com seleção entre Infracliente, Elétrica cliente, Elétrica concessionária e Mau uso.','Encerramento exige causa raiz, solução técnica, validação Vectra/Umtelecom e senha preenchidos.']
  },{
