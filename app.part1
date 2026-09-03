@@ -508,12 +508,16 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <button data-tab="at">⏱️ Atendimento</button>
     <button data-tab="rl">📊 Relatório</button>
      <button data-tab="ml">📦 Material Logístico</button>
+    <button data-tab="vi">📄 Relatórios de vistorias</button>
+    <button data-tab="aq">🗃️ Chamados excluídos</button>
     <button data-tab="ad">🔐 Admins</button>
   </div>
   <div class="content">
     <section class="nf-dashboard-hero nf-dashboard-admin" aria-label="Visão administrativa">
       <div><span>Central de operações</span><strong>Gestão em tempo real</strong><small>Chamados, equipes, prazos e indicadores em um só lugar.</small></div>
     </section>
+    <div id="v-vi" class="hidden"><div class="card"><h3>Relatórios de vistorias</h3><label class="label" for="busca-vistorias-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-vistorias-admin" type="search"><div id="vistorias-admin"></div></div></div>
+    <div id="v-aq" class="hidden"><div class="card"><h3>Chamados excluídos da lista</h3><p>Os chamados, históricos e valores continuam salvos. A base exportada inclui esses registros.</p><div id="lista-arquivados"></div></div></div>
     <div id="v-db">
       <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:.65rem;color:var(--gr)">Indicadores de qualidade referentes ao mês atual.</span><button type="button" class="btn btn-s" id="btn-limpar-indicadores">🧹 Limpar indicadores</button></div>
       <div class="card" style="margin-bottom:14px">
@@ -762,6 +766,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <button data-tab="dp">📥 Despachados</button>
     <button data-tab="at">⏱️ Atendimento</button>
     <button data-tab="co">✅ Concluídos</button>
+    <button data-tab="vi">📄 Relatórios de vistorias</button>
     <button data-tab="ar">📋 Atividades Realizadas</button>
      <button data-tab="mt">📦 Material</button>
   </div>
@@ -769,6 +774,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <section class="nf-dashboard-hero nf-dashboard-tech" aria-label="Operação técnica">
       <div><span>Operação de campo</span><strong>Seu trabalho, mais conectado</strong><small>Rotas, atendimentos, escolas, materiais e evidências organizados.</small></div>
     </section>
+    <div id="t-vi" class="hidden"><div class="card"><h3>Relatórios de vistorias</h3><form id="form-vistoria"><div class="form-group"><label class="label" for="vistoria-chamado">Chamado / Site</label><select class="select" id="vistoria-chamado" required></select></div><div class="form-group"><label class="label" for="vistoria-pdf">Anexar relatório de vistoria (PDF, até 20 MB)</label><input class="input" type="file" id="vistoria-pdf" accept="application/pdf,.pdf" required></div><button class="btn btn-p" id="vistoria-enviar" type="submit">Enviar relatório de vistoria</button><p role="status" id="vistoria-mensagem"></p></form><label class="label" for="busca-vistorias-tecnico">Buscar relatórios enviados</label><input class="input" id="busca-vistorias-tecnico" type="search"><div id="vistorias-tecnico"></div></div></div>
     <div id="t-db">
       <div class="grid-3" style="margin-bottom:14px">
         <div class="card stat"><div class="l">Despachados</div><div class="v" id="ts-d">0</div></div>

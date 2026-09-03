@@ -539,7 +539,7 @@ function enterTec() {
 function admTab(btn, a) {
   document.querySelectorAll('#nv button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','tc','ch','at','rl','ml','ad'].forEach(x => {
+  ['db','tc','ch','at','rl','ml','ad','vi','aq'].forEach(x => {
     const e = el('v-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -550,12 +550,14 @@ function admTab(btn, a) {
   if (a === 'rl') rRl();
   if (a === 'ml') rMl();
   if (a === 'ad') rAd();
+  if (a === 'vi') renderVistorias();
+  if (a === 'aq') renderArquivoChamados();
 }
 
 function tecTab(btn, a) {
   document.querySelectorAll('#nv2 button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','dp','at','co','ar','mt'].forEach(x => {
+  ['db','dp','at','co','ar','mt','vi'].forEach(x => {
     const e = el('t-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -565,6 +567,7 @@ function tecTab(btn, a) {
   if (a === 'co') rTco();
   if (a === 'ar') rTar();
   if (a === 'mt') rTmat();
+  if (a === 'vi') renderVistorias();
 }
 
 // ========== MATERIAIS / LOGÍSTICA ==========
@@ -1181,9 +1184,9 @@ function barrasRanking(ranking,cor){
 }
 
 function rCh() {
-  const ab = D.ch.filter(c => c.st === 'aberto');
-  const di = D.ch.filter(c => c.st === 'pendente');
-  const re = D.ch.filter(c => c.st === 'recusado');
+  const ab = D.ch.filter(chamadoVisivel).filter(c => c.st === 'aberto');
+  const di = D.ch.filter(chamadoVisivel).filter(c => c.st === 'pendente');
+  const re = D.ch.filter(chamadoVisivel).filter(c => c.st === 'recusado');
   const elAb = el('l-ab');
   const elDi = el('l-di');
   const elRe = el('l-re');
@@ -1194,13 +1197,13 @@ function rCh() {
     <div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${adminGeral() ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em aberto</h3></div>';
 
   if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando técnico</span></div>
     <div class="os-r"><b>Site:</b> ${c.si}</div><div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
     ${infoReincidencia(c).html}
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${adminGeral() ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
   if(elRe) elRe.innerHTML = re.length ? re.map(c => {
     const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : 'Não definida';
@@ -1209,15 +1212,15 @@ function rCh() {
     <div class="os-r"><b>Técnico:</b> ${nt(c.te)}</div>
     <div class="os-r"><b>Motivo:</b> ${c.mr}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${adminGeral() ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado recusado</h3></div>';
 }
 
 function rDb() {
-  const p = D.ch.filter(c => c.st === 'pendente').length;
-  const a = D.ch.filter(c => c.st === 'andamento').length;
-  const co = D.ch.filter(c => c.st === 'concluida').length;
-  const r = D.ch.filter(c => c.st === 'recusado').length;
+  const p = D.ch.filter(chamadoVisivel).filter(c => c.st === 'pendente').length;
+  const a = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento').length;
+  const co = D.ch.filter(chamadoVisivel).filter(c => c.st === 'concluida').length;
+  const r = D.ch.filter(chamadoVisivel).filter(c => c.st === 'recusado').length;
   const sp = el('s-p'), sa = el('s-a'), sc = el('s-c'), sr = el('s-r');
   if(sp) sp.textContent = p; if(sa) sa.textContent = a;
   if(sc) sc.textContent = co; if(sr) sr.textContent = r;
@@ -1271,8 +1274,8 @@ function abrirCardDashboard(tipo){
   if(!box||!lista)return;
   const titulos={pendente:'Pendentes',andamento:'Em andamento',concluida:'Concluídos',recusado:'Recusados','dentro-prazo':'Concluídos dentro do prazo','perda-prazo':'Chamados com perda de prazo',reincidencia:'Chamados reincidentes'};
   box.dataset.tipo=tipo;box.classList.remove('hidden');el('db-detalhes-titulo').textContent='📋 '+(titulos[tipo]||'Chamados');periodo?.classList.toggle('hidden',tipo!=='concluida');
-  const itens=chamadosDoCardDashboard(tipo).slice().sort((a,b)=>new Date(b.cc||b.cr||0)-new Date(a.cc||a.cr||0));
-  lista.innerHTML=itens.map(c=>{const status={aberto:'Aberto',pendente:'Pendente',andamento:'Andamento',concluida:'Concluído',recusado:'Recusado'}[c.st]||c.st;return `<div class="os"><div class="os-h"><span class="os-id">${esc(c.pr||'Sem protocolo')}</span><span class="badge b-${c.st==='concluida'?'concluida':c.st==='andamento'?'andamento':c.st==='recusado'?'recusado':'pendente'}">${esc(status)}</span></div><div class="os-r"><b>Site:</b> ${esc(c.si||'—')}</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||'—')}</div><div class="os-r"><b>Técnico:</b> ${esc(c.te?nt(c.te):'—')}</div>${c.cc?`<div class="os-r"><b>Encerrado em:</b> ${new Date(c.cc).toLocaleString('pt-BR')}</div>`:''}${c.ex?.relatorio?`<div class="os-r"><b>Relatório:</b> ${esc(c.ex.relatorio)}</div>`:''}${historicoTransferenciasHtml(c)}</div>`;}).join('')||'<div class="empty">Nenhum chamado encontrado neste card.</div>';
+  const itens=chamadosDoCardDashboard(tipo).filter(chamadoVisivel).slice().sort((a,b)=>new Date(b.cc||b.cr||0)-new Date(a.cc||a.cr||0));
+  lista.innerHTML=itens.map(c=>{const status={aberto:'Aberto',pendente:'Pendente',andamento:'Andamento',concluida:'Concluído',recusado:'Recusado'}[c.st]||c.st;return `<div class="os"><div class="os-h"><span class="os-id">${esc(c.pr||'Sem protocolo')}</span><span class="badge b-${c.st==='concluida'?'concluida':c.st==='andamento'?'andamento':c.st==='recusado'?'recusado':'pendente'}">${esc(status)}</span></div><div class="os-r"><b>Site:</b> ${esc(c.si||'—')}</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||'—')}</div><div class="os-r"><b>Técnico:</b> ${esc(c.te?nt(c.te):'—')}</div>${c.cc?`<div class="os-r"><b>Encerrado em:</b> ${new Date(c.cc).toLocaleString('pt-BR')}</div>`:''}${c.ex?.relatorio?`<div class="os-r"><b>Relatório:</b> ${esc(c.ex.relatorio)}</div>`:''}${historicoTransferenciasHtml(c)}${botaoArquivoChamado(c)}</div>`;}).join('')||'<div class="empty">Nenhum chamado encontrado neste card.</div>';
   box.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function limparIndicadoresDashboard(){
@@ -1329,10 +1332,10 @@ function exportarBaseChamadosFechados(dt1,dt2){
 function rAt() {
   const tb = el('tb-at');
   if(!tb) return;
-  const list = D.ch.filter(c => c.st === 'andamento');
+  const list = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento');
   tb.innerHTML = list.map(c => {
     const t = tm(c.am, c.re);
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button><button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>${adminGeral() ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
+    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button><button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
@@ -1621,12 +1624,8 @@ function opRedirecionar(id) {
   el('m-dp').classList.add('a');
 }
 
-function excluirChamado(id) {
-  const c = D.ch.find(x => x.id === id);
-  if (!adminGeral()) { alert('Somente o Administrador Geral pode excluir chamados.'); return; }
-  if (!c || !confirm(`Excluir permanentemente o chamado ${c.pr}?`)) return;
-  D.ch = D.ch.filter(x => x.id !== id); sv(); rCh(); rAt(); rDb();
-  alert('Chamado excluído com sucesso.');
+async function excluirChamado(id) {
+  return alterarArquivoChamado(id);
 }
 
 function cfDp() {
@@ -1732,12 +1731,12 @@ function rmAd(u) { if (!confirm('Remover administrador?')) return; D.ad = D.ad.f
 
 // ========== RENDER TÉCNICO ==========
 function rTdb() {
-  const dp = D.ch.filter(c => c.te === S.u && c.st === 'pendente').length;
-  const a = D.ch.filter(c => c.te === S.u && c.st === 'andamento').length;
-  const co = D.ch.filter(c => c.te === S.u && c.st === 'concluida').length;
+  const dp = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'pendente').length;
+  const a = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'andamento').length;
+  const co = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'concluida').length;
   const sd = el('ts-d'), sa = el('ts-a'), sc = el('ts-c');
   if(sd) sd.textContent = dp; if(sa) sa.textContent = a; if(sc) sc.textContent = co;
-  const list = D.ch.filter(c => c.te === S.u && c.st === 'andamento');
+  const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'andamento');
   const tmEl = el('t-tm');
   if(tmEl) tmEl.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am, c.re);
@@ -1746,7 +1745,7 @@ function rTdb() {
 }
 
 function rTdp() {
-  const list = D.ch.filter(c => c.te === S.u && c.st === 'pendente');
+  const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'pendente');
   const dl = el('t-dl');
   if(dl) dl.innerHTML = list.length ? list.map(c =>
     `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando</span></div>
@@ -1762,7 +1761,7 @@ function rTdp() {
 }
 
 function rTat() {
-  const list = D.ch.filter(c => c.te === S.u && c.st === 'andamento');
+  const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'andamento');
   const al = el('t-al');
   if(al) al.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am, c.re);
@@ -1775,7 +1774,7 @@ function rTat() {
 }
 
 function rTco() {
-  const list = D.ch.filter(c => c.te === S.u && c.st === 'concluida');
+  const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'concluida');
   const cl = el('t-cl');
   if(cl) cl.innerHTML = list.length ? list.map(c => {
     const rejeitado = c.ap && c.ap.status === 'rejeitado';
@@ -2930,6 +2929,7 @@ async function sbLoadAll(){
   SB_LOADED_CH=new Set(D.ch.map(x=>x.id)); SB_LOADED_MAT=new Set(D.mat.map(x=>x.id)); SB_LOADED_MR=new Set(D.mr.map(x=>x.id));
   lsSet('dd',D);
   sbSetConnectionBadge('Supabase conectado', true);
+  await carregarArquivosVistorias();
   document.dispatchEvent(new Event('nf-data-ready'));
 }
 
@@ -3111,8 +3111,7 @@ async function sbSyncAll(){
       }
     }
     if(SB_PROFILE.tipo==='admin'){
-      const nowIds=new Set(D.ch.filter(x=>sbUUID(x.id)).map(x=>x.id)); const deleted=[...SB_LOADED_CH].filter(id=>!nowIds.has(id));
-      if(deleted.length){ const {error}=await SB.from('chamados').delete().in('id',deleted); if(error) throw error; }
+      // Exclusão física desativada: chamados são arquivados em chamados_arquivados.
     }
 
     // Execuções e aprovações.
@@ -3449,6 +3448,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 </script>
+<script src="/vistorias.js?v=1"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

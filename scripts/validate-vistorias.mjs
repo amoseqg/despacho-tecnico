@@ -1,0 +1,16 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const source=fs.readFileSync('vistorias.js','utf8');
+const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',files:[],innerHTML:'',textContent:'',disabled:false,options:[]});return nodes.get(id);};
+const archive=new Map();const reports=[];const blobs=new Map();let fail=false,downloads=0;
+const tech='00000000-0000-4000-8000-000000000001',admin='00000000-0000-4000-8000-000000000002',ch='00000000-0000-4000-8000-000000000003';
+const context={console,Map,Set,crypto:{randomUUID:()=> '00000000-0000-4000-8000-000000000004'},setTimeout:fn=>fn(),URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},document:{addEventListener(){},createElement:()=>({click(){downloads++;}})},el,esc:s=>String(s??''),nt:()=> 'Técnico',sbNameById:()=> 'Técnico',sbUUID:()=>true,confirm:()=>true,sbShowError:(msg,e)=>{context.lastError=e.message},SB_PROFILE:{id:admin,tipo:'admin'},S:{u:'tech'},D:{ch:[{id:ch,pr:'TESTE',si:'Site',te:'tech',st:'concluida'}]},sbExigirSessaoAdmin:async()=>context.SB_PROFILE,sbRenderizarTelas(){},SB:{auth:{getUser:async()=>({data:{user:{id:context.SB_PROFILE.id}}})},from(table){let row,match;const api={upsert(r){row=r;return api},insert(r){row=r;return api},select(){return api},eq(k,v){match=[k,v];return api},order(){return api},range:async()=>({data:table==='chamados_arquivados'?[...archive.values()]:reports}),async single(){if(fail)return{error:{message:'gravação recusada'}};if(table==='chamados_arquivados')archive.set(row.chamado_id,row);else reports.push({...row,criado_em:new Date().toISOString()});return{data:table==='chamados_arquivados'?row:reports.at(-1)}},then(resolve){resolve({data:reports.filter(r=>r[match[0]]===match[1])})}};return api},storage:{from(){return{async upload(path,file){blobs.set(path,file);return{}},async remove(paths){paths.forEach(p=>blobs.delete(p));return{}},async download(path){return{data:blobs.get(path)}}}}}}};
+vm.createContext(context);vm.runInContext(source,context);
+await context.alterarArquivoChamado(ch);assert.equal(context.chamadoVisivel(context.D.ch[0]),false);assert.equal(context.D.ch.length,1);
+await context.carregarArquivosVistorias();assert.equal(context.chamadoVisivel(context.D.ch[0]),false);
+await context.alterarArquivoChamado(ch,true);assert.equal(context.chamadoVisivel(context.D.ch[0]),true);
+fail=true;await context.alterarArquivoChamado(ch);assert.equal(context.chamadoVisivel(context.D.ch[0]),true);fail=false;
+context.SB_PROFILE={id:tech,tipo:'tecnico'};el('vistoria-chamado').value=ch;el('vistoria-pdf').files=[{name:'vistoria.pdf',size:50,slice:()=>({text:async()=>'%PDF-1.7'})}];
+await context.enviarVistoria({preventDefault(){}});assert.equal(reports.length,1);assert.equal(blobs.size,1);assert.match(el('vistoria-mensagem').textContent,/salvo/);
+await context.baixarVistoria(reports[0].id,{disabled:false});assert.equal(downloads,1);
+el('vistoria-pdf').files=[{name:'falso.pdf',size:50,slice:()=>({text:async()=>'<html>'})}];await context.enviarVistoria({preventDefault(){}});assert.equal(reports.length,1);assert.match(el('vistoria-mensagem').textContent,/PDF válido/);
+console.log('PASS: archive/reload/restore; failed write preserves UI; PDF upload/download; invalid PDF rejected.');

@@ -17,5 +17,6 @@ jobs:
         with:
           node-version: 20
       - run: node scripts/validate-app.mjs
+      - run: node scripts/validate-vistorias.mjs
       - run: node scripts/validate-appearance.mjs
       - run: node scripts/validate-admin-alerts.mjs
