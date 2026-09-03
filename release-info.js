@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.1.0',date:'2026-09-03',title:'Campos obrigatórios no encerramento',
+  changes:['Causa raiz com seleção entre Infracliente, Elétrica cliente, Elétrica concessionária e Mau uso.','Encerramento exige causa raiz, solução técnica, validação Vectra/Umtelecom e senha preenchidos.']
+ },{
   version:'1.0.1',date:'2026-09-03',title:'Correção dos identificadores no encerramento',
   changes:[
    'Número Método preenchido com o protocolo do chamado; Número SDM utiliza seu próprio campo.',

@@ -1975,6 +1975,51 @@ function corrigirIdentificadoresEncerramento(texto,c) {
   return resultado;
 }
 
+function camposObrigatoriosEncerramento() {
+  return [
+    {id:'ex-causa',label:'CAUSA RAÍZ',re:/^CAUSA RA[IÍ]Z[ \t]*:/i},
+    {id:'ex-solucao',label:'SOLUÇÃO TECNICA',re:/^SOLU[CÇ][AÃ]O T[EÉ]CNICA[ \t]*:/i},
+    {id:'ex-validacao',label:'VALIDAÇÃO VECTRA/UMTELECOM',re:/^VALIDA[CÇ][AÃ]O (?:VECTRA(?:\s*\/\s*UMTELECOM)?|UMTELECOM)[ \t]*:/i},
+    {id:'ex-senha',label:'SENHA',re:/^SENHA[ \t]*:/i}
+  ];
+}
+function trechoCampoEncerramento(texto,campo) {
+  const linhas=String(texto||'').split(/\r?\n/);
+  const inicio=linhas.findIndex(l=>campo.re.test(l));
+  if(inicio<0)return {linhas,inicio,fim:-1,valor:''};
+  let fim=inicio+1;
+  while(fim<linhas.length&&!/^[A-ZÀ-Ü][A-ZÀ-Ü /]*[ \t]*:/i.test(linhas[fim]))fim++;
+  return {linhas,inicio,fim,valor:[linhas[inicio].replace(campo.re,'').trim(),...linhas.slice(inicio+1,fim)].join('\n').trim()};
+}
+function preencherCamposEncerramento() {
+  for(const campo of camposObrigatoriosEncerramento()){
+    const input=el(campo.id),valor=trechoCampoEncerramento(el('ex-relatorio').value,campo).valor;
+    input.value=campo.id==='ex-causa'?(Array.from(input.options).find(o=>o.value.toLocaleLowerCase()===valor.toLocaleLowerCase())?.value||''):valor;
+    input.setCustomValidity('');
+  }
+}
+function sincronizarCamposEncerramento() {
+  let texto=el('ex-relatorio').value;
+  for(const campo of camposObrigatoriosEncerramento()){
+    const input=el(campo.id),trecho=trechoCampoEncerramento(texto,campo);
+    input.setCustomValidity('');
+    const linha=campo.label+': '+input.value.trim();
+    if(trecho.inicio<0)texto+='\n'+linha;
+    else {trecho.linhas.splice(trecho.inicio,trecho.fim-trecho.inicio,linha);texto=trecho.linhas.join('\n');}
+  }
+  el('ex-relatorio').value=texto;
+}
+function validarCamposEncerramento() {
+  for(const campo of camposObrigatoriosEncerramento()){
+    const input=el(campo.id);
+    const valido=input.value.trim()&&(campo.id!=='ex-causa'||['Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso'].includes(input.value));
+    input.setCustomValidity(valido?'':'Preencha este campo obrigatório.');
+    if(!valido){input.reportValidity();input.focus();return false;}
+  }
+  sincronizarCamposEncerramento();
+  return true;
+}
+
 function finalizarMascaraEncerramento() {
   const agora = new Date();
   let texto = corrigirIdentificadoresEncerramento(el('ex-relatorio').value,D.ch.find(c=>c.id===EID));
@@ -2172,6 +2217,7 @@ function opEx(id) {
   el('ex-utp').value = anterior.utp || ''; el('ex-cci').value = anterior.cci || ''; el('ex-can').value = anterior.can || '';
   el('ex-tmat').value = anterior.tmat || ''; el('ex-obs').value = anterior.obs || '';
   el('ex-relatorio').value = corrigirIdentificadoresEncerramento(anterior.relatorio || mascaraEncerramento(c),c);
+  preencherCamposEncerramento();
   el('ex-total').textContent = anterior.total || 'R$ 0,00';
   el('ex-dist-info').classList.add('hidden');
 
@@ -2196,6 +2242,7 @@ async function cfEx() {
   const btn=el('btn-cf-ex'), textoBtn=btn?.textContent;
   const anterior={ex:c.ex,st:c.st,cc:c.cc,ap:c.ap,ajuste:c.ajuste};
   const eraAjuste = !!c.ajuste;
+  if(!validarCamposEncerramento())return;
   finalizarMascaraEncerramento();
   const vkmTxt = (el('ex-vkm').value || '').replace('R$ ', '').replace(',', '.');
   const vkm = parseFloat(vkmTxt) || 0;
@@ -3467,7 +3514,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/vistorias.js?v=1"></script>
-<script src="/release-info.js?v=1.0.1"></script>
+<script src="/release-info.js?v=1.1.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>
