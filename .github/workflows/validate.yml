@@ -19,5 +19,6 @@ jobs:
       - run: node scripts/validate-app.mjs
       - run: node scripts/validate-vistorias.mjs
       - run: node scripts/validate-release.mjs
+      - run: node scripts/validate-encerramento.mjs
       - run: node scripts/validate-appearance.mjs
       - run: node scripts/validate-admin-alerts.mjs

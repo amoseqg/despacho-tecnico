@@ -1954,12 +1954,30 @@ function mascaraEncerramento(c) {
   const agora = new Date();
   const data = agora.toLocaleDateString('pt-BR');
   const horario = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `NUMERO SDM : ${c.pr || ''}\nNUMERO MÉTODO: \nCLIENTE: ${c.si || ''}\nTÉCNICO: ${S && S.n ? S.n : ''}\nCAUSA RAÍZ: \nSOLUÇÃO TECNICA: \nDATA ENCERRAMENTO: ${data}\nHORARIO: ${horario}\nLOCAL: ${c.en || c.cid || ''}\nVALIDAÇÃO VECTRA : \nSENHA: \nMATERIAL: `;
+  return `NUMERO SDM : ${c.sdm || ''}\nNUMERO MÉTODO: ${c.pr || ''}\nCLIENTE: ${c.si || ''}\nTÉCNICO: ${S && S.n ? S.n : ''}\nCAUSA RAÍZ: \nSOLUÇÃO TECNICA: \nDATA ENCERRAMENTO: ${data}\nHORARIO: ${horario}\nLOCAL: ${c.en || c.cid || ''}\nVALIDAÇÃO VECTRA : \nSENHA: \nMATERIAL: `;
+}
+
+// Corrige somente os identificadores da máscara; preserva o relato técnico.
+function corrigirIdentificadoresEncerramento(texto,c) {
+  if(!c)return texto;
+  const metodo=String(c.pr||'').trim(),sdm=String(c.sdm||'').trim();
+  const campoSdm=/^N[ÚU]MERO[ \t]+SDM[ \t]*:[ \t]*([^\r\n]*)/im;
+  const campoMetodo=/^N[ÚU]MERO[ \t]+M[ÉE]TODO[ \t]*:[ \t]*([^\r\n]*)/im;
+  const atual=String(texto||'').match(campoSdm)?.[1]?.trim()||'';
+  let resultado=String(texto||'');
+  // Um SDM digitado pelo técnico, diferente do protocolo, é preservado.
+  if(campoSdm.test(resultado)){
+    if(!atual||atual===metodo)resultado=resultado.replace(campoSdm,()=>`NUMERO SDM : ${sdm}`);
+  }else resultado=`NUMERO SDM : ${sdm}\n`+resultado;
+  if(campoMetodo.test(resultado)){
+    if(metodo)resultado=resultado.replace(campoMetodo,()=>`NUMERO MÉTODO: ${metodo}`);
+  }else resultado=`NUMERO MÉTODO: ${metodo}\n`+resultado;
+  return resultado;
 }
 
 function finalizarMascaraEncerramento() {
   const agora = new Date();
-  let texto = el('ex-relatorio').value;
+  let texto = corrigirIdentificadoresEncerramento(el('ex-relatorio').value,D.ch.find(c=>c.id===EID));
   texto = texto.replace(/^DATA ENCERRAMENTO:.*$/m, `DATA ENCERRAMENTO: ${agora.toLocaleDateString('pt-BR')}`);
   texto = texto.replace(/^HORARIO:.*$/m, `HORARIO: ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
   const materiais = [];
@@ -2153,7 +2171,7 @@ function opEx(id) {
   el('ex-avulso-box').classList.toggle('hidden', !(anterior.atv && anterior.atv.endsWith('|0')));
   el('ex-utp').value = anterior.utp || ''; el('ex-cci').value = anterior.cci || ''; el('ex-can').value = anterior.can || '';
   el('ex-tmat').value = anterior.tmat || ''; el('ex-obs').value = anterior.obs || '';
-  el('ex-relatorio').value = anterior.relatorio || mascaraEncerramento(c);
+  el('ex-relatorio').value = corrigirIdentificadoresEncerramento(anterior.relatorio || mascaraEncerramento(c),c);
   el('ex-total').textContent = anterior.total || 'R$ 0,00';
   el('ex-dist-info').classList.add('hidden');
 
@@ -3449,7 +3467,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/vistorias.js?v=1"></script>
-<script src="/release-info.js?v=1.0.0"></script>
+<script src="/release-info.js?v=1.0.1"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

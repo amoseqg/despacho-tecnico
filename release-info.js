@@ -2,6 +2,12 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.0.1',date:'2026-09-03',title:'Correção dos identificadores no encerramento',
+  changes:[
+   'Número Método preenchido com o protocolo do chamado; Número SDM utiliza seu próprio campo.',
+   'Máscaras antigas corrigidas ao abrir para edição, preservando o relato e o SDM informado pelo técnico.'
+  ]
+ },{
   version:'1.0.0',date:'2026-09-03',title:'Primeira versão registrada',
   changes:[
    'Gestão de chamados, despacho e acompanhamento por administrador e técnico.',
