@@ -685,7 +685,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     </div>
     <div id="v-ml" class="hidden">
       <div class="card" style="margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p)">📦 Material Logístico — Solicitações</h3><button type="button" class="btn btn-p btn-exp-materiais-liberados">📥 Exportar materiais liberados</button></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p)">📦 Material Logístico — Solicitações</h3><button type="button" class="btn btn-p btn-exp-materiais-liberados">📥 Exportar demandas com material liberado</button><button type="button" class="btn btn-y btn-historico-materiais" aria-pressed="false">Ver histórico de itens apagados</button></div>
         <div class="info">Materiais disponíveis para solicitação: lista importada da planilha <b>MATERIAL LOGISTICO.xlsx</b>. Estoque inicial dos itens importados: 0.</div>
         <div class="info">Os técnicos solicitam materiais vinculados a um protocolo. O administrador analisa a solicitação e a direciona para a separação no estoque.</div>
         <div id="ml-solicitacoes"></div>
@@ -847,7 +847,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <details id="lg-tramite">
         <summary style="font-size:.9rem;color:var(--p);font-weight:700;cursor:pointer;padding:8px 0">🚚 Trâmite dos materiais</summary>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
-          <button type="button" class="btn btn-p btn-exp-materiais-liberados">📥 Exportar materiais liberados</button>
+          <button type="button" class="btn btn-p btn-exp-materiais-liberados">📥 Exportar demandas com material liberado</button><button type="button" class="btn btn-y btn-historico-materiais" aria-pressed="false">Ver histórico de itens apagados</button>
           <button type="button" class="btn btn-y" id="btn-limpar-entregues">🧹 Limpar itens entregues</button>
         </div>
         <div class="info">Capital: separação → aguardando aceite → entregue. Interior/Noronha: separação → em trânsito com rastreio e previsão → aceite do técnico → entregue. A limpeza remove os entregues desta lista e mantém o histórico na exportação.</div>

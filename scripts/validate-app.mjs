@@ -110,3 +110,29 @@ assert.ok(await ctx.sbPersistirAprovacoes([{id:'1'}],'aprovado',''));
 assert.match(html,/<details id="lg-tramite">\s*<summary/);
 assert.ok(!html.includes('btn-toggle-tramite'),'O clique pertence ao título');
 console.log('Regressões concluídas: limpeza persistida, falha de gravação, preservação do histórico, permissão, decimais, reincidência e confirmação de aprovação.');
+
+// Exclusão visual individual: persistência, concorrência, restauração e exportação.
+for(const nome of ['materialOcultoDaLista','materialVisivelNaLista','arquivarMaterialIndividual'])vm.runInContext(funcao(nome),ctx);
+vm.runInContext('let mostrarHistoricoMateriais=false; const arquivosMateriaisEmCurso=new Set();',ctx);
+ctx.rMl=()=>{};ctx.S={t:'adm'};
+const registro={id:'demanda',status:'separado',qtdSeparada:2,obs:'Observação preservada\n[[LOGISTICA]]{"etapa":"aguardando_aceite","rastreamento":"BR456"}'};
+ctx.D.mr=[registro];let gravacoes=0,erroGravacao=false;
+ctx.SB={from:tabela=>{assert.equal(tabela,'solicitacoes_material');return {update:campos=>{
+ gravacoes++;assert.deepEqual(Object.keys(campos),['observacao']);const filtros={};
+ const q={eq:(k,v)=>{filtros[k]=v;return q},or:()=>q,select:()=>q,single:async()=>{
+  assert.equal(filtros.id,registro.id);assert.equal(filtros.status,registro.status);assert.equal(filtros.observacao,registro.obs);
+  return erroGravacao?{data:null,error:new Error('conflito de atualização')}:{data:{id:registro.id,observacao:campos.observacao}};
+ }};return q;
+}}}};
+await ctx.arquivarMaterialIndividual(registro.id);
+assert.equal(ctx.materialVisivelNaLista(registro),false);
+assert.equal(ctx.D.mr.length,1);assert.equal(registro.status,'separado');assert.equal(registro.qtdSeparada,2);
+assert.equal(ctx.logMeta(registro).rastreamento,'BR456');assert.equal(ctx.logObsBase(registro),'Observação preservada');
+assert.equal(ctx.materiaisLiberadosTecnicos().length,1);
+const recarregado=JSON.parse(JSON.stringify(registro));assert.equal(ctx.materialOcultoDaLista(recarregado),true);
+vm.runInContext('mostrarHistoricoMateriais=true',ctx);assert.equal(ctx.materialVisivelNaLista(recarregado),true);
+await ctx.arquivarMaterialIndividual(registro.id);assert.equal(ctx.materialOcultoDaLista(registro),false);
+erroGravacao=true;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(ctx.materialOcultoDaLista(registro),false);
+ctx.S={t:'tec'};const antes=gravacoes;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(gravacoes,antes);
+ctx.S={t:'log'};erroGravacao=false;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(ctx.materialOcultoDaLista(registro),true);
+console.log('Exclusão individual: administrador/logística, histórico após recarga, restauração, exportação, conflito e restrição de técnico validados.');
