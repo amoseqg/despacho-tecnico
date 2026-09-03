@@ -3449,6 +3449,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/vistorias.js?v=1"></script>
+<script src="/release-info.js?v=1.0.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>
