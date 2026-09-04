@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from '@/src/lib/supabase/client';
 import type { PerfilDb } from '@/src/features/auth/perfil.service';
 import { listarChamados, obterReincidencia, type ChamadoResumo, type ReincidenciaResumo } from '@/src/features/chamados/chamados.service';
 import { ServiceExecution } from '@/src/features/servicos/ServiceExecution';
+import { LogisticaPanel } from '@/src/features/logistica/LogisticaPanel';
 
 export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb }) {
   const [chamados, setChamados] = useState<ChamadoResumo[]>([]);
@@ -58,6 +59,8 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
         <article className="metric"><strong>{concluidos}</strong><span>Concluídos carregados</span></article>
         <article className="metric"><strong>{reincidentes}</strong><span>Reincidências identificadas</span></article>
       </section>
+
+      {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <LogisticaPanel />}
 
       <section className="panel">
         <div className="panel-heading"><div><span className="eyebrow">Base real</span><h2>Chamados do Supabase</h2></div></div>
