@@ -43,8 +43,8 @@ export function AdminPanel({ adminId }: { adminId: string }) {
   }
 
   function exportarCsv() {
-    const cab = ['Protocolo','SDM','OS Peconecta','Circuito','Site','Cidade','Atividade','Status','Criado por','Criado em','Concluído em'];
-    const linhas = visiveis.map(c => [c.protocolo,c.sdm ?? '',c.os_pe_conectado ?? '',c.circuito,c.site_nome ?? '',c.cidade ?? '',c.atividade_servico ?? '',c.status,c.criado_por ?? '',c.criado_em,c.concluido_em ?? '']);
+    const cab = ['Protocolo','SDM','OS Peconecta','Circuito','Site','Cidade','Atividade','Status','Aberto por','ID abertura','Criado em','Concluído em'];
+    const linhas = visiveis.map(c => [c.protocolo,c.sdm ?? '',c.os_pe_conectado ?? '',c.circuito,c.site_nome ?? '',c.cidade ?? '',c.atividade_servico ?? '',c.status,c.criado_por_nome ?? '',c.criado_por ?? '',c.criado_em,c.concluido_em ?? '']);
     const csv = [cab, ...linhas].map(l => l.map(v => `"${String(v).replaceAll('"','""')}"`).join(';')).join('\n');
     const blob = new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -68,7 +68,7 @@ export function AdminPanel({ adminId }: { adminId: string }) {
         </div>
         {erro && <div className="error-box">{erro}</div>}
         {carregando && <p>Carregando...</p>}
-        {!carregando && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Protocolo</th><th>Site</th><th>Circuito</th><th>Status</th><th>Ação</th></tr></thead><tbody>{visiveis.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td>{c.circuito}</td><td>{c.status}</td><td><button className="text-action danger" onClick={() => void alternarArquivo(c, false)}>Ocultar</button></td></tr>)}</tbody></table></div>}
+        {!carregando && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Protocolo</th><th>Site</th><th>Circuito</th><th>Status</th><th>Aberto por</th><th>Ação</th></tr></thead><tbody>{visiveis.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td>{c.circuito}</td><td>{c.status}</td><td>{c.criado_por_nome || '—'}</td><td><button className="text-action danger" onClick={() => void alternarArquivo(c, false)}>Ocultar</button></td></tr>)}</tbody></table></div>}
         {ocultos.length > 0 && <details className="archived-block"><summary>Chamados ocultos ({ocultos.length})</summary><div className="admin-table-wrap"><table className="admin-table"><tbody>{ocultos.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td><button className="text-action" onClick={() => void alternarArquivo(c, true)}>Restaurar</button></td></tr>)}</tbody></table></div></details>}
       </section>
 
