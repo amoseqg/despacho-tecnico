@@ -25,6 +25,7 @@ export type ChamadoAdminResumo = {
   status: string;
   tecnico_id: string | null;
   criado_por: string | null;
+  criado_por_nome: string | null;
   criado_em: string;
   concluido_em: string | null;
 };
@@ -49,7 +50,7 @@ export async function listarChamadosAdmin(termo = ''): Promise<ChamadoAdminResum
   const supabase = createSupabaseBrowserClient();
   let query = supabase
     .from('chamados')
-    .select('id,protocolo,sdm,os_pe_conectado,circuito,site_nome,cidade,atividade_servico,status,tecnico_id,criado_por,criado_em,concluido_em')
+    .select('id,protocolo,sdm,os_pe_conectado,circuito,site_nome,cidade,atividade_servico,status,tecnico_id,criado_por,criado_em,concluido_em,aberto_por:perfis!chamados_criado_por_fkey(nome)')
     .order('criado_em', { ascending: false });
 
   const busca = termo.trim();
@@ -57,7 +58,22 @@ export async function listarChamadosAdmin(termo = ''): Promise<ChamadoAdminResum
 
   const { data, error } = await query.limit(100);
   if (error) throw error;
-  return (data ?? []) as ChamadoAdminResumo[];
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    protocolo: row.protocolo,
+    sdm: row.sdm,
+    os_pe_conectado: row.os_pe_conectado,
+    circuito: row.circuito,
+    site_nome: row.site_nome,
+    cidade: row.cidade,
+    atividade_servico: row.atividade_servico,
+    status: row.status,
+    tecnico_id: row.tecnico_id,
+    criado_por: row.criado_por,
+    criado_por_nome: row.aberto_por?.nome ?? null,
+    criado_em: row.criado_em,
+    concluido_em: row.concluido_em,
+  }));
 }
 
 export async function arquivarChamado(chamadoId: string, adminId: string): Promise<void> {
