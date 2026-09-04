@@ -767,7 +767,6 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <button data-tab="dp">📥 Despachados</button>
     <button data-tab="at">⏱️ Atendimento</button>
     <button data-tab="co">✅ Concluídos</button>
-    <button data-tab="vi">📄 Relatórios de vistorias</button>
     <button data-tab="ar">📋 Atividades Realizadas</button>
      <button data-tab="mt">📦 Material</button>
   </div>
@@ -775,7 +774,6 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <section class="nf-dashboard-hero nf-dashboard-tech" aria-label="Operação técnica">
       <div><span>Operação de campo</span><strong>Seu trabalho, mais conectado</strong><small>Rotas, atendimentos, escolas, materiais e evidências organizados.</small></div>
     </section>
-    <div id="t-vi" class="hidden"><div class="card"><h3>Relatórios de vistorias</h3><form id="form-vistoria"><div class="form-group"><label class="label" for="vistoria-chamado">Chamado / Site</label><select class="select" id="vistoria-chamado" required></select></div><div class="form-group"><label class="label" for="vistoria-pdf">Anexar relatório de vistoria (PDF, até 20 MB)</label><input class="input" type="file" id="vistoria-pdf" accept="application/pdf,.pdf" required></div><button class="btn btn-p" id="vistoria-enviar" type="submit">Enviar relatório de vistoria</button><p role="status" id="vistoria-mensagem"></p></form><label class="label" for="busca-vistorias-tecnico">Buscar relatórios enviados</label><input class="input" id="busca-vistorias-tecnico" type="search"><div id="vistorias-tecnico"></div></div></div>
     <div id="t-db">
       <div class="grid-3" style="margin-bottom:14px">
         <div class="card stat"><div class="l">Despachados</div><div class="v" id="ts-d">0</div></div>
@@ -1034,6 +1032,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
             <option value="Incidente de dados interior|150.00">Incidente de dados interior - R$ 150,00</option>
             <option value="Instalação|150.00">Instalação - R$ 150,00</option>
             <option value="Alteração|150.00">Alteração - R$ 150,00</option>
+            <option value="Vistoria|150.00">Vistoria - R$ 150,00</option>
             <option value="Serviços maiores|0">Serviços maiores (informar valor abaixo)</option>
           </select>
         </div>
@@ -1054,7 +1053,6 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="form-group"><label class="label" for="ex-validacao">Validação Vectra/Umtelecom *</label><input id="ex-validacao" class="input" required oninput="sincronizarCamposEncerramento()"></div>
       <div class="form-group"><label class="label" for="ex-senha">Senha *</label><input id="ex-senha" class="input" required autocomplete="off" oninput="sincronizarCamposEncerramento()"></div>
       <div class="form-group"><label class="label">Máscara de encerramento</label><textarea id="ex-relatorio" oninput="preencherCamposEncerramento()" class="input" rows="13" style="font-family:monospace;line-height:1.45" placeholder="Preencha o relatório de encerramento..."></textarea></div>
-      <div class="form-group"><label class="label">Observações adicionais</label><textarea id="ex-obs" class="input" rows="2" placeholder="Informações adicionais..."></textarea></div>
       <div class="form-group">
         <label class="label">📷 Fotos da execução</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
@@ -1066,6 +1064,14 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <small>As fotos são acumuladas e preservadas no rascunho. Até 8 fotos, máximo de 8 MB por foto.</small>
         <div id="ex-fotos-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:8px"></div>
       </div>
+      <form id="form-vistoria" class="card" style="margin:10px 0;background:#f8fafc;border:1px solid #cbd5e1">
+        <h3 style="font-size:.78rem;color:var(--p);margin-bottom:8px">📄 Relatório de vistoria</h3>
+        <select class="hidden" id="vistoria-chamado" required aria-hidden="true" tabindex="-1"></select>
+        <div class="form-group"><label class="label" for="vistoria-pdf">Anexar relatório de vistoria (PDF, até 20 MB)</label><input class="input" type="file" id="vistoria-pdf" accept="application/pdf,.pdf" required></div>
+        <div class="form-group"><label class="label" for="ex-obs">Observação sobre o relatório</label><textarea id="ex-obs" class="input" rows="2" placeholder="Informe uma observação sobre a vistoria ou o relatório anexado"></textarea></div>
+        <button class="btn btn-p" id="vistoria-enviar" type="submit">📤 Enviar relatório de vistoria</button>
+        <p role="status" id="vistoria-mensagem" style="margin-top:8px"></p>
+      </form>
       <div class="total-box">
         <strong>VALOR TOTAL DO SERVIÇO: <span id="ex-total" style="font-size:1.1rem">R$ 0,00</span></strong>
       </div>

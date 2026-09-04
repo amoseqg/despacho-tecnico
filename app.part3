@@ -557,7 +557,7 @@ function admTab(btn, a) {
 function tecTab(btn, a) {
   document.querySelectorAll('#nv2 button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','dp','at','co','ar','mt','vi'].forEach(x => {
+  ['db','dp','at','co','ar','mt'].forEach(x => {
     const e = el('t-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -567,7 +567,6 @@ function tecTab(btn, a) {
   if (a === 'co') rTco();
   if (a === 'ar') rTar();
   if (a === 'mt') rTmat();
-  if (a === 'vi') renderVistorias();
 }
 
 // ========== MATERIAIS / LOGÍSTICA ==========
@@ -2267,6 +2266,10 @@ async function opEx(id) {
   el('ex-cd').dataset.cidade='';
   prepararBuscaEscolas(anterior,c);
   prepararFotos();
+  renderVistorias();
+  el('vistoria-chamado').value=String(c.id);
+  el('vistoria-pdf').value='';
+  el('vistoria-mensagem').textContent='';
   el('ex-km').value = anterior.km || ''; el('ex-vkm').value = anterior.vkm || '';
   el('ex-atv').value = anterior.atv || ''; el('ex-vatv').value = anterior.vatv || '';
   el('ex-avulso').value = anterior.avulso || '';
@@ -3578,8 +3581,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 </script>
-<script src="/vistorias.js?v=1"></script>
-<script src="/release-info.js?v=1.1.3"></script>
+<script src="/vistorias.js?v=1.1.4"></script>
+<script src="/release-info.js?v=1.1.4"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

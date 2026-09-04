@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.1.4',date:'2026-09-04',title:'Vistoria integrada à execução',
+  changes:['Novo tipo de atividade Vistoria no valor de R$ 150,00.','Anexo do relatório de vistoria movido para a tela Executar Serviço, abaixo das fotos.','Campo de observação do relatório incluído e atalho antigo removido do cabeçalho técnico.']
+ },{
   version:'1.1.3',date:'2026-09-04',title:'Pesquisa nas solicitações de material',
   changes:['Campo de pesquisa na área Material Logístico para localizar solicitações pelo nome do técnico ou protocolo.','Pesquisa disponível tanto na lista atual quanto no histórico de itens apagados.']
  },{
