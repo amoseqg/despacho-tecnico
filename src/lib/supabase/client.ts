@@ -2,13 +2,12 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 
-export function createSupabaseBrowserClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const fallbackUrl = 'https://hxbuoqxojwpsreakmfdc.supabase.co';
+const fallbackPublishableKey = 'sb_publishable_8TfOJdgLoppVWJWjpfQwkw_bzIFuRyW';
 
-  if (!url || !key) {
-    throw new Error('Variáveis públicas do Supabase não configuradas.');
-  }
+export function createSupabaseBrowserClient() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || fallbackUrl;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || fallbackPublishableKey;
 
   return createBrowserClient(url, key);
 }
