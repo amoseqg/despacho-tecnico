@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.1.5',date:'2026-09-04',title:'Vistoria na causa raiz',
+  changes:['Opção Vistoria adicionada à lista obrigatória de causa raiz no encerramento do chamado.']
+ },{
   version:'1.1.4',date:'2026-09-04',title:'Vistoria integrada à execução',
   changes:['Novo tipo de atividade Vistoria no valor de R$ 150,00.','Anexo do relatório de vistoria movido para a tela Executar Serviço, abaixo das fotos.','Campo de observação do relatório incluído e atalho antigo removido do cabeçalho técnico.']
  },{

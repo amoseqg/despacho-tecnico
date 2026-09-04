@@ -16,7 +16,7 @@ assert.ok(src.includes('corrigirIdentificadoresEncerramento(anterior.relatorio |
 console.log('PASS: Método e SDM distintos; máscara antiga corrigida; SDM manual, relato e quebras preservados; correção idempotente.');
 const inputs={};
 for(const id of ['ex-causa','ex-solucao','ex-validacao','ex-senha','ex-relatorio'])inputs[id]={value:'',setCustomValidity(v){this.error=v},reportValidity(){},focus(){}};
-inputs['ex-causa'].options=['','Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso'].map(value=>({value}));
+inputs['ex-causa'].options=['','Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso','Vistoria'].map(value=>({value}));
 ctx.el=id=>inputs[id];
 for(const name of ['camposObrigatoriosEncerramento','trechoCampoEncerramento','preencherCamposEncerramento','sincronizarCamposEncerramento','validarCamposEncerramento'])vm.runInNewContext(src.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))[0],ctx);
 inputs['ex-relatorio'].value=novo;
@@ -29,6 +29,7 @@ assert.equal(ctx.validarCamposEncerramento(),true);
 assert.match(inputs['ex-relatorio'].value,/SOLUÇÃO TECNICA: Troca do cabo\nTeste realizado\nDATA ENCERRAMENTO:/);
 ctx.preencherCamposEncerramento();ids.forEach((id,i)=>assert.equal(inputs[id].value,valores[i]));
 inputs['ex-causa'].value='Outra';assert.equal(ctx.validarCamposEncerramento(),false);
+inputs['ex-causa'].value='Vistoria';assert.equal(ctx.validarCamposEncerramento(),true);
 inputs['ex-relatorio'].value=novo;ctx.preencherCamposEncerramento();assert.equal(inputs['ex-senha'].value,'');assert.equal(ctx.validarCamposEncerramento(),false);
 assert.ok(src.indexOf('if(!validarCamposEncerramento())return;')<src.indexOf("c.st = 'concluida'; c.cc"));
 console.log('PASS: campos vazios e causa inválida bloqueados; relatório multilinha e reabertura preservados; novo chamado limpa campos.');

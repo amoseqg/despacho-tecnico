@@ -2016,7 +2016,7 @@ function sincronizarCamposEncerramento() {
 function validarCamposEncerramento() {
   for(const campo of camposObrigatoriosEncerramento()){
     const input=el(campo.id);
-    const valido=input.value.trim()&&(campo.id!=='ex-causa'||['Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso'].includes(input.value));
+    const valido=input.value.trim()&&(campo.id!=='ex-causa'||['Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso','Vistoria'].includes(input.value));
     input.setCustomValidity(valido?'':'Preencha este campo obrigatório.');
     if(!valido){input.reportValidity();input.focus();return false;}
   }
@@ -3582,7 +3582,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/vistorias.js?v=1.1.4"></script>
-<script src="/release-info.js?v=1.1.4"></script>
+<script src="/release-info.js?v=1.1.5"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>
