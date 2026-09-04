@@ -5,7 +5,7 @@ import type { User } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '@/src/lib/supabase/client';
 import type { PerfilDb } from '@/src/features/auth/perfil.service';
 import { listarChamados, obterReincidencia, type ChamadoResumo, type ReincidenciaResumo } from '@/src/features/chamados/chamados.service';
-import { ServicePhotos } from '@/src/features/servicos/ServicePhotos';
+import { ServiceExecution } from '@/src/features/servicos/ServiceExecution';
 
 export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb }) {
   const [chamados, setChamados] = useState<ChamadoResumo[]>([]);
@@ -75,10 +75,10 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
                 </div>
                 <div className="ticket-meta"><span>Circuito: {chamado.circuito}</span><span>SDM: {chamado.sdm || '—'}</span><span>{chamado.cidade || 'Cidade não informada'}</span></div>
                 {reincidencia && <div className="reincidencia"><strong>Reincidência</strong><span>Último técnico: {reincidencia.tecnico_anterior || 'Não informado'}</span><span>Ação: {reincidencia.acao_realizada || 'Não informada'}</span></div>}
-                {perfil.tipo === 'tecnico' && chamado.status !== 'concluida' && (
+                {perfil.tipo === 'tecnico' && chamado.status !== 'concluida' && chamado.status !== 'cancelado' && (
                   <details className="execution-preview">
                     <summary>Executar serviço</summary>
-                    <ServicePhotos chamadoId={chamado.id} />
+                    <ServiceExecution chamadoId={chamado.id} tecnicoId={perfil.id} atividadeInicial={chamado.atividade_servico} />
                   </details>
                 )}
               </article>
