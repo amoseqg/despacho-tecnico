@@ -20,6 +20,13 @@ function nomeSeguro(nome: string) {
 }
 
 export async function concluirServico(input: EncerramentoInput) {
+  if (!input.causaRaiz || !input.solucaoTecnica.trim() || !input.validacao.trim() || !input.senha.trim()) {
+    throw new Error('Campos obrigatórios de encerramento não preenchidos.');
+  }
+  if (input.atividade === 'vistoria' && !input.relatorioVistoria) {
+    throw new Error('Relatório de vistoria obrigatório.');
+  }
+
   const supabase = createSupabaseBrowserClient();
   const rascunho = await carregarRascunho(input.chamadoId);
 
@@ -44,21 +51,21 @@ export async function concluirServico(input: EncerramentoInput) {
 
   if (input.relatorioVistoria) {
     const arquivo = input.relatorioVistoria;
-    const caminho = `${input.tecnicoId}/${input.chamadoId}/${crypto.randomUUID()}-${nomeSeguro(arquivo.name || 'relatorio-vistoria.pdf')}`;
+    const caminho = `${input.tecnicoId}/${input.chamadoId}/relatorio-${nomeSeguro(arquivo.name || 'relatorio-vistoria.pdf')}`;
     const { error: uploadError } = await supabase.storage.from('relatorios-vistoria').upload(caminho, arquivo, {
       contentType: arquivo.type || 'application/pdf',
-      upsert: false,
+      upsert: true,
     });
     if (uploadError) throw uploadError;
 
-    const { error: registroError } = await supabase.from('relatorios_vistoria').insert({
+    const { error: registroError } = await supabase.from('relatorios_vistoria').upsert({
       chamado_id: input.chamadoId,
       tecnico_id: input.tecnicoId,
       caminho,
       nome_original: arquivo.name || 'relatorio-vistoria.pdf',
       tamanho_bytes: arquivo.size,
       tipo_mime: arquivo.type || 'application/pdf',
-    });
+    }, { onConflict: 'caminho' });
     if (registroError) throw registroError;
   }
 
@@ -82,11 +89,12 @@ export async function concluirServico(input: EncerramentoInput) {
   }, { onConflict: 'chamado_id' });
   if (execucaoError) throw execucaoError;
 
-  const { error: chamadoError } = await supabase.from('chamados').update({
+  const { data: chamadoAtualizado, error: chamadoError } = await supabase.from('chamados').update({
     status: 'concluida',
     concluido_em: new Date().toISOString(),
-  }).eq('id', input.chamadoId).eq('tecnico_id', input.tecnicoId);
+  }).eq('id', input.chamadoId).eq('tecnico_id', input.tecnicoId).select('id').maybeSingle();
   if (chamadoError) throw chamadoError;
+  if (!chamadoAtualizado) throw new Error('O chamado não foi atualizado. Confirme se ele ainda está atribuído a este técnico.');
 
   await limparRascunho(input.chamadoId);
 }
