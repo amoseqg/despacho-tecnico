@@ -42,7 +42,15 @@ export function ServiceExecution({ chamadoId, tecnicoId, atividadeInicial }: { c
 
   async function concluir(event: FormEvent) {
     event.preventDefault();
-    if (!causaRaiz) return;
+    if (!causaRaiz || !solucaoTecnica.trim() || !validacao.trim() || !senha.trim()) {
+      setMensagem('Erro: preencha Causa raiz, Solução técnica, Validação Vectra/UMTelecom e Senha.');
+      return;
+    }
+    if (atividade === 'vistoria' && !relatorio) {
+      setMensagem('Erro: anexe o relatório de vistoria em PDF antes de concluir.');
+      return;
+    }
+
     setSalvando(true);
     setMensagem('');
     try {
@@ -70,7 +78,12 @@ export function ServiceExecution({ chamadoId, tecnicoId, atividadeInicial }: { c
     <form className="execution-form" onSubmit={concluir} onBlur={() => { void persistirCampos(); }}>
       <label>Tipo de atividade
         <select value={atividade} onChange={e => setAtividade(e.target.value)}>
-          <option value="instalacao">Instalação</option><option value="alteracao">Alteração</option><option value="mudanca">Mudança</option><option value="manutencao">Manutenção</option><option value="suporte">Suporte</option><option value="vistoria">Vistoria - R$ 150,00</option>
+          <option value="instalacao">Instalação</option>
+          <option value="alteracao">Alteração</option>
+          <option value="mudanca_endereco">Mudança</option>
+          <option value="manutencao">Manutenção</option>
+          <option value="suporte">Suporte</option>
+          <option value="vistoria">Vistoria - R$ 150,00</option>
         </select>
       </label>
       {atividade === 'vistoria' && <p className="helper-text">Vistoria com relatório obrigatório.</p>}
