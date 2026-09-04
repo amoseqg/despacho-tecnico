@@ -2,33 +2,31 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { arquivarChamado, listarChamadosAdmin, obterArquivados, pesquisarTecnicos, restaurarChamado, type ChamadoAdminResumo, type TecnicoResumo } from './admin.service';
+import { ChamadoEditor } from './ChamadoEditor';
 
 export function AdminPanel({ adminId }: { adminId: string }) {
   const [buscaChamado, setBuscaChamado] = useState('');
   const [buscaTecnico, setBuscaTecnico] = useState('');
   const [chamados, setChamados] = useState<ChamadoAdminResumo[]>([]);
   const [tecnicos, setTecnicos] = useState<TecnicoResumo[]>([]);
+  const [pesquisouTecnico, setPesquisouTecnico] = useState(false);
+  const [editando, setEditando] = useState<ChamadoAdminResumo | null>(null);
   const [arquivados, setArquivados] = useState<Set<string>>(new Set());
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(true);
 
+  async function carregarChamados() {
+    const [listaChamados, idsArquivados] = await Promise.all([listarChamadosAdmin(buscaChamado), obterArquivados()]);
+    setChamados(listaChamados);
+    setArquivados(idsArquivados);
+  }
+
   async function carregar() {
     setCarregando(true);
     setErro('');
-    try {
-      const [listaChamados, listaTecnicos, idsArquivados] = await Promise.all([
-        listarChamadosAdmin(buscaChamado),
-        pesquisarTecnicos(buscaTecnico),
-        obterArquivados(),
-      ]);
-      setChamados(listaChamados);
-      setTecnicos(listaTecnicos);
-      setArquivados(idsArquivados);
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : 'Não foi possível carregar o painel administrativo.');
-    } finally {
-      setCarregando(false);
-    }
+    try { await carregarChamados(); }
+    catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível carregar o painel administrativo.'); }
+    finally { setCarregando(false); }
   }
 
   useEffect(() => { void carregar(); }, []);
@@ -36,10 +34,20 @@ export function AdminPanel({ adminId }: { adminId: string }) {
   const visiveis = useMemo(() => chamados.filter(c => !arquivados.has(c.id)), [chamados, arquivados]);
   const ocultos = useMemo(() => chamados.filter(c => arquivados.has(c.id)), [chamados, arquivados]);
 
+  async function localizarTecnico() {
+    setErro(''); setPesquisouTecnico(true);
+    try {
+      const termo = buscaTecnico.trim();
+      setTecnicos(termo ? await pesquisarTecnicos(termo) : []);
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível localizar o técnico.'); }
+  }
+
   async function alternarArquivo(chamado: ChamadoAdminResumo, arquivado: boolean) {
-    if (arquivado) await restaurarChamado(chamado.id, adminId);
-    else await arquivarChamado(chamado.id, adminId);
-    await carregar();
+    try {
+      if (arquivado) await restaurarChamado(chamado.id, adminId);
+      else await arquivarChamado(chamado.id, adminId);
+      await carregarChamados();
+    } catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível alterar a visibilidade do chamado.'); }
   }
 
   function exportarCsv() {
@@ -57,6 +65,8 @@ export function AdminPanel({ adminId }: { adminId: string }) {
 
   return (
     <section className="admin-stack">
+      <section className="panel"><ChamadoEditor adminId={adminId} chamado={editando} onCancelar={() => setEditando(null)} onSalvo={async () => { setEditando(null); await carregarChamados(); }} /></section>
+
       <section className="panel">
         <div className="panel-heading admin-heading">
           <div><span className="eyebrow">Administrador</span><h2>Gestão de chamados</h2></div>
@@ -68,17 +78,19 @@ export function AdminPanel({ adminId }: { adminId: string }) {
         </div>
         {erro && <div className="error-box">{erro}</div>}
         {carregando && <p>Carregando...</p>}
-        {!carregando && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Protocolo</th><th>Site</th><th>Circuito</th><th>Status</th><th>Aberto por</th><th>Ação</th></tr></thead><tbody>{visiveis.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td>{c.circuito}</td><td>{c.status}</td><td>{c.criado_por_nome || '—'}</td><td><button className="text-action danger" onClick={() => void alternarArquivo(c, false)}>Ocultar</button></td></tr>)}</tbody></table></div>}
+        {!carregando && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Protocolo</th><th>Site</th><th>Circuito</th><th>Status</th><th>Aberto por</th><th>Ações</th></tr></thead><tbody>{visiveis.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td>{c.circuito}</td><td>{c.status}</td><td>{c.criado_por_nome || '—'}</td><td><div className="table-actions"><button className="text-action" onClick={() => setEditando(c)}>Editar</button><button className="text-action danger" onClick={() => void alternarArquivo(c, false)}>Ocultar</button></div></td></tr>)}</tbody></table></div>}
         {ocultos.length > 0 && <details className="archived-block"><summary>Chamados ocultos ({ocultos.length})</summary><div className="admin-table-wrap"><table className="admin-table"><tbody>{ocultos.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td><button className="text-action" onClick={() => void alternarArquivo(c, true)}>Restaurar</button></td></tr>)}</tbody></table></div></details>}
       </section>
 
       <section className="panel">
         <div className="panel-heading"><div><span className="eyebrow">Cadastro</span><h2>Técnicos</h2></div></div>
         <div className="admin-search-row">
-          <input value={buscaTecnico} onChange={e => setBuscaTecnico(e.target.value)} placeholder="Digite o nome, usuário ou e-mail do técnico" />
-          <button className="button primary" onClick={() => void carregar()}>Localizar</button>
+          <input value={buscaTecnico} onChange={e => { setBuscaTecnico(e.target.value); setPesquisouTecnico(false); setTecnicos([]); }} onKeyDown={e => { if (e.key === 'Enter') void localizarTecnico(); }} placeholder="Digite o nome, usuário ou e-mail do técnico" />
+          <button className="button primary" onClick={() => void localizarTecnico()}>Localizar</button>
         </div>
-        <div className="technician-grid">{tecnicos.map(t => <article className="technician-card" key={t.id}><strong>{t.nome}</strong><span>{t.email || t.usuario}</span><span>Região: {t.regiao || 'não informada'}</span><span>Status: {t.ativo ? 'Ativo' : 'Inativo'}</span></article>)}</div>
+        {!pesquisouTecnico && <p className="helper-text">A lista permanece oculta. Digite um técnico para consultar o cadastro.</p>}
+        {pesquisouTecnico && tecnicos.length === 0 && <p>Nenhum técnico encontrado.</p>}
+        {pesquisouTecnico && <div className="technician-grid">{tecnicos.map(t => <article className="technician-card" key={t.id}><strong>{t.nome}</strong><span>{t.email || t.usuario}</span><span>Região: {t.regiao || 'não informada'}</span><span>Status: {t.ativo ? 'Ativo' : 'Inativo'}</span></article>)}</div>}
       </section>
     </section>
   );
