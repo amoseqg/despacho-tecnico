@@ -77,15 +77,32 @@ button, input, select, textarea { font: inherit; }
 .tramite-toggle { width: 100%; display: flex; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: #f8fafc; color: var(--ink); padding: 13px 14px; cursor: pointer; font-weight: 700; }
 .tramite-toggle strong { color: var(--petroleum); }
 .logistics-body { display: grid; gap: 12px; margin-top: 14px; }
-.search-input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; background: #fff; }
+.search-input, .admin-search-row input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; background: #fff; }
 .material-flow-list { display: grid; gap: 10px; }
 .material-flow-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fff; }
 .material-flow-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
 .material-flow-head > div { display: grid; gap: 4px; }
 .material-flow-head span { color: var(--muted); font-size: .75rem; }
 .material-flow-card .button { margin-top: 12px; }
+.admin-stack { display: grid; gap: 0; }
+.admin-search-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-bottom: 14px; }
+.admin-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+.admin-table { width: 100%; border-collapse: collapse; min-width: 680px; font-size: .78rem; }
+.admin-table th, .admin-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; }
+.admin-table th { background: #f8fafc; color: #475569; font-size: .7rem; text-transform: uppercase; }
+.admin-table tr:last-child td { border-bottom: 0; }
+.text-action { border: 0; background: transparent; color: var(--petroleum); cursor: pointer; font-weight: 700; padding: 4px 0; }
+.text-action.danger { color: #b91c1c; }
+.archived-block { margin-top: 14px; }
+.archived-block summary { cursor: pointer; font-weight: 700; color: var(--muted); margin-bottom: 10px; }
+.technician-grid, .report-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+.technician-card, .report-card { display: grid; gap: 5px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fff; }
+.technician-card span, .report-card span { color: var(--muted); font-size: .75rem; }
+.report-card .button { margin-top: 8px; justify-self: start; }
 @media (max-width: 720px) {
   .hero { flex-direction: column; }
-  .summary-grid, .module-grid { grid-template-columns: 1fr; }
+  .summary-grid, .module-grid, .technician-grid, .report-grid { grid-template-columns: 1fr; }
   .ticket-head, .material-flow-head, .panel-heading { flex-direction: column; align-items: stretch; }
+  .admin-search-row { grid-template-columns: 1fr; }
+  .admin-table { min-width: 620px; }
 }
