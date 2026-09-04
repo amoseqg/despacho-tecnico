@@ -5,7 +5,7 @@ import type { User } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '@/src/lib/supabase/client';
 import type { PerfilDb } from '@/src/features/auth/perfil.service';
 import { listarChamados, obterReincidencia, type ChamadoResumo, type ReincidenciaResumo } from '@/src/features/chamados/chamados.service';
-import { PhotoPicker } from '@/src/features/servico/PhotoPicker';
+import { ServicePhotos } from '@/src/features/servicos/ServicePhotos';
 
 export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb }) {
   const [chamados, setChamados] = useState<ChamadoResumo[]>([]);
@@ -78,7 +78,7 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
                 {perfil.tipo === 'tecnico' && chamado.status !== 'concluida' && (
                   <details className="execution-preview">
                     <summary>Executar serviço</summary>
-                    <PhotoPicker chamadoId={chamado.id} />
+                    <ServicePhotos chamadoId={chamado.id} />
                   </details>
                 )}
               </article>
