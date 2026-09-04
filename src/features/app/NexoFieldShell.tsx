@@ -10,6 +10,7 @@ import { LogisticaPanel } from '@/src/features/logistica/LogisticaPanel';
 import { AdminPanel } from '@/src/features/admin/AdminPanel';
 import { VistoriasPanel } from '@/src/features/admin/VistoriasPanel';
 import { DashboardPanel } from '@/src/features/admin/DashboardPanel';
+import { FinanceiroDesempenhoPanel } from '@/src/features/admin/FinanceiroDesempenhoPanel';
 
 export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb }) {
   const [chamados, setChamados] = useState<ChamadoResumo[]>([]);
@@ -64,6 +65,7 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
       </section>
 
       {perfil.tipo === 'admin' && <DashboardPanel />}
+      {perfil.tipo === 'admin' && <FinanceiroDesempenhoPanel />}
       {perfil.tipo === 'admin' && <AdminPanel adminId={perfil.id} />}
       {perfil.tipo === 'admin' && <VistoriasPanel />}
       {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <LogisticaPanel />}
