@@ -1,3 +1,5 @@
+'use client';
+
 import { AuthGate } from '@/src/features/auth/AuthGate';
 import { NexoFieldShell } from '@/src/features/app/NexoFieldShell';
 
