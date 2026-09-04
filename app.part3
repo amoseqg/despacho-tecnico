@@ -632,7 +632,12 @@ async function arquivarMaterialIndividual(id){
 }
 function rMl(){
   const box=el('ml-solicitacoes'); if(!box) return;
-  const list=D.mr.filter(materialVisivelNaLista).slice().reverse();
+  const busca=String(el('busca-solicitacoes-material')?.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
+  const list=D.mr.filter(materialVisivelNaLista).filter(r=>{
+    if(!busca)return true;const c=D.ch.find(x=>x.id===r.chamadoId);
+    const protocolo=String(c?c.pr:r.protocolo||'');const tecnico=String(nt(r.tecnico)||'');
+    return (tecnico+' '+protocolo).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').includes(busca);
+  }).slice().reverse();
   box.innerHTML=list.length?list.map(r=>{
     const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r);
     return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
@@ -641,7 +646,7 @@ function rMl(){
       ${logDetalhes(r)}
       ${r.responsavel?`<div class="os-r"><b>Responsável logística:</b> ${escM(r.responsavel)}</div>`:''}
       <div style="margin-top:8px">${!materialOcultoDaLista(r)&&r.status==='solicitado'?`<button class="btn btn-y btn-mat-direcionar" data-id="${r.id}">➡️ Direcionar para separação</button>`:''} ${botaoArquivoMaterial(r)}</div></div>`;
-  }).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
+  }).join(''):`<div class="empty"><h3>${busca?'Nenhuma solicitação localizada':'Nenhuma solicitação de material'}</h3>${busca?'<p>Confira o nome do técnico ou o protocolo informado.</p>':''}</div>`;
   rRastreioMateriais('ml-rastreio-lista');
   rMlEstoque(); rMateriaisCadastro();
 }
@@ -2710,6 +2715,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   const btnExpServXlsx = el('btn-exp-serv-xlsx');
   if(btnExpServXlsx) btnExpServXlsx.addEventListener('click', exportarServicoAprovadoExcel);
+  const buscaSolicitacoesMaterial=el('busca-solicitacoes-material');
+  if(buscaSolicitacoesMaterial) buscaSolicitacoesMaterial.addEventListener('input',rMl);
 
   const btnFilAr = el('btn-fil-ar');
   if(btnFilAr) btnFilAr.addEventListener('click', function() {
@@ -3572,7 +3579,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/vistorias.js?v=1"></script>
-<script src="/release-info.js?v=1.1.2"></script>
+<script src="/release-info.js?v=1.1.3"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

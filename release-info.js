@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.1.3',date:'2026-09-04',title:'Pesquisa nas solicitações de material',
+  changes:['Campo de pesquisa na área Material Logístico para localizar solicitações pelo nome do técnico ou protocolo.','Pesquisa disponível tanto na lista atual quanto no histórico de itens apagados.']
+ },{
   version:'1.1.2',date:'2026-09-04',title:'Fotos e rascunho no Android',
   changes:['Rascunho do serviço restaurado automaticamente após recarga da página.','Ações separadas para tirar foto e anexar imagens da galeria.','Novas fotos são acumuladas sem remover as anteriores.']
  },{
