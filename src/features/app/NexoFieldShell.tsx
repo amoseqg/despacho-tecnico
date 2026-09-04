@@ -8,6 +8,7 @@ import { listarChamados, obterReincidencia, type ChamadoResumo, type Reincidenci
 import { ServiceExecution } from '@/src/features/servicos/ServiceExecution';
 import { LogisticaPanel } from '@/src/features/logistica/LogisticaPanel';
 import { AdminPanel } from '@/src/features/admin/AdminPanel';
+import { VistoriasPanel } from '@/src/features/admin/VistoriasPanel';
 
 export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb }) {
   const [chamados, setChamados] = useState<ChamadoResumo[]>([]);
@@ -62,6 +63,7 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
       </section>
 
       {perfil.tipo === 'admin' && <AdminPanel adminId={perfil.id} />}
+      {perfil.tipo === 'admin' && <VistoriasPanel />}
       {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <LogisticaPanel />}
 
       <section className="panel">
