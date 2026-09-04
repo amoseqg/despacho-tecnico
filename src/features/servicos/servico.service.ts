@@ -19,6 +19,11 @@ function nomeSeguro(nome: string) {
   return nome.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '-');
 }
 
+function objetoJaExiste(message: string) {
+  const texto = message.toLowerCase();
+  return texto.includes('already exists') || texto.includes('duplicate');
+}
+
 export async function concluirServico(input: EncerramentoInput) {
   if (!input.causaRaiz || !input.solucaoTecnica.trim() || !input.validacao.trim() || !input.senha.trim()) {
     throw new Error('Campos obrigatórios de encerramento não preenchidos.');
@@ -36,7 +41,7 @@ export async function concluirServico(input: EncerramentoInput) {
       contentType: foto.tipo,
       upsert: false,
     });
-    if (uploadError && !uploadError.message.toLowerCase().includes('already exists')) throw uploadError;
+    if (uploadError && !objetoJaExiste(uploadError.message)) throw uploadError;
 
     const { error: registroError } = await supabase.from('fotos_atividade').insert({
       chamado_id: input.chamadoId,
@@ -54,9 +59,9 @@ export async function concluirServico(input: EncerramentoInput) {
     const caminho = `${input.tecnicoId}/${input.chamadoId}/relatorio-${nomeSeguro(arquivo.name || 'relatorio-vistoria.pdf')}`;
     const { error: uploadError } = await supabase.storage.from('relatorios-vistoria').upload(caminho, arquivo, {
       contentType: arquivo.type || 'application/pdf',
-      upsert: true,
+      upsert: false,
     });
-    if (uploadError) throw uploadError;
+    if (uploadError && !objetoJaExiste(uploadError.message)) throw uploadError;
 
     const { error: registroError } = await supabase.from('relatorios_vistoria').upsert({
       chamado_id: input.chamadoId,
