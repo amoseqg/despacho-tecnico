@@ -64,7 +64,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='1\.1\.1'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='1\.1\.2'/,'O carregador deve invalidar o cache com a versão atual.');
 for(const parte of nomes)assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 
 // Executa funções reais da aplicação com respostas controladas do servidor.

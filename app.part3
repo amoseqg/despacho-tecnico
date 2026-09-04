@@ -2154,12 +2154,64 @@ function prepararBuscaEscolas(anterior,c){
     }
   };
 }
+const EX_DRAFT_PREFIX='nexofield_execucao_rascunho_v1:';
+const EX_ACTIVE_PREFIX='nexofield_execucao_ativa_v1:';
+let EX_DRAFT_TIMER=null;
+let EX_PREVIEW_URLS=[];
+function chaveRascunhoExecucao(id=EID){return EX_DRAFT_PREFIX+(SB_PROFILE?.id||S?.u||'anonimo')+':'+id;}
+function chaveExecucaoAtiva(){return EX_ACTIVE_PREFIX+(SB_PROFILE?.id||S?.u||'anonimo');}
+function abrirBancoFotosRascunho(){
+  return new Promise((resolve,reject)=>{const req=indexedDB.open('nexofield-rascunhos',1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains('fotos'))db.createObjectStore('fotos',{keyPath:'chave'});};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+}
+async function gravarFotosRascunho(){
+  if(!EID)return;const db=await abrirBancoFotosRascunho();const tx=db.transaction('fotos','readwrite');
+  tx.objectStore('fotos').put({chave:chaveRascunhoExecucao(),fotos:EX_FOTOS_NOVAS.map(f=>({nome:f.name,tipo:f.type,ultimaModificacao:f.lastModified,blob:f}))});
+  await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
+}
+async function lerFotosRascunho(id){
+  const db=await abrirBancoFotosRascunho();const tx=db.transaction('fotos','readonly');const req=tx.objectStore('fotos').get(chaveRascunhoExecucao(id));
+  const registro=await new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});db.close();
+  return (registro?.fotos||[]).map(f=>new File([f.blob],f.nome,{type:f.tipo,lastModified:f.ultimaModificacao}));
+}
+async function apagarFotosRascunho(id){
+  const db=await abrirBancoFotosRascunho();const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').delete(chaveRascunhoExecucao(id));
+  await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
+}
+function dadosRascunhoExecucao(){
+  const ids=['ex-co','ex-cd','ex-cr','ex-km','ex-vkm','ex-atv','ex-vatv','ex-avulso','ex-utp','ex-cci','ex-can','ex-tmat','ex-causa','ex-solucao','ex-validacao','ex-senha','ex-relatorio','ex-obs','ex-total'];
+  const campos={};for(const id of ids){const campo=el(id);campos[id]=id==='ex-total'?campo?.textContent||'':campo?.value||'';}
+  campos['ex-esc-d']=el('ex-esc-d')?.value||'';campos.escd=el('ex-esc-d')?.dataset.id||'';return {chamadoId:EID,campos,atualizadoEm:new Date().toISOString()};
+}
+function salvarRascunhoExecucao(){
+  if(!EID||!SB_PROFILE)return;localStorage.setItem(chaveRascunhoExecucao(),JSON.stringify(dadosRascunhoExecucao()));localStorage.setItem(chaveExecucaoAtiva(),EID);
+}
+function agendarRascunhoExecucao(){clearTimeout(EX_DRAFT_TIMER);EX_DRAFT_TIMER=setTimeout(salvarRascunhoExecucao,150);}
+async function restaurarRascunhoExecucao(c){
+  let draft=null;try{draft=JSON.parse(localStorage.getItem(chaveRascunhoExecucao(c.id))||'null');}catch(_e){}
+  if(draft?.campos){for(const [id,valor] of Object.entries(draft.campos)){const campo=el(id);if(!campo)continue;if(id==='ex-total')campo.textContent=valor;else campo.value=valor;}el('ex-esc-d').dataset.id=draft.campos.escd||'';el('ex-avulso-box').classList.toggle('hidden',!(el('ex-atv').value||'').endsWith('|0'));preencherCamposEncerramento();}
+  try{EX_FOTOS_NOVAS=await lerFotosRascunho(c.id);}catch(err){console.warn('Fotos do rascunho não puderam ser recuperadas',err);EX_FOTOS_NOVAS=[];}atualizarPreviewFotos();
+}
+async function limparRascunhoExecucao(id){
+  localStorage.removeItem(chaveRascunhoExecucao(id));if(localStorage.getItem(chaveExecucaoAtiva())===String(id))localStorage.removeItem(chaveExecucaoAtiva());
+  try{await apagarFotosRascunho(id);}catch(err){console.warn('Rascunho de fotos não pôde ser removido',err);}
+}
 function prepararFotos(){
-  EX_FOTOS_NOVAS=[];el('ex-fotos').value='';el('ex-fotos-preview').innerHTML='';
+  EX_FOTOS_NOVAS=[];el('ex-fotos').value='';el('ex-galeria').value='';el('ex-fotos-preview').innerHTML='';
 }
 function atualizarPreviewFotos(){
-  el('ex-fotos-preview').innerHTML=EX_FOTOS_NOVAS.map((f,i)=>`<div style="position:relative"><img src="${URL.createObjectURL(f)}" alt="Foto selecionada" style="width:100%;height:82px;object-fit:cover;border-radius:7px"><button type="button" data-i="${i}" class="rm-foto" style="position:absolute;right:3px;top:3px;border:0;border-radius:50%;background:#b91c1c;color:white;width:24px;height:24px">×</button></div>`).join('');
-  el('ex-fotos-preview').querySelectorAll('.rm-foto').forEach(b=>b.onclick=()=>{EX_FOTOS_NOVAS.splice(Number(b.dataset.i),1);atualizarPreviewFotos();});
+  EX_PREVIEW_URLS.forEach(URL.revokeObjectURL);EX_PREVIEW_URLS=[];
+  el('ex-fotos-preview').innerHTML=EX_FOTOS_NOVAS.map((f,i)=>{const url=URL.createObjectURL(f);EX_PREVIEW_URLS.push(url);return `<div style="position:relative"><img src="${url}" alt="Foto selecionada ${i+1}" style="width:100%;height:82px;object-fit:cover;border-radius:7px"><button type="button" data-i="${i}" class="rm-foto" aria-label="Remover foto ${i+1}" style="position:absolute;right:3px;top:3px;border:0;border-radius:50%;background:#b91c1c;color:white;width:24px;height:24px">×</button></div>`;}).join('');
+  el('ex-fotos-preview').querySelectorAll('.rm-foto').forEach(b=>b.onclick=async()=>{EX_FOTOS_NOVAS.splice(Number(b.dataset.i),1);atualizarPreviewFotos();try{await gravarFotosRascunho();}catch(err){console.warn('Foto não pôde ser salva no rascunho',err);}salvarRascunhoExecucao();});
+}
+async function adicionarFotosExecucao(lista){
+  const novas=[...lista];if(!novas.length)return;
+  const validas=[];for(const f of novas){if(!['image/jpeg','image/png','image/webp'].includes(f.type)){alert(`Formato não permitido: ${f.name}`);continue;}if(f.size>8*1024*1024){alert(`A foto ${f.name} ultrapassa 8 MB.`);continue;}validas.push(f);}
+  const disponiveis=Math.max(0,8-EX_FOTOS_NOVAS.length);if(validas.length>disponiveis)alert('O limite é de 8 fotos. As primeiras imagens disponíveis foram mantidas.');
+  EX_FOTOS_NOVAS.push(...validas.slice(0,disponiveis));atualizarPreviewFotos();try{await gravarFotosRascunho();}catch(err){console.warn('Fotos não puderam ser salvas no rascunho',err);}salvarRascunhoExecucao();
+}
+function reabrirExecucaoRascunho(){
+  if(S?.t!=='tec'||!SB_PROFILE)return;const id=localStorage.getItem(chaveExecucaoAtiva());if(!id)return;
+  const chamado=D.ch.find(c=>String(c.id)===String(id)&&c.st!=='concluida'&&c.te===S.u);if(chamado)setTimeout(()=>opEx(chamado.id),120);
 }
 async function sbEnviarFotos(c){
   if(!EX_FOTOS_NOVAS.length)return [];
@@ -2186,7 +2238,7 @@ async function abrirFotosChamado(id){
   let m=el('m-fotos-atividade');if(!m){m=document.createElement('div');m.id='m-fotos-atividade';m.className='modal';m.innerHTML='<div class="modal-box" style="max-width:850px"><div class="modal-hd"><h3>📷 Fotos da atividade</h3><button class="close" id="cls-fotos-atividade">×</button></div><div class="modal-bd" id="fotos-atividade-grid"></div></div>';document.body.appendChild(m);el('cls-fotos-atividade').onclick=()=>m.classList.remove('a');}
   el('fotos-atividade-grid').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${urls.map(u=>`<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Evidência da atividade" style="width:100%;height:180px;object-fit:cover;border-radius:8px"></a>`).join('')}</div>`;m.classList.add('a');
 }
-function opEx(id) {
+async function opEx(id) {
   EID = id;
   const c = D.ch.find(x => x.id === id);
   if(!c) return;
@@ -2222,6 +2274,8 @@ function opEx(id) {
   el('ex-dist-info').classList.add('hidden');
 
   el('m-ex').classList.add('a');
+  localStorage.setItem(chaveExecucaoAtiva(),String(id));
+  await restaurarRascunhoExecucao(c);
 
   if (TI) clearInterval(TI);
   TI = setInterval(() => {
@@ -2272,6 +2326,7 @@ async function cfEx() {
     const fotos=await sbEnviarFotos(c);
     c.ex.fotos=[...(c.ex.fotos||[]),...fotos];
     await sbPersistirFinalizacao(c);
+    await limparRascunhoExecucao(c.id);
     lsSet('dd',D);
     clsEx();
     rTat(); rTco(); rTdb();
@@ -2617,7 +2672,10 @@ document.addEventListener('DOMContentLoaded', function() {
   el('ex-utp').addEventListener('input', calcMat);
   el('ex-cci').addEventListener('input', calcMat);
   el('ex-can').addEventListener('input', calcMat);
-  el('ex-fotos').addEventListener('change',e=>{EX_FOTOS_NOVAS=[...e.target.files];if(EX_FOTOS_NOVAS.length>8){alert('Selecione no máximo 8 fotos.');EX_FOTOS_NOVAS=EX_FOTOS_NOVAS.slice(0,8);}atualizarPreviewFotos();});
+  el('ex-fotos').addEventListener('change',async e=>{await adicionarFotosExecucao(e.target.files);e.target.value='';});
+  el('ex-galeria').addEventListener('change',async e=>{await adicionarFotosExecucao(e.target.files);e.target.value='';});
+  el('m-ex').addEventListener('input',agendarRascunhoExecucao);
+  el('m-ex').addEventListener('change',agendarRascunhoExecucao);
   el('btn-calc-dist').addEventListener('click', calcDist);
 
   // Exportar CSV
@@ -3457,7 +3515,7 @@ async function sbRestoreSession(){
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
     ss();
     setTimeout(()=>{
-      if(S.t==='log') enterLog(); else if(S.t==='adm') enterAdm(); else enterTec();
+      if(S.t==='log') enterLog(); else if(S.t==='adm') enterAdm(); else {enterTec();reabrirExecucaoRascunho();}
       if(window.__DT_PASSWORD_RECOVERY){
         setTimeout(()=>{
           try{
@@ -3514,7 +3572,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/vistorias.js?v=1"></script>
-<script src="/release-info.js?v=1.1.0"></script>
+<script src="/release-info.js?v=1.1.2"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

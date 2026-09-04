@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.1.2',date:'2026-09-04',title:'Fotos e rascunho no Android',
+  changes:['Rascunho do serviço restaurado automaticamente após recarga da página.','Ações separadas para tirar foto e anexar imagens da galeria.','Novas fotos são acumuladas sem remover as anteriores.']
+ },{
   version:'1.1.1',date:'2026-09-03',title:'Correções restauradas e cache atualizado',
   changes:['Número Método e SDM mantidos nos campos corretos.','Campos obrigatórios e opções de causa raiz restaurados.','Arquivos versionados para impedir que o navegador reutilize uma edição antiga.']
  },{

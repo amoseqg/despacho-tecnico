@@ -1056,8 +1056,13 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="form-group"><label class="label">Observações adicionais</label><textarea id="ex-obs" class="input" rows="2" placeholder="Informações adicionais..."></textarea></div>
       <div class="form-group">
         <label class="label">📷 Fotos da execução</label>
-        <input type="file" id="ex-fotos" class="input" accept="image/jpeg,image/png,image/webp" capture="environment" multiple>
-        <small>Até 8 fotos (JPG, PNG ou WebP), máximo de 8 MB por foto.</small>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <label class="btn btn-p" for="ex-fotos" style="cursor:pointer">📷 Tirar foto</label>
+          <label class="btn btn-s" for="ex-galeria" style="cursor:pointer">🖼️ Anexar da galeria</label>
+        </div>
+        <input type="file" id="ex-fotos" accept="image/jpeg,image/png,image/webp" capture="environment" style="position:absolute;left:-9999px;width:1px;height:1px">
+        <input type="file" id="ex-galeria" accept="image/jpeg,image/png,image/webp" multiple style="position:absolute;left:-9999px;width:1px;height:1px">
+        <small>As fotos são acumuladas e preservadas no rascunho. Até 8 fotos, máximo de 8 MB por foto.</small>
         <div id="ex-fotos-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px;margin-top:8px"></div>
       </div>
       <div class="total-box">
