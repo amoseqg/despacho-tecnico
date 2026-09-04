@@ -24,8 +24,8 @@ button, input, select, textarea { font: inherit; }
 .metric { padding: 18px; display: flex; flex-direction: column; gap: 5px; }
 .metric strong { font-size: 1.7rem; color: var(--petroleum); }
 .metric span { color: var(--muted); font-size: .82rem; }
-.panel { padding: 22px; }
-.panel-heading { display: flex; justify-content: space-between; align-items: end; margin-bottom: 16px; }
+.panel { padding: 22px; margin-bottom: 16px; }
+.panel-heading { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 16px; }
 .panel h2 { margin: 4px 0 0; font-size: 1.25rem; }
 .module-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .module { border: 1px solid var(--line); border-radius: 13px; padding: 15px; }
@@ -60,9 +60,10 @@ button, input, select, textarea { font: inherit; }
 .ticket-head > div { display: grid; gap: 4px; }
 .ticket-head span { color: var(--muted); font-size: .78rem; }
 .ticket-status { border-radius: 999px; padding: 5px 9px; font-size: .65rem; font-weight: 700; text-transform: uppercase; background: #eef2f7; }
-.st-aberto, .st-pendente { background: #fef3c7; color: #92400e; }
-.st-andamento { background: #dbeafe; color: #1e40af; }
-.st-concluida { background: #dcfce7; color: #166534; }
+.st-aberto, .st-pendente, .st-solicitado { background: #fef3c7; color: #92400e; }
+.st-andamento, .st-direcionado { background: #dbeafe; color: #1e40af; }
+.st-concluida, .st-entregue { background: #dcfce7; color: #166534; }
+.st-separado { background: #ede9fe; color: #5b21b6; }
 .st-recusado, .st-cancelado { background: #fee2e2; color: #991b1b; }
 .ticket-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: .75rem; }
 .reincidencia { margin-top: 12px; display: grid; gap: 4px; border-left: 3px solid #f59e0b; background: #fffbeb; padding: 10px 12px; border-radius: 8px; font-size: .76rem; }
@@ -70,8 +71,21 @@ button, input, select, textarea { font: inherit; }
 .execution-preview summary { cursor: pointer; font-weight: 700; color: var(--petroleum); }
 .service-photos { display: grid; gap: 8px; margin-top: 12px; }
 .service-photos small { color: var(--muted); }
+.logistics-panel { overflow: hidden; }
+.logistics-stats { display: flex; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: .72rem; }
+.logistics-stats span { border: 1px solid var(--line); border-radius: 999px; padding: 5px 9px; }
+.tramite-toggle { width: 100%; display: flex; justify-content: space-between; gap: 12px; border: 1px solid var(--line); border-radius: 12px; background: #f8fafc; color: var(--ink); padding: 13px 14px; cursor: pointer; font-weight: 700; }
+.tramite-toggle strong { color: var(--petroleum); }
+.logistics-body { display: grid; gap: 12px; margin-top: 14px; }
+.search-input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; background: #fff; }
+.material-flow-list { display: grid; gap: 10px; }
+.material-flow-card { border: 1px solid var(--line); border-radius: 12px; padding: 14px; background: #fff; }
+.material-flow-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.material-flow-head > div { display: grid; gap: 4px; }
+.material-flow-head span { color: var(--muted); font-size: .75rem; }
+.material-flow-card .button { margin-top: 12px; }
 @media (max-width: 720px) {
   .hero { flex-direction: column; }
   .summary-grid, .module-grid { grid-template-columns: 1fr; }
-  .ticket-head { flex-direction: column; }
+  .ticket-head, .material-flow-head, .panel-heading { flex-direction: column; align-items: stretch; }
 }
