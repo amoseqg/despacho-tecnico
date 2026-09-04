@@ -13,7 +13,22 @@
 .address-card > span { color:var(--muted); font-size:.75rem; text-transform:capitalize; }
 .st-aprovado { background:#dcfce7; color:#166534; }
 .st-rejeitado { background:#fee2e2; color:#991b1b; }
+.call-editor { display:grid; gap:14px; }
+.editor-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.call-editor label { display:grid; gap:6px; font-size:.78rem; font-weight:700; position:relative; }
+.call-editor input,.call-editor select,.call-editor textarea { width:100%; border:1px solid var(--line); border-radius:10px; padding:10px 11px; background:#fff; color:var(--ink); }
+.call-editor textarea { resize:vertical; min-height:92px; }
+.editor-full { grid-column:1/-1; }
+.inline-button { justify-self:start; margin-top:3px; }
+.city-picker { z-index:8; }
+.city-results { position:absolute; left:0; right:0; top:100%; margin-top:3px; max-height:220px; overflow:auto; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 12px 28px rgba(15,23,42,.14); z-index:20; }
+.city-results button { display:block; width:100%; text-align:left; border:0; border-bottom:1px solid #eef2f7; background:#fff; padding:9px 11px; cursor:pointer; }
+.city-results button:hover { background:#f8fafc; }
+.table-actions { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.success-box { border:1px solid #bbf7d0; background:#f0fdf4; color:#166534; border-radius:10px; padding:10px 12px; font-size:.82rem; }
+.helper-text { color:var(--muted); font-size:.78rem; }
 @media (max-width:720px) {
-  .tracking-grid,.address-grid { grid-template-columns:1fr; }
+  .tracking-grid,.address-grid,.editor-grid { grid-template-columns:1fr; }
   .theme-switcher { width:100%; justify-content:space-between; }
+  .call-editor .panel-heading { gap:10px; }
 }
