@@ -7,10 +7,14 @@ import type { PerfilDb } from '@/src/features/auth/perfil.service';
 import { listarChamados, obterReincidencia, type ChamadoResumo, type ReincidenciaResumo } from '@/src/features/chamados/chamados.service';
 import { ServiceExecution } from '@/src/features/servicos/ServiceExecution';
 import { LogisticaPanel } from '@/src/features/logistica/LogisticaPanel';
+import { RastreamentoInteriorPanel } from '@/src/features/logistica/RastreamentoInteriorPanel';
+import { EnderecosTecnicosPanel } from '@/src/features/logistica/EnderecosTecnicosPanel';
 import { AdminPanel } from '@/src/features/admin/AdminPanel';
 import { VistoriasPanel } from '@/src/features/admin/VistoriasPanel';
 import { DashboardPanel } from '@/src/features/admin/DashboardPanel';
 import { FinanceiroDesempenhoPanel } from '@/src/features/admin/FinanceiroDesempenhoPanel';
+import { AprovacoesPanel } from '@/src/features/admin/AprovacoesPanel';
+import { ThemeSwitcher } from './ThemeSwitcher';
 
 export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb }) {
   const [chamados, setChamados] = useState<ChamadoResumo[]>([]);
@@ -55,7 +59,7 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
           <h1>{tituloPerfil}</h1>
           <p>{perfil.nome} · {user.email}</p>
         </div>
-        <div className="header-actions"><span className="version">2.0.0-migration.1</span><button className="button light" onClick={sair}>Sair</button></div>
+        <div className="header-actions"><ThemeSwitcher /><span className="version">2.0.0-migration.1</span><button className="button light" onClick={sair}>Sair</button></div>
       </header>
 
       <section className="summary-grid">
@@ -66,9 +70,12 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
 
       {perfil.tipo === 'admin' && <DashboardPanel />}
       {perfil.tipo === 'admin' && <FinanceiroDesempenhoPanel />}
+      {perfil.tipo === 'admin' && <AprovacoesPanel adminId={perfil.id} />}
       {perfil.tipo === 'admin' && <AdminPanel adminId={perfil.id} />}
       {perfil.tipo === 'admin' && <VistoriasPanel />}
       {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <LogisticaPanel />}
+      {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <EnderecosTecnicosPanel />}
+      {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <RastreamentoInteriorPanel />}
 
       <section className="panel">
         <div className="panel-heading"><div><span className="eyebrow">Base real</span><h2>Chamados do Supabase</h2></div></div>
