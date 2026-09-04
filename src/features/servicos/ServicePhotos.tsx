@@ -19,7 +19,13 @@ export function ServicePhotos({ chamadoId }: { chamadoId: string }) {
     const novas = files.map(criarFotoRascunho);
     const atualizadas = [...fotos, ...novas];
     setFotos(atualizadas);
-    await salvarRascunho({ chamadoId, campos: {}, fotos: atualizadas, atualizadoEm: new Date().toISOString() });
+    const existente = await carregarRascunho(chamadoId);
+    await salvarRascunho({
+      chamadoId,
+      campos: existente?.campos ?? {},
+      fotos: atualizadas,
+      atualizadoEm: new Date().toISOString(),
+    });
   }
 
   return (
