@@ -41,8 +41,37 @@ button, input, select, textarea { font: inherit; }
 .button { border: 0; border-radius: 10px; padding: 10px 14px; font-weight: 700; cursor: pointer; }
 .button.primary { background: var(--petroleum); color: white; }
 .button.secondary { background: white; color: var(--ink); border: 1px solid var(--line); }
+.button.light { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.22); }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.login-shell { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at top, #dceff1, var(--background) 48%); }
+.login-card { width: min(430px, 100%); background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 28px; box-shadow: 0 18px 50px rgba(15,76,92,.14); }
+.login-card h1 { margin: 8px 0 6px; }
+.login-card p { color: var(--muted); margin: 0 0 20px; }
+.login-form { display: grid; gap: 14px; }
+.login-form label { display: grid; gap: 6px; font-size: .82rem; font-weight: 700; }
+.login-form input { width: 100%; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; }
+.login-form button { border: 0; border-radius: 10px; padding: 12px; background: var(--petroleum); color: #fff; font-weight: 700; cursor: pointer; }
+.error-box { border: 1px solid #fecaca; background: #fef2f2; color: #991b1b; border-radius: 10px; padding: 10px 12px; font-size: .82rem; }
+.compact-hero h1 { font-size: clamp(1.55rem, 3vw, 2.2rem); }
+.header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.ticket-list { display: grid; gap: 12px; }
+.ticket { border: 1px solid var(--line); border-radius: 14px; padding: 15px; background: #fff; }
+.ticket-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.ticket-head > div { display: grid; gap: 4px; }
+.ticket-head span { color: var(--muted); font-size: .78rem; }
+.ticket-status { border-radius: 999px; padding: 5px 9px; font-size: .65rem; font-weight: 700; text-transform: uppercase; background: #eef2f7; }
+.st-aberto, .st-pendente { background: #fef3c7; color: #92400e; }
+.st-andamento { background: #dbeafe; color: #1e40af; }
+.st-concluida { background: #dcfce7; color: #166534; }
+.st-recusado, .st-cancelado { background: #fee2e2; color: #991b1b; }
+.ticket-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; color: var(--muted); font-size: .75rem; }
+.reincidencia { margin-top: 12px; display: grid; gap: 4px; border-left: 3px solid #f59e0b; background: #fffbeb; padding: 10px 12px; border-radius: 8px; font-size: .76rem; }
+.execution-preview { margin-top: 14px; border-top: 1px solid var(--line); padding-top: 12px; }
+.execution-preview summary { cursor: pointer; font-weight: 700; color: var(--petroleum); }
+.service-photos { display: grid; gap: 8px; margin-top: 12px; }
+.service-photos small { color: var(--muted); }
 @media (max-width: 720px) {
   .hero { flex-direction: column; }
   .summary-grid, .module-grid { grid-template-columns: 1fr; }
+  .ticket-head { flex-direction: column; }
 }
