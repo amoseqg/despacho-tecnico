@@ -93,6 +93,7 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
                   <span className={`ticket-status st-${chamado.status}`}>{chamado.status}</span>
                 </div>
                 <div className="ticket-meta"><span>Circuito: {chamado.circuito}</span><span>SDM: {chamado.sdm || '—'}</span><span>{chamado.cidade || 'Cidade não informada'}</span></div>
+                <div className="ticket-meta"><span><strong>Motivo do chamado:</strong> {chamado.motivo_chamado || '—'}</span></div>
                 {reincidencia && <div className="reincidencia"><strong>Reincidência</strong><span>Último técnico: {reincidencia.tecnico_anterior || 'Não informado'}</span><span>Ação: {reincidencia.acao_realizada || 'Não informada'}</span></div>}
                 {perfil.tipo === 'tecnico' && chamado.status !== 'concluida' && chamado.status !== 'cancelado' && (
                   <details className="execution-preview">

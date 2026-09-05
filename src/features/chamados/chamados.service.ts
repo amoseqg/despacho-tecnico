@@ -10,6 +10,7 @@ export type ChamadoResumo = {
   circuito: string;
   site_nome: string | null;
   cidade: string | null;
+  motivo_chamado: string | null;
   status: 'aberto' | 'pendente' | 'andamento' | 'recusado' | 'concluida' | 'cancelado';
   tecnico_id: string | null;
   atividade_servico: string | null;
@@ -28,7 +29,7 @@ export async function listarChamados(perfil: PerfilDb): Promise<ChamadoResumo[]>
   const supabase = createSupabaseBrowserClient();
   let query = supabase
     .from('chamados')
-    .select('id,protocolo,sdm,circuito,site_nome,cidade,status,tecnico_id,atividade_servico,criado_em')
+    .select('id,protocolo,sdm,circuito,site_nome,cidade,motivo_chamado,status,tecnico_id,atividade_servico,criado_em')
     .neq('status', 'cancelado')
     .order('criado_em', { ascending: false })
     .limit(100);

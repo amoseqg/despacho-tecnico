@@ -8,7 +8,7 @@ assert.ok(editor.includes('Motivo do chamado'), 'O campo Motivo do chamado não 
 assert.ok(editor.includes('motivo_chamado'), 'O formulário não mantém o motivo no estado tipado.');
 assert.ok(editor.includes("'motivo do chamado'"), 'O parser não reconhece o rótulo Motivo do chamado.');
 assert.ok(editor.includes('onPaste='), 'A captura automática ao colar não foi configurada.');
-assert.ok(service.includes('descricaoComMotivo'), 'O motivo não é incorporado à descrição antes da gravação.');
-assert.ok(service.includes('MOTIVO DO CHAMADO:'), 'O rótulo persistido não foi encontrado.');
+assert.ok(service.includes('motivo_chamado:'), 'O motivo não é enviado para a coluna própria.');
+assert.ok(!service.includes('descricaoComMotivo'), 'O motivo ainda está sendo incorporado à descrição.');
 
-console.log('Motivo do chamado: campo, captura ao colar e persistência na descrição validados.');
+console.log('Motivo do chamado: campo, captura ao colar e persistência separada validados.');

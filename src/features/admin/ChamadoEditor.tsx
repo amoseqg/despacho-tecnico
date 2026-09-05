@@ -71,7 +71,7 @@ export function ChamadoEditor({ adminId, chamado, onSalvo, onCancelar }: Props) 
     setForm({
       id: chamado.id, protocolo: chamado.protocolo || '', sdm: chamado.sdm || '', os_pe_conectado: chamado.os_pe_conectado || '',
       circuito: chamado.circuito || '', site_nome: chamado.site_nome || '', cidade: chamado.cidade || '', endereco: chamado.endereco || '', contato: chamado.contato || '',
-      descricao: chamado.descricao || '', motivo_chamado: parseDescricao(chamado.descricao || '').motivo_chamado || '', tipo_os: chamado.tipo_os || 'manutencao', atividade_servico: (chamado.atividade_servico as ChamadoEditorInput['atividade_servico']) || null,
+      descricao: chamado.descricao || '', motivo_chamado: chamado.motivo_chamado || parseDescricao(chamado.descricao || '').motivo_chamado || '', tipo_os: chamado.tipo_os || 'manutencao', atividade_servico: (chamado.atividade_servico as ChamadoEditorInput['atividade_servico']) || null,
       regiao: chamado.regiao || 'capital', area: chamado.area || '', skill: (chamado.skill as ChamadoEditorInput['skill']) || 'voz', tecnico_id: chamado.tecnico_id || null,
     });
   }, [chamado]);
