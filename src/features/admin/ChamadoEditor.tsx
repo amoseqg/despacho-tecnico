@@ -116,7 +116,10 @@ export function ChamadoEditor({ adminId, chamado, onSalvo, onCancelar }: Props) 
     <form className="call-editor" onSubmit={salvar}>
       <div className="panel-heading"><div><span className="eyebrow">Administrador</span><h2>{chamado ? 'Editar chamado' : 'Novo chamado'}</h2></div>{chamado && onCancelar && <button type="button" className="button secondary" onClick={onCancelar}>Cancelar edição</button>}</div>
       <label className="editor-full">Descrição do chamado
-        <textarea rows={5} value={form.descricao || ''} onChange={e => campo('descricao', e.target.value)} onPaste={e => {
+        <textarea rows={5} value={form.descricao || ''} onChange={e => {
+          const descricao = e.target.value;
+          setForm(f => ({ ...f, descricao, ...(!descricao.trim() && { motivo_chamado: '' }) }));
+        }} onPaste={e => {
           const extraidos = parseDescricao(e.clipboardData.getData('text'));
           setForm(f => ({ ...f, ...Object.fromEntries(Object.entries(extraidos).filter(([, v]) => Boolean(v))) }));
           if (extraidos.motivo_chamado) setMensagem('Motivo do chamado identificado automaticamente. Revise antes de salvar.');

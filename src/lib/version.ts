@@ -1,4 +1,4 @@
-export const NEXOFIELD_VERSION = '2.0.0-migration.4' as const;
+export const NEXOFIELD_VERSION = '2.0.0-migration.5' as const;
 
 export const NEXOFIELD_RELEASE = {
   version: NEXOFIELD_VERSION,

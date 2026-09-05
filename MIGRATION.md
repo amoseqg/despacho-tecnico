@@ -59,7 +59,7 @@ Esta branch converte gradualmente o NexoField de HTML/JavaScript monolítico par
 
 ## Situação atual
 
-- Versão de trabalho: `2.0.0-migration.4`.
+- Versão de trabalho: `2.0.0-migration.5`.
 - Campo Motivo do chamado incluído no cadastro administrativo, com captura automática da descrição colada e persistência em coluna própria do banco.
 - A compilação de produção e a verificação TypeScript estão aprovadas.
 - Os testes automatizados da versão estável 1.1.5 continuam aprovados para comparação de regressão.
