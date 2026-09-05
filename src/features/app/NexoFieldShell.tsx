@@ -15,6 +15,7 @@ import { DashboardPanel } from '@/src/features/admin/DashboardPanel';
 import { FinanceiroDesempenhoPanel } from '@/src/features/admin/FinanceiroDesempenhoPanel';
 import { AprovacoesPanel } from '@/src/features/admin/AprovacoesPanel';
 import { ThemeSwitcher } from './ThemeSwitcher';
+import { NEXOFIELD_VERSION } from '@/src/lib/version';
 
 export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb }) {
   const [chamados, setChamados] = useState<ChamadoResumo[]>([]);
@@ -59,7 +60,7 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
           <h1>{tituloPerfil}</h1>
           <p>{perfil.nome} · {user.email}</p>
         </div>
-        <div className="header-actions"><ThemeSwitcher /><span className="version">2.0.0-migration.1</span><button className="button light" onClick={sair}>Sair</button></div>
+        <div className="header-actions"><ThemeSwitcher /><span className="version">{NEXOFIELD_VERSION}</span><button className="button light" onClick={sair}>Sair</button></div>
       </header>
 
       <section className="summary-grid">

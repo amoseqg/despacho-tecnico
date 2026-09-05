@@ -4,6 +4,7 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { createSupabaseBrowserClient } from '@/src/lib/supabase/client';
 import { obterPerfilAtual, type PerfilDb } from './perfil.service';
+import { NEXOFIELD_RELEASE } from '@/src/lib/version';
 
 export function AuthGate({ children }: { children: (ctx: { user: User; perfil: PerfilDb }) => ReactNode }) {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -73,7 +74,7 @@ export function AuthGate({ children }: { children: (ctx: { user: User; perfil: P
     return (
       <main className="login-shell">
         <section className="login-card">
-          <span className="eyebrow">NexoField 2.0</span>
+          <span className="eyebrow">{NEXOFIELD_RELEASE.label}</span>
           <h1>Acesso ao sistema</h1>
           <p>Use o mesmo usuário cadastrado no NexoField atual.</p>
           <form onSubmit={entrar} className="login-form">

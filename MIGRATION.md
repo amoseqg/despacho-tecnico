@@ -46,10 +46,23 @@ Esta branch converte gradualmente o NexoField de HTML/JavaScript monolítico par
 - Base Next.js + React + TypeScript.
 - Tipos de domínio para usuários, chamados, encerramento, fotos, vistorias e materiais.
 - Cliente Supabase baseado em variáveis públicas.
+- Autenticação e recuperação de perfil usando as contas atuais.
+- Consulta, criação, edição, pesquisa, arquivamento e restauração de chamados.
+- Reincidência por circuito com técnico e ação anteriores.
 - Persistência de rascunho e fotos via IndexedDB.
 - Componente React com câmera e galeria separadas.
-- Mapa dos módulos existentes para acompanhamento da migração.
-- Interface inicial responsiva do NexoField 2.0.
+- Encerramento obrigatório, atividade Vistoria e relatório em PDF.
+- Dashboard, aprovações, pagamentos, desempenho e exportações administrativas.
+- Trâmite de materiais, histórico, exportação, rastreamento e endereços dos técnicos.
+- Temas verde petróleo, azul e branco com persistência por conta.
+- Interface responsiva do NexoField 2.0 para os três perfis.
+
+## Situação atual
+
+- Versão de trabalho: `2.0.0-migration.2`.
+- A compilação de produção e a verificação TypeScript estão aprovadas.
+- Os testes automatizados da versão estável 1.1.5 continuam aprovados para comparação de regressão.
+- Ainda falta validar os fluxos completos com contas reais dos três perfis, inclusive no Chrome/Android, antes da promoção para produção.
 
 ## Critério para troca da produção
 
