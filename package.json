@@ -1,13 +1,14 @@
 {
   "name": "nexofield",
-  "version": "2.0.0-migration.2",
+  "version": "2.0.0-migration.3",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "validate:migration": "node scripts/validate-migration.mjs"
+    "validate:migration": "node scripts/validate-migration.mjs",
+    "validate:motivo": "node scripts/validate-motivo-chamado.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

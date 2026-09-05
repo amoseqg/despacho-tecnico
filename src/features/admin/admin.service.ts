@@ -48,6 +48,7 @@ export type ChamadoEditorInput = {
   endereco?: string | null;
   contato?: string | null;
   descricao?: string | null;
+  motivo_chamado?: string | null;
   tipo_os: 'manutencao' | 'servico';
   atividade_servico?: 'instalacao' | 'alteracao' | 'mudanca_endereco' | 'vistoria' | null;
   regiao: 'capital' | 'interior' | 'noronha';
@@ -55,6 +56,18 @@ export type ChamadoEditorInput = {
   skill: 'voz' | 'dados' | 'infra';
   tecnico_id?: string | null;
 };
+
+function descricaoComMotivo(descricao: string | null | undefined, motivo: string | null | undefined) {
+  const texto = descricao?.trim() || '';
+  const valor = motivo?.trim() || '';
+  if (!valor) return texto || null;
+
+  const linha = `MOTIVO DO CHAMADO: ${valor}`;
+  const rotuloExistente = /^\s*motivo\s+(?:do\s+)?chamado\s*[:\-].*$/im;
+  return rotuloExistente.test(texto)
+    ? texto.replace(rotuloExistente, linha)
+    : [texto, linha].filter(Boolean).join('\n');
+}
 
 export async function pesquisarTecnicos(termo: string): Promise<TecnicoResumo[]> {
   const supabase = createSupabaseBrowserClient();
@@ -133,7 +146,7 @@ function payloadChamado(input: ChamadoEditorInput) {
     cidade: input.cidade?.trim() || null,
     endereco: input.endereco?.trim() || null,
     contato: input.contato?.trim() || null,
-    descricao: input.descricao?.trim() || null,
+    descricao: descricaoComMotivo(input.descricao, input.motivo_chamado),
     tipo_os: input.tipo_os,
     atividade_servico: input.tipo_os === 'servico' ? input.atividade_servico ?? null : null,
     regiao: input.regiao,
