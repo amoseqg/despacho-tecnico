@@ -11,7 +11,7 @@ type Props = {
 };
 
 const vazio: ChamadoEditorInput = {
-  protocolo: '', sdm: '', os_pe_conectado: '', circuito: '', site_nome: '', cidade: '', endereco: '', contato: '', descricao: '', motivo_chamado: '',
+  protocolo: '', sdm: '', os_pe_conectado: '', circuito: '', site_nome: '', cidade: '', endereco: '', contato: '', descricao: '',
   tipo_os: 'manutencao', atividade_servico: null, regiao: 'capital', area: '', skill: 'voz', tecnico_id: null,
 };
 
@@ -45,12 +45,10 @@ function parseDescricao(texto: string): Partial<ChamadoEditorInput> {
   const endereco = extrairPorRotulos(texto, ['endereco', 'endereço']);
   const cidade = extrairPorRotulos(texto, ['cidade', 'municipio', 'município']);
   const contato = extrairPorRotulos(texto, ['contato', 'telefone']);
-  const motivo = extrairPorRotulos(texto, ['motivo do chamado', 'motivo chamado', 'descricao do problema', 'descrição do problema', 'defeito reclamado', 'motivo']);
   return {
     ...(protocolo && { protocolo: protocolo.replace(/\D/g, '') }),
     ...(sdm && { sdm }), ...(os && { os_pe_conectado: os }), ...(circuito && { circuito }),
     ...(site && { site_nome: site }), ...(endereco && { endereco }), ...(cidade && { cidade }), ...(contato && { contato }),
-    ...(motivo && { motivo_chamado: motivo }),
   };
 }
 
@@ -71,7 +69,7 @@ export function ChamadoEditor({ adminId, chamado, onSalvo, onCancelar }: Props) 
     setForm({
       id: chamado.id, protocolo: chamado.protocolo || '', sdm: chamado.sdm || '', os_pe_conectado: chamado.os_pe_conectado || '',
       circuito: chamado.circuito || '', site_nome: chamado.site_nome || '', cidade: chamado.cidade || '', endereco: chamado.endereco || '', contato: chamado.contato || '',
-      descricao: chamado.descricao || '', motivo_chamado: chamado.motivo_chamado || parseDescricao(chamado.descricao || '').motivo_chamado || '', tipo_os: chamado.tipo_os || 'manutencao', atividade_servico: (chamado.atividade_servico as ChamadoEditorInput['atividade_servico']) || null,
+      descricao: chamado.descricao || '', tipo_os: chamado.tipo_os || 'manutencao', atividade_servico: (chamado.atividade_servico as ChamadoEditorInput['atividade_servico']) || null,
       regiao: chamado.regiao || 'capital', area: chamado.area || '', skill: (chamado.skill as ChamadoEditorInput['skill']) || 'voz', tecnico_id: chamado.tecnico_id || null,
     });
   }, [chamado]);
@@ -118,11 +116,10 @@ export function ChamadoEditor({ adminId, chamado, onSalvo, onCancelar }: Props) 
       <label className="editor-full">Descrição do chamado
         <textarea rows={5} value={form.descricao || ''} onChange={e => {
           const descricao = e.target.value;
-          setForm(f => ({ ...f, descricao, ...(!descricao.trim() && { motivo_chamado: '' }) }));
+          setForm(f => ({ ...f, descricao }));
         }} onPaste={e => {
           const extraidos = parseDescricao(e.clipboardData.getData('text'));
           setForm(f => ({ ...f, ...Object.fromEntries(Object.entries(extraidos).filter(([, v]) => Boolean(v))) }));
-          if (extraidos.motivo_chamado) setMensagem('Motivo do chamado identificado automaticamente. Revise antes de salvar.');
         }} placeholder="Cole a descrição recebida para preencher os campos automaticamente" />
         <button type="button" className="button secondary inline-button" onClick={interpretarDescricao}>Preencher pela descrição</button>
       </label>
@@ -138,7 +135,6 @@ export function ChamadoEditor({ adminId, chamado, onSalvo, onCancelar }: Props) 
           {(buscaCidade || form.cidade) && cidadesFiltradas.length > 0 && <div className="city-results">{cidadesFiltradas.map(c => <button key={c} type="button" onClick={() => { campo('cidade', c); setBuscaCidade(''); }}>{c}</button>)}</div>}
         </label>
         <label>Contato<input value={form.contato || ''} onChange={e => campo('contato', e.target.value)} /></label>
-        <label>Motivo do chamado<input value={form.motivo_chamado || ''} onChange={e => campo('motivo_chamado', e.target.value)} placeholder="Informe o motivo do chamado" /></label>
         <label>Tipo de OS<select value={form.tipo_os} onChange={e => campo('tipo_os', e.target.value as ChamadoEditorInput['tipo_os'])}><option value="manutencao">Manutenção</option><option value="servico">Serviço</option></select></label>
         {form.tipo_os === 'servico' && <label>Atividade *<select required value={form.atividade_servico || ''} onChange={e => campo('atividade_servico', e.target.value as ChamadoEditorInput['atividade_servico'])}><option value="">Selecione</option><option value="instalacao">Instalação</option><option value="alteracao">Alteração</option><option value="mudanca_endereco">Mudança de endereço</option><option value="vistoria">Vistoria - R$ 150,00</option></select></label>}
         <label>Região<select value={form.regiao} onChange={e => { const r = e.target.value as ChamadoEditorInput['regiao']; setForm(f => ({ ...f, regiao: r, area: r === 'capital' ? '' : r, tecnico_id: null })); }}><option value="capital">Capital</option><option value="interior">Interior</option><option value="noronha">Fernando de Noronha</option></select></label>

@@ -24,7 +24,6 @@ export type ChamadoAdminResumo = {
   endereco?: string | null;
   contato?: string | null;
   descricao?: string | null;
-  motivo_chamado?: string | null;
   tipo_os?: 'manutencao' | 'servico';
   atividade_servico: string | null;
   regiao?: 'capital' | 'interior' | 'noronha';
@@ -49,7 +48,6 @@ export type ChamadoEditorInput = {
   endereco?: string | null;
   contato?: string | null;
   descricao?: string | null;
-  motivo_chamado?: string | null;
   tipo_os: 'manutencao' | 'servico';
   atividade_servico?: 'instalacao' | 'alteracao' | 'mudanca_endereco' | 'vistoria' | null;
   regiao: 'capital' | 'interior' | 'noronha';
@@ -87,7 +85,7 @@ export async function listarChamadosAdmin(termo = ''): Promise<ChamadoAdminResum
   const supabase = createSupabaseBrowserClient();
   let query = supabase
     .from('chamados')
-    .select('id,protocolo,sdm,os_pe_conectado,circuito,site_nome,cidade,endereco,contato,descricao,motivo_chamado,tipo_os,atividade_servico,regiao,area,skill,status,tecnico_id,criado_por,criado_em,concluido_em,aberto_por:perfis!chamados_criado_por_fkey(nome)')
+    .select('id,protocolo,sdm,os_pe_conectado,circuito,site_nome,cidade,endereco,contato,descricao,tipo_os,atividade_servico,regiao,area,skill,status,tecnico_id,criado_por,criado_em,concluido_em,aberto_por:perfis!chamados_criado_por_fkey(nome)')
     .order('criado_em', { ascending: false });
 
   const busca = termo.trim();
@@ -106,7 +104,6 @@ export async function listarChamadosAdmin(termo = ''): Promise<ChamadoAdminResum
     endereco: row.endereco,
     contato: row.contato,
     descricao: row.descricao,
-    motivo_chamado: row.motivo_chamado,
     tipo_os: row.tipo_os,
     atividade_servico: row.atividade_servico,
     regiao: row.regiao,
@@ -136,7 +133,6 @@ function payloadChamado(input: ChamadoEditorInput) {
     cidade: input.cidade?.trim() || null,
     endereco: input.endereco?.trim() || null,
     contato: input.contato?.trim() || null,
-    motivo_chamado: input.motivo_chamado?.trim() || null,
     descricao: input.descricao?.trim() || null,
     tipo_os: input.tipo_os,
     atividade_servico: input.tipo_os === 'servico' ? input.atividade_servico ?? null : null,

@@ -17,10 +17,7 @@ grant select, insert on public.rastreamento_tecnico to authenticated;
 drop policy if exists rastreamento_leitura_autorizada on public.rastreamento_tecnico;
 create policy rastreamento_leitura_autorizada
  on public.rastreamento_tecnico for select to authenticated
- using (
-  exists (select 1 from public.perfis p where p.id=(select auth.uid()) and p.ativo and p.tipo='admin')
-  or tecnico_id = (select auth.uid())
- );
+ using (exists (select 1 from public.perfis p where p.id=(select auth.uid()) and p.ativo and p.tipo='admin'));
 drop policy if exists rastreamento_tecnico_insere_proprio on public.rastreamento_tecnico;
 create policy rastreamento_tecnico_insere_proprio
  on public.rastreamento_tecnico for insert to authenticated

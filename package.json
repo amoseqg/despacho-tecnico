@@ -1,6 +1,6 @@
 {
   "name": "nexofield",
-  "version": "2.0.0-migration.6",
+  "version": "2.0.0-migration.7",
   "private": true,
   "scripts": {
     "dev": "next dev",

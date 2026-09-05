@@ -99,9 +99,8 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
                   <span className={`ticket-status st-${chamado.status}`}>{chamado.status}</span>
                 </div>
                 <div className="ticket-meta"><span>Circuito: {chamado.circuito}</span><span>SDM: {chamado.sdm || '—'}</span><span>{chamado.cidade || 'Cidade não informada'}</span></div>
-                <div className="ticket-meta"><span><strong>Motivo do chamado:</strong> {chamado.motivo_chamado || '—'}</span></div>
                 {reincidencia && <div className="reincidencia"><strong>Reincidência</strong><span>Último técnico: {reincidencia.tecnico_anterior || 'Não informado'}</span><span>Ação: {reincidencia.acao_realizada || 'Não informada'}</span></div>}
-                {perfil.tipo==='tecnico'&&chamado.status==='pendente'&&<button className="button primary" onClick={async()=>{if(!confirm('Ao aceitar, sua localização será solicitada e compartilhada somente durante este atendimento.'))return;try{await aceitarChamado(chamado.id,perfil.id);setChamados(lista=>lista.map(c=>c.id===chamado.id?{...c,status:'andamento'}:c));}catch(e){setErro(e instanceof Error?e.message:'Não foi possível aceitar o chamado.')}}}>Aceitar chamado e iniciar rastreamento</button>}
+                {perfil.tipo==='tecnico'&&chamado.status==='pendente'&&<button className="button primary" onClick={async()=>{try{await aceitarChamado(chamado.id,perfil.id);setChamados(lista=>lista.map(c=>c.id===chamado.id?{...c,status:'andamento'}:c));}catch(e){setErro(e instanceof Error?e.message:'Não foi possível aceitar o chamado.')}}}>Aceitar chamado</button>}
                 {perfil.tipo==='tecnico'&&chamado.status==='andamento'&&<TechnicianTracking chamadoId={chamado.id} tecnicoId={perfil.id} />}
                 {perfil.tipo === 'tecnico' && chamado.status === 'andamento' && (
                   <details className="execution-preview">

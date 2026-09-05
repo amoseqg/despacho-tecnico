@@ -59,9 +59,9 @@ Esta branch converte gradualmente o NexoField de HTML/JavaScript monolítico par
 
 ## Situação atual
 
-- Versão de trabalho: `2.0.0-migration.6`.
+- Versão de trabalho: `2.0.0-migration.7`.
 - Rastreamento do técnico após aceite, consulta de fotos, buscas ocultas de vistorias/excluídos e exportação de excluídos migrados.
-- Campo Motivo do chamado incluído no cadastro administrativo, com captura automática da descrição colada e persistência em coluna própria do banco.
+- Campo Motivo do chamado removido do cadastro, da captura automática e das telas.
 - A compilação de produção e a verificação TypeScript estão aprovadas.
 - Os testes automatizados da versão estável 1.1.5 continuam aprovados para comparação de regressão.
 - Ainda falta validar os fluxos completos com contas reais dos três perfis, inclusive no Chrome/Android, antes da promoção para produção.
