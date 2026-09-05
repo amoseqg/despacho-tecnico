@@ -14,7 +14,7 @@ assert.match(html, /<\/html>\s*$/i, 'O HTML recomposto não termina corretamente
 
 const idsObrigatorios = [
   'card-adm', 'btn-add-ch', 'c-descricao-colada', 'c-pr', 'c-sdm',
-  'c-ci', 'c-si', 'c-en', 'c-opcoes', 'ex-fotos', 'ex-fotos-preview'
+  'c-ci', 'c-si', 'c-en', 'c-opcoes', 'c-motivo', 'ex-fotos', 'ex-fotos-preview'
 ];
 for (const id of idsObrigatorios) {
   assert.match(html, new RegExp(`id=["']${id}["']`), `Elemento obrigatório ausente: ${id}`);
@@ -64,7 +64,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='1\.1\.5'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='1\.2\.0'/,'O carregador deve invalidar o cache com a versão atual.');
 for(const parte of nomes)assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 
 // Executa funções reais da aplicação com respostas controladas do servidor.

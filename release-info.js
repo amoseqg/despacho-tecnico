@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.2.0',date:'2026-09-05',title:'Motivo do chamado',
+  changes:['Campo Motivo do chamado incluído na área administrativa.','O motivo é capturado automaticamente ao colar a descrição e fica registrado dentro do texto do chamado.']
+ },{
   version:'1.1.5',date:'2026-09-04',title:'Vistoria na causa raiz',
   changes:['Opção Vistoria adicionada à lista obrigatória de causa raiz no encerramento do chamado.']
  },{
