@@ -11,6 +11,10 @@ import { RastreamentoInteriorPanel } from '@/src/features/logistica/Rastreamento
 import { EnderecosTecnicosPanel } from '@/src/features/logistica/EnderecosTecnicosPanel';
 import { AdminPanel } from '@/src/features/admin/AdminPanel';
 import { VistoriasPanel } from '@/src/features/admin/VistoriasPanel';
+import { FotosPanel } from '@/src/features/admin/FotosPanel';
+import { TechnicianLocationsPanel } from '@/src/features/admin/TechnicianLocationsPanel';
+import { TechnicianTracking } from '@/src/features/chamados/TechnicianTracking';
+import { aceitarChamado } from '@/src/features/chamados/tracking.service';
 import { DashboardPanel } from '@/src/features/admin/DashboardPanel';
 import { FinanceiroDesempenhoPanel } from '@/src/features/admin/FinanceiroDesempenhoPanel';
 import { AprovacoesPanel } from '@/src/features/admin/AprovacoesPanel';
@@ -74,6 +78,8 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
       {perfil.tipo === 'admin' && <AprovacoesPanel adminId={perfil.id} />}
       {perfil.tipo === 'admin' && <AdminPanel adminId={perfil.id} />}
       {perfil.tipo === 'admin' && <VistoriasPanel />}
+      {perfil.tipo === 'admin' && <FotosPanel />}
+      {perfil.tipo === 'admin' && <TechnicianLocationsPanel />}
       {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <LogisticaPanel />}
       {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <EnderecosTecnicosPanel />}
       {(perfil.tipo === 'admin' || perfil.tipo === 'logistica') && <RastreamentoInteriorPanel />}
@@ -95,10 +101,12 @@ export function NexoFieldShell({ user, perfil }: { user: User; perfil: PerfilDb 
                 <div className="ticket-meta"><span>Circuito: {chamado.circuito}</span><span>SDM: {chamado.sdm || '—'}</span><span>{chamado.cidade || 'Cidade não informada'}</span></div>
                 <div className="ticket-meta"><span><strong>Motivo do chamado:</strong> {chamado.motivo_chamado || '—'}</span></div>
                 {reincidencia && <div className="reincidencia"><strong>Reincidência</strong><span>Último técnico: {reincidencia.tecnico_anterior || 'Não informado'}</span><span>Ação: {reincidencia.acao_realizada || 'Não informada'}</span></div>}
-                {perfil.tipo === 'tecnico' && chamado.status !== 'concluida' && chamado.status !== 'cancelado' && (
+                {perfil.tipo==='tecnico'&&chamado.status==='pendente'&&<button className="button primary" onClick={async()=>{if(!confirm('Ao aceitar, sua localização será solicitada e compartilhada somente durante este atendimento.'))return;try{await aceitarChamado(chamado.id,perfil.id);setChamados(lista=>lista.map(c=>c.id===chamado.id?{...c,status:'andamento'}:c));}catch(e){setErro(e instanceof Error?e.message:'Não foi possível aceitar o chamado.')}}}>Aceitar chamado e iniciar rastreamento</button>}
+                {perfil.tipo==='tecnico'&&chamado.status==='andamento'&&<TechnicianTracking chamadoId={chamado.id} tecnicoId={perfil.id} />}
+                {perfil.tipo === 'tecnico' && chamado.status === 'andamento' && (
                   <details className="execution-preview">
                     <summary>Executar serviço</summary>
-                    <ServiceExecution chamadoId={chamado.id} tecnicoId={perfil.id} atividadeInicial={chamado.atividade_servico} />
+                    <ServiceExecution chamadoId={chamado.id} tecnicoId={perfil.id} atividadeInicial={chamado.atividade_servico} onConcluido={()=>setChamados(lista=>lista.map(c=>c.id===chamado.id?{...c,status:'concluida'}:c))} />
                   </details>
                 )}
               </article>

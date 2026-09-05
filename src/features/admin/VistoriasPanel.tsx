@@ -18,7 +18,7 @@ export function VistoriasPanel() {
 
   const filtrados = useMemo(() => {
     const termo = busca.trim().toLowerCase();
-    if (!termo) return relatorios;
+    if (!termo) return [];
     return relatorios.filter(r => [r.chamado?.protocolo, r.chamado?.site_nome, r.chamado?.circuito, r.tecnico?.nome, r.nome_original].some(v => String(v ?? '').toLowerCase().includes(termo)));
   }, [relatorios, busca]);
 
@@ -28,6 +28,7 @@ export function VistoriasPanel() {
       <div className="admin-search-row"><input value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar por protocolo, técnico, circuito ou site" /></div>
       {carregando && <p>Carregando relatórios...</p>}
       {erro && <div className="error-box">{erro}</div>}
+      {!busca.trim() && <p className="helper-text">Os relatórios permanecem ocultos. Digite um chamado, site ou técnico para consultar.</p>}
       {!carregando && !erro && filtrados.length === 0 && <p>Nenhum relatório de vistoria encontrado.</p>}
       <div className="report-grid">
         {filtrados.map(r => (

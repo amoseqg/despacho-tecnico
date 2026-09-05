@@ -7,7 +7,7 @@ import { concluirServico } from './servico.service';
 
 const causas = ['Infracliente', 'Elétrica cliente', 'Elétrica concessionária', 'Mau uso', 'Vistoria'] as const;
 
-export function ServiceExecution({ chamadoId, tecnicoId, atividadeInicial }: { chamadoId: string; tecnicoId: string; atividadeInicial?: string | null }) {
+export function ServiceExecution({ chamadoId, tecnicoId, atividadeInicial, onConcluido }: { chamadoId: string; tecnicoId: string; atividadeInicial?: string | null; onConcluido?: () => void }) {
   const [atividade, setAtividade] = useState(atividadeInicial || 'manutencao');
   const [causaRaiz, setCausaRaiz] = useState<(typeof causas)[number] | ''>('');
   const [solucaoTecnica, setSolucaoTecnica] = useState('');
@@ -66,6 +66,7 @@ export function ServiceExecution({ chamadoId, tecnicoId, atividadeInicial }: { c
         observacao,
         relatorioVistoria: relatorio,
       });
+      onConcluido?.();
       setMensagem('Serviço concluído e sincronizado com o Supabase.');
     } catch (e) {
       setMensagem(e instanceof Error ? `Erro: ${e.message}` : 'Não foi possível concluir o serviço.');

@@ -7,6 +7,7 @@ import { ChamadoEditor } from './ChamadoEditor';
 export function AdminPanel({ adminId }: { adminId: string }) {
   const [buscaChamado, setBuscaChamado] = useState('');
   const [buscaTecnico, setBuscaTecnico] = useState('');
+  const [buscaArquivados, setBuscaArquivados] = useState('');
   const [chamados, setChamados] = useState<ChamadoAdminResumo[]>([]);
   const [tecnicos, setTecnicos] = useState<TecnicoResumo[]>([]);
   const [pesquisouTecnico, setPesquisouTecnico] = useState(false);
@@ -33,6 +34,11 @@ export function AdminPanel({ adminId }: { adminId: string }) {
 
   const visiveis = useMemo(() => chamados.filter(c => !arquivados.has(c.id)), [chamados, arquivados]);
   const ocultos = useMemo(() => chamados.filter(c => arquivados.has(c.id)), [chamados, arquivados]);
+  const ocultosFiltrados = useMemo(() => {
+    const termo=buscaArquivados.trim().toLowerCase();
+    if(!termo)return [];
+    return ocultos.filter(c=>[c.protocolo,c.site_nome,c.circuito,c.tecnico_id].some(v=>String(v??'').toLowerCase().includes(termo)));
+  },[ocultos,buscaArquivados]);
 
   async function localizarTecnico() {
     setErro(''); setPesquisouTecnico(true);
@@ -63,6 +69,14 @@ export function AdminPanel({ adminId }: { adminId: string }) {
     URL.revokeObjectURL(url);
   }
 
+  function exportarArquivados() {
+    const cab=['Protocolo','SDM','Circuito','Site','Cidade','Status','Técnico ID','Criado em','Concluído em'];
+    const linhas=ocultos.map(c=>[c.protocolo,c.sdm??'',c.circuito,c.site_nome??'',c.cidade??'',c.status,c.tecnico_id??'',c.criado_em,c.concluido_em??'']);
+    if(!linhas.length)return;
+    const csv=[cab,...linhas].map(l=>l.map(v=>`"${String(v).replaceAll('"','""')}"`).join(';')).join('\n');
+    const url=URL.createObjectURL(new Blob([`\ufeff${csv}`],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`nexofield-chamados-excluidos-${new Date().toISOString().slice(0,10)}.csv`;a.click();URL.revokeObjectURL(url);
+  }
+
   return (
     <section className="admin-stack">
       <section className="panel"><ChamadoEditor adminId={adminId} chamado={editando} onCancelar={() => setEditando(null)} onSalvo={async () => { setEditando(null); await carregarChamados(); }} /></section>
@@ -79,7 +93,7 @@ export function AdminPanel({ adminId }: { adminId: string }) {
         {erro && <div className="error-box">{erro}</div>}
         {carregando && <p>Carregando...</p>}
         {!carregando && <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>Protocolo</th><th>Site</th><th>Circuito</th><th>Status</th><th>Aberto por</th><th>Ações</th></tr></thead><tbody>{visiveis.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td>{c.circuito}</td><td>{c.status}</td><td>{c.criado_por_nome || '—'}</td><td><div className="table-actions"><button className="text-action" onClick={() => setEditando(c)}>Editar</button><button className="text-action danger" onClick={() => void alternarArquivo(c, false)}>Ocultar</button></div></td></tr>)}</tbody></table></div>}
-        {ocultos.length > 0 && <details className="archived-block"><summary>Chamados ocultos ({ocultos.length})</summary><div className="admin-table-wrap"><table className="admin-table"><tbody>{ocultos.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td><button className="text-action" onClick={() => void alternarArquivo(c, true)}>Restaurar</button></td></tr>)}</tbody></table></div></details>}
+        <div className="archived-block"><div className="panel-heading"><h3>Chamados excluídos da lista</h3><button className="button secondary" disabled={!ocultos.length} onClick={exportarArquivados}>Exportar excluídos</button></div><div className="admin-search-row"><input value={buscaArquivados} onChange={e=>setBuscaArquivados(e.target.value)} placeholder="Buscar por chamado, site ou técnico" /></div>{!buscaArquivados.trim()&&<p className="helper-text">A lista permanece oculta até uma busca.</p>}{buscaArquivados.trim()&&<div className="admin-table-wrap"><table className="admin-table"><tbody>{ocultosFiltrados.map(c => <tr key={c.id}><td>{c.protocolo}</td><td>{c.site_nome || '—'}</td><td><button className="text-action" onClick={() => void alternarArquivo(c, true)}>Restaurar</button></td></tr>)}</tbody></table></div>}</div>
       </section>
 
       <section className="panel">

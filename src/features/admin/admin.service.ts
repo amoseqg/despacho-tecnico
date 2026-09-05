@@ -171,7 +171,7 @@ export async function arquivarChamado(chamadoId: string, adminId: string): Promi
   const supabase = createSupabaseBrowserClient();
   const { error } = await supabase
     .from('chamados_arquivados')
-    .upsert({ chamado_id: chamadoId, alterado_por: adminId, ativo: false, alterado_em: new Date().toISOString() }, { onConflict: 'chamado_id' });
+    .upsert({ chamado_id: chamadoId, alterado_por: adminId, ativo: true, alterado_em: new Date().toISOString() }, { onConflict: 'chamado_id' });
   if (error) throw error;
 }
 
@@ -179,7 +179,7 @@ export async function restaurarChamado(chamadoId: string, adminId: string): Prom
   const supabase = createSupabaseBrowserClient();
   const { error } = await supabase
     .from('chamados_arquivados')
-    .upsert({ chamado_id: chamadoId, alterado_por: adminId, ativo: true, alterado_em: new Date().toISOString() }, { onConflict: 'chamado_id' });
+    .upsert({ chamado_id: chamadoId, alterado_por: adminId, ativo: false, alterado_em: new Date().toISOString() }, { onConflict: 'chamado_id' });
   if (error) throw error;
 }
 
@@ -187,5 +187,5 @@ export async function obterArquivados(): Promise<Set<string>> {
   const supabase = createSupabaseBrowserClient();
   const { data, error } = await supabase.from('chamados_arquivados').select('chamado_id,ativo');
   if (error) throw error;
-  return new Set((data ?? []).filter(item => item.ativo === false).map(item => item.chamado_id));
+  return new Set((data ?? []).filter(item => item.ativo === true).map(item => item.chamado_id));
 }
