@@ -162,7 +162,13 @@ function preencherDadosDaDescricao(texto){
   if(dados.endereco) el('c-en').value=dados.endereco;
   if(dados.cidade) el('c-cd').value=dados.cidade;
   if(dados.contato) el('c-co').value=dados.contato;
-  if(dados.motivo) el('c-motivo').value=dados.motivo;
+  if(dados.motivo){
+    el('c-motivo').value=dados.motivo;
+    el('c-motivo').dataset.preenchimento='automatico';
+  }else if(el('c-motivo').dataset.preenchimento==='automatico'){
+    el('c-motivo').value='';
+    delete el('c-motivo').dataset.preenchimento;
+  }
   return dados;
 }
 
@@ -176,6 +182,8 @@ function buscarCircuitoNaDescricao() {
   opcoes.classList.add('hidden');
 
   if(!texto){
+    el('c-motivo').value='';
+    delete el('c-motivo').dataset.preenchimento;
     if(campoProtocolo.dataset.preenchimento==='automatico'){
       campoProtocolo.value='';
       delete campoProtocolo.dataset.preenchimento;
@@ -2633,6 +2641,15 @@ document.addEventListener('DOMContentLoaded', function() {
     circuitoDescricaoTimer=setTimeout(buscarCircuitoNaDescricao,180);
   });
   el('c-descricao-colada').addEventListener('change',buscarCircuitoNaDescricao);
+  el('c-de').addEventListener('input',function(){
+    if(!this.value.trim()){
+      el('c-motivo').value='';
+      delete el('c-motivo').dataset.preenchimento;
+    }
+  });
+  el('c-motivo').addEventListener('input',function(){
+    this.dataset.preenchimento='manual';
+  });
   ['c-pr','c-sdm'].forEach(id=>el(id).addEventListener('input',function(){
     this.dataset.preenchimento='manual';
   }));
@@ -3587,7 +3604,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 </script>
 <script src="/vistorias.js?v=1.1.4"></script>
-<script src="/release-info.js?v=1.2.1"></script>
+<script src="/release-info.js?v=1.2.2"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

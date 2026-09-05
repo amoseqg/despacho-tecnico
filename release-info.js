@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.2.2',date:'2026-09-05',title:'Sincronização do motivo',
+  changes:['Ao apagar a descrição, o motivo capturado automaticamente também é removido.']
+ },{
   version:'1.2.1',date:'2026-09-05',title:'Motivo separado da descrição',
   changes:['Motivo do chamado agora é salvo em campo próprio e exibido separadamente nos cartões.','Descrições novas não recebem mais o motivo incorporado ao texto.']
  },{
