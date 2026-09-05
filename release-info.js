@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.2.1',date:'2026-09-05',title:'Motivo separado da descrição',
+  changes:['Motivo do chamado agora é salvo em campo próprio e exibido separadamente nos cartões.','Descrições novas não recebem mais o motivo incorporado ao texto.']
+ },{
   version:'1.2.0',date:'2026-09-05',title:'Motivo do chamado',
   changes:['Campo Motivo do chamado incluído na área administrativa.','O motivo é capturado automaticamente ao colar a descrição e fica registrado dentro do texto do chamado.']
  },{
