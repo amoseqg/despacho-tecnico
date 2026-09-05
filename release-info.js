@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.3.0',date:'2026-09-05',title:'Rastreamento e consultas administrativas',
+  changes:['Rastreamento do técnico iniciado após o aceite, com autorização de localização.','Área própria para registros fotográficos de chamados encerrados.','Relatórios de vistorias e chamados excluídos ficam ocultos até a busca.','Exportação da base de chamados excluídos adicionada.']
+ },{
   version:'1.2.2',date:'2026-09-05',title:'Sincronização do motivo',
   changes:['Ao apagar a descrição, o motivo capturado automaticamente também é removido.']
  },{

@@ -549,7 +549,7 @@ function enterTec() {
 function admTab(btn, a) {
   document.querySelectorAll('#nv button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','tc','ch','at','rl','ml','ad','vi','aq'].forEach(x => {
+  ['db','tc','ch','at','rl','ml','ad','vi','ft','aq'].forEach(x => {
     const e = el('v-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -561,6 +561,7 @@ function admTab(btn, a) {
   if (a === 'ml') rMl();
   if (a === 'ad') rAd();
   if (a === 'vi') renderVistorias();
+  if (a === 'ft') renderFotosAdmin();
   if (a === 'aq') renderArquivoChamados();
 }
 
@@ -1351,7 +1352,7 @@ function rAt() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento');
   tb.innerHTML = list.map(c => {
     const t = tm(c.am, c.re);
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button><button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
+    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button><button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>${localizacaoChamadoHtml(c)}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
@@ -1786,6 +1787,7 @@ function rTat() {
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
+    ${statusRastreamentoTecnicoHtml(c)}
     <div style="margin-top:8px"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">📝 Executar</button></div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
@@ -2255,6 +2257,14 @@ async function abrirFotosChamado(id){
   let m=el('m-fotos-atividade');if(!m){m=document.createElement('div');m.id='m-fotos-atividade';m.className='modal';m.innerHTML='<div class="modal-box" style="max-width:850px"><div class="modal-hd"><h3>📷 Fotos da atividade</h3><button class="close" id="cls-fotos-atividade">×</button></div><div class="modal-bd" id="fotos-atividade-grid"></div></div>';document.body.appendChild(m);el('cls-fotos-atividade').onclick=()=>m.classList.remove('a');}
   el('fotos-atividade-grid').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${urls.map(u=>`<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Evidência da atividade" style="width:100%;height:180px;object-fit:cover;border-radius:8px"></a>`).join('')}</div>`;m.classList.add('a');
 }
+function renderFotosAdmin(){
+  const box=el('fotos-admin');if(!box||SB_PROFILE?.tipo!=='admin')return;
+  const busca=normalizarRotuloDescricao(el('busca-fotos-admin')?.value||'').toLowerCase();
+  const lista=D.ch.filter(c=>c.st==='concluida'&&(SB_FOTOS_MAP.get(c.id)||[]).length)
+    .filter(c=>!busca||normalizarRotuloDescricao(`${c.pr} ${c.si} ${nt(c.te)}`).toLowerCase().includes(busca))
+    .sort((a,b)=>new Date(b.cc||0)-new Date(a.cc||0));
+  box.innerHTML=lista.map(c=>`<div class="os"><div class="os-h"><strong>${esc(c.pr)} — ${esc(c.si||'')}</strong><span class="badge b-concluida">${(SB_FOTOS_MAP.get(c.id)||[]).length} foto(s)</span></div><div class="os-r"><b>Técnico:</b> ${esc(nt(c.te)||'—')} • <b>Encerrado:</b> ${c.cc?new Date(c.cc).toLocaleString('pt-BR'):'—'}</div><button class="btn btn-p btn-fotos" data-id="${esc(c.id)}">📷 Ver registros fotográficos</button></div>`).join('')||'<div class="empty">Nenhum registro fotográfico encontrado.</div>';
+}
 async function opEx(id) {
   EID = id;
   const c = D.ch.find(x => x.id === id);
@@ -2351,6 +2361,7 @@ async function cfEx() {
     lsSet('dd',D);
     clsEx();
     rTat(); rTco(); rTdb();
+    pararRastreamentoTecnico(c.id);
     alert('Chamado encerrado e sincronizado com o administrador!');
   }catch(err){
     c.ex=anterior.ex;c.st=anterior.st;c.cc=anterior.cc;c.ap=anterior.ap;c.ajuste=anterior.ajuste;
@@ -2742,6 +2753,7 @@ document.addEventListener('DOMContentLoaded', function() {
   if(btnExpServXlsx) btnExpServXlsx.addEventListener('click', exportarServicoAprovadoExcel);
   const buscaSolicitacoesMaterial=el('busca-solicitacoes-material');
   if(buscaSolicitacoesMaterial) buscaSolicitacoesMaterial.addEventListener('input',rMl);
+  el('busca-fotos-admin')?.addEventListener('input',renderFotosAdmin);
 
   const btnFilAr = el('btn-fil-ar');
   if(btnFilAr) btnFilAr.addEventListener('click', function() {
@@ -3603,8 +3615,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 </script>
-<script src="/vistorias.js?v=1.1.4"></script>
-<script src="/release-info.js?v=1.2.2"></script>
+<script src="/vistorias.js?v=1.3.0"></script>
+<script src="/tracking.js?v=1.3.0"></script>
+<script src="/release-info.js?v=1.3.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

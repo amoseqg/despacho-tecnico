@@ -509,6 +509,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <button data-tab="rl">📊 Relatório</button>
      <button data-tab="ml">📦 Material Logístico</button>
     <button data-tab="vi">📄 Relatórios de vistorias</button>
+    <button data-tab="ft">📷 Registros fotográficos</button>
     <button data-tab="aq">🗃️ Chamados excluídos</button>
     <button data-tab="ad">🔐 Admins</button>
   </div>
@@ -517,7 +518,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div><span>Central de operações</span><strong>Gestão em tempo real</strong><small>Chamados, equipes, prazos e indicadores em um só lugar.</small></div>
     </section>
     <div id="v-vi" class="hidden"><div class="card"><h3>Relatórios de vistorias</h3><label class="label" for="busca-vistorias-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-vistorias-admin" type="search"><div id="vistorias-admin"></div></div></div>
-    <div id="v-aq" class="hidden"><div class="card"><h3>Chamados excluídos da lista</h3><p>Os chamados, históricos e valores continuam salvos. A base exportada inclui esses registros.</p><div id="lista-arquivados"></div></div></div>
+    <div id="v-ft" class="hidden"><div class="card"><h3>Registros fotográficos dos chamados encerrados</h3><label class="label" for="busca-fotos-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-fotos-admin" type="search" placeholder="Digite para localizar as fotos"><div id="fotos-admin"></div></div></div>
+    <div id="v-aq" class="hidden"><div class="card"><h3>Chamados excluídos da lista</h3><p>Os chamados, históricos e valores continuam salvos. Digite no campo abaixo para consultar.</p><label class="label" for="busca-arquivados-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-arquivados-admin" type="search" placeholder="Digite para localizar um chamado excluído"><div style="margin:8px 0"><button type="button" class="btn btn-p" id="btn-exportar-arquivados">📥 Exportar chamados excluídos</button></div><div id="lista-arquivados"></div></div></div>
     <div id="v-db">
       <div style="display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-bottom:10px"><span style="font-size:.65rem;color:var(--gr)">Indicadores de qualidade referentes ao mês atual.</span><button type="button" class="btn btn-s" id="btn-limpar-indicadores">🧹 Limpar indicadores</button></div>
       <div class="card" style="margin-bottom:14px">
