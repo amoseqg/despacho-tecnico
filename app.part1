@@ -644,7 +644,6 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         </div>
         <div class="form-group"><label class="label">Técnico que atende a região</label><select id="c-tecnico" class="select"><option value="">Selecione primeiro a skill e a área...</option></select><div id="c-tecnico-status" style="font-size:.65rem;margin-top:4px;color:var(--gr)"></div></div>
         <div class="form-group"><label style="font-size:.75rem;color:var(--r)"><input type="checkbox" id="c-liberar-area"> Liberar excepcionalmente técnico de outra área de cobertura</label><div style="font-size:.62rem;color:var(--gr);margin-top:3px">A liberação ficará registrada com o nome do administrador.</div></div>
-        <div class="form-group"><label class="label">Motivo do chamado</label><input type="text" id="c-motivo" class="input" placeholder="Capturado da descrição ou informado manualmente"></div>
         <div class="form-group"><label class="label">Descrição</label><textarea id="c-de" class="input" rows="3" placeholder="Descreva o problema..."></textarea></div>
         <div class="form-group"><label class="label">Data de Execução da Atividade</label><input type="date" id="c-dtexec" class="input"></div>
         <button class="btn btn-p" id="btn-add-ch">📞 Criar Chamado</button>

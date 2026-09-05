@@ -155,20 +155,12 @@ function preencherDadosDaDescricao(texto){
     site:extrairTextoRotulado(texto,['SITE / CLIENTE','SITE/CLIENTE','NOME DO SITE','SITE','CLIENTE']),
     endereco:extrairTextoRotulado(texto,['ENDEREÇO','ENDERECO']),
     cidade:extrairTextoRotulado(texto,['CIDADE','MUNICÍPIO','MUNICIPIO']),
-    contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL']),
-    motivo:extrairTextoRotulado(texto,['MOTIVO DO CHAMADO','MOTIVO CHAMADO','DESCRIÇÃO DO PROBLEMA','DESCRICAO DO PROBLEMA','DEFEITO RECLAMADO','MOTIVO'])
+    contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL'])
   };
   if(dados.site) el('c-si').value=dados.site;
   if(dados.endereco) el('c-en').value=dados.endereco;
   if(dados.cidade) el('c-cd').value=dados.cidade;
   if(dados.contato) el('c-co').value=dados.contato;
-  if(dados.motivo){
-    el('c-motivo').value=dados.motivo;
-    el('c-motivo').dataset.preenchimento='automatico';
-  }else if(el('c-motivo').dataset.preenchimento==='automatico'){
-    el('c-motivo').value='';
-    delete el('c-motivo').dataset.preenchimento;
-  }
   return dados;
 }
 
@@ -182,8 +174,6 @@ function buscarCircuitoNaDescricao() {
   opcoes.classList.add('hidden');
 
   if(!texto){
-    el('c-motivo').value='';
-    delete el('c-motivo').dataset.preenchimento;
     if(campoProtocolo.dataset.preenchimento==='automatico'){
       campoProtocolo.value='';
       delete campoProtocolo.dataset.preenchimento;
@@ -1027,7 +1017,6 @@ async function addCh() {
   const tecnico = tecnicoEl ? String(tecnicoEl.value || '').trim() : '';
   const liberarArea = el('c-liberar-area').checked;
   const en = el('c-en').value.trim();
-  const motivo = el('c-motivo').value.trim();
   const de = el('c-de').value.trim();
   if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
@@ -1037,7 +1026,7 @@ async function addCh() {
   if (!tecnico) { alert('Selecione o técnico que atenderá o chamado'); return; }
   const dtexec = el('c-dtexec').value;
   const novoChamado = {
-    id: 'CH-'+Date.now(), pr, sdm, si, ci, re, skill, area: re === 'capital' ? area : '', en, motivo, de, dtexec,
+    id: 'CH-'+Date.now(), pr, sdm, si, ci, re, skill, area: re === 'capital' ? area : '', en, de, dtexec,
     abertura,
     regiaoOperacional: el('c-regiao-planilha').value, tecnicosIndicados: el('c-tecnicos-planilha').value,
     cid: el('c-cd').value, contato: el('c-co').value, horario: el('c-ho').value,
@@ -1070,7 +1059,7 @@ async function addCh() {
 
     el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; limparSite();
     el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
-    el('c-motivo').value = ''; el('c-de').value = ''; el('c-dtexec').value = '';
+    el('c-de').value = ''; el('c-dtexec').value = '';
     el('c-sk').value = ''; el('c-area').value = '';
     el('c-tecnico').innerHTML = '<option value="">Selecione primeiro a skill e a área...</option>'; el('c-liberar-area').checked = false;
     el('c-status').textContent = 'Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.';
@@ -1211,14 +1200,13 @@ function rCh() {
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aberto</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
-    <div class="os-r"><b>Motivo do chamado:</b> ${esc(c.motivo||'—')}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em aberto</h3></div>';
 
   if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando técnico</span></div>
-    <div class="os-r"><b>Site:</b> ${c.si}</div><div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Motivo do chamado:</b> ${esc(c.motivo||'—')}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
+    <div class="os-r"><b>Site:</b> ${c.si}</div><div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
     ${infoReincidencia(c).html}
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
@@ -1768,7 +1756,6 @@ function rTdp() {
     `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
-    <div class="os-r"><b>Motivo do chamado:</b> ${esc(c.motivo||'—')}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     ${infoReincidencia(c).html}
     <div style="margin-top:8px;display:flex;gap:6px">
@@ -1787,7 +1774,6 @@ function rTat() {
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
-    ${statusRastreamentoTecnicoHtml(c)}
     <div style="margin-top:8px"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">📝 Executar</button></div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
@@ -2652,15 +2638,6 @@ document.addEventListener('DOMContentLoaded', function() {
     circuitoDescricaoTimer=setTimeout(buscarCircuitoNaDescricao,180);
   });
   el('c-descricao-colada').addEventListener('change',buscarCircuitoNaDescricao);
-  el('c-de').addEventListener('input',function(){
-    if(!this.value.trim()){
-      el('c-motivo').value='';
-      delete el('c-motivo').dataset.preenchimento;
-    }
-  });
-  el('c-motivo').addEventListener('input',function(){
-    this.dataset.preenchimento='manual';
-  });
   ['c-pr','c-sdm'].forEach(id=>el(id).addEventListener('input',function(){
     this.dataset.preenchimento='manual';
   }));
@@ -3066,7 +3043,7 @@ async function sbLoadAll(){
     const ex=exMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
       id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', si:c.site_nome||'', ci:c.circuito||'',
-      re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', motivo:c.motivo_chamado||'', de:c.descricao||'', dtexec:c.data_execucao||'',
+      re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
       dt:c.liberacao_area?{tipo:'liberacao-area',admin:sbNameById(c.liberacao_area_admin),d:c.liberacao_area_em,area:c.area,regiaoOperacional:c.regiao_operacional}:null,
@@ -3133,7 +3110,7 @@ function sbChamadoRow(c){
     endereco:c.en||null, contato:c.contato||null, horario_expediente:c.horario||null, velocidade:c.velocidade||null, prtm:c.prtm||null,
     pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null, regiao_operacional:c.regiaoOperacional||null, tecnicos_indicados:c.tecnicosIndicados||null,
     regiao:c.re, skill:c.skill, area:c.re==='capital'?(c.area||null):null, tecnico_id:sbIdByUser(c.te), criado_por:SB_PROFILE?.id||null,
-    motivo_chamado:c.motivo||null, descricao:c.de||null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
+    descricao:c.de||null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:sbIso(c.cr)||new Date().toISOString(), aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
   };
@@ -3615,9 +3592,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 </script>
-<script src="/vistorias.js?v=1.3.0"></script>
-<script src="/tracking.js?v=1.3.0"></script>
-<script src="/release-info.js?v=1.3.0"></script>
+<script src="/vistorias.js?v=1.3.1"></script>
+<script src="/tracking.js?v=1.3.1"></script>
+<script src="/release-info.js?v=1.3.1"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

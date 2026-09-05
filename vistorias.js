@@ -37,7 +37,7 @@ function renderArquivoChamados(){
 function exportarChamadosArquivados(){
  const registros=D.ch.filter(c=>!chamadoVisivel(c));
  if(!registros.length){alert('Nenhum chamado excluído da lista para exportar.');return;}
- const linhas=registros.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Site / Cliente':c.si||'','Circuito':c.ci||'','Cidade':c.cid||'','Técnico':nt(c.te)||'','Status preservado':c.st||'','Excluído em':NF_ARQUIVOS.get(c.id)?.alterado_em?new Date(NF_ARQUIVOS.get(c.id).alterado_em).toLocaleString('pt-BR'):'','Motivo do chamado':c.motivo||'','Descrição':c.de||''}));
+ const linhas=registros.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Site / Cliente':c.si||'','Circuito':c.ci||'','Cidade':c.cid||'','Técnico':nt(c.te)||'','Status preservado':c.st||'','Excluído em':NF_ARQUIVOS.get(c.id)?.alterado_em?new Date(NF_ARQUIVOS.get(c.id).alterado_em).toLocaleString('pt-BR'):'','Descrição':c.de||''}));
  const ws=XLSX.utils.json_to_sheet(linhas);ws['!cols']=Object.keys(linhas[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),55)}));
  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Chamados excluídos');XLSX.writeFile(wb,`chamados_excluidos_${new Date().toISOString().slice(0,10)}.xlsx`);
 }

@@ -5,18 +5,13 @@ let NF_GEO_ULTIMO_ENVIO=new Map();
 
 function localizacaoChamadoHtml(c){
  const p=NF_RASTREAMENTO.get(c.id);
- if(!p)return '<span class="badge b-pendente" title="Aguardando o técnico autorizar a localização">📍 Aguardando localização</span>';
+ if(!p)return '<span class="badge b-pendente" title="Aguardando a primeira posição do atendimento">📍 Aguardando localização</span>';
  const quando=new Date(p.registrado_em).toLocaleString('pt-BR');
  return `<button type="button" class="btn btn-g nf-ver-localizacao" data-id="${esc(c.id)}" style="padding:4px 7px;font-size:.6rem" title="Última atualização: ${esc(quando)}">📍 Rastrear técnico</button>`;
 }
 
-function statusRastreamentoTecnicoHtml(c){
- const ativo=NF_GEO_WATCHES.has(c.id);
- return `<div class="${ativo?'info':'trava'}" style="margin-top:8px"><b>📍 Rastreamento:</b> ${ativo?'ativo durante este atendimento':'aguardando autorização de localização'}</div>`;
-}
-
 async function carregarRastreamentoTecnicos(){
- if(!SB_PROFILE)return;
+ if(!SB_PROFILE||SB_PROFILE.tipo!=='admin')return;
  const {data,error}=await SB.from('rastreamento_tecnico').select('*').order('registrado_em',{ascending:false}).limit(500);
  if(error){console.warn('Rastreamento indisponível:',error.message);return;}
  const mapa=new Map();for(const p of data||[])if(!mapa.has(p.chamado_id))mapa.set(p.chamado_id,p);
@@ -31,9 +26,8 @@ async function registrarPosicaoChamado(chamadoId,posicao){
  if(agora-ultimo<30000)return;
  NF_GEO_ULTIMO_ENVIO.set(chamadoId,agora);
  const linha={chamado_id:chamadoId,tecnico_id:SB_PROFILE.id,latitude:posicao.coords.latitude,longitude:posicao.coords.longitude,precisao_metros:posicao.coords.accuracy,registrado_em:new Date(posicao.timestamp||agora).toISOString()};
- const {data,error}=await SB.from('rastreamento_tecnico').insert(linha).select('*').single();
+ const {error}=await SB.from('rastreamento_tecnico').insert(linha);
  if(error){NF_GEO_ULTIMO_ENVIO.delete(chamadoId);console.warn('Não foi possível atualizar a localização:',error.message);return;}
- NF_RASTREAMENTO.set(chamadoId,data);rTat();
 }
 
 function iniciarRastreamentoTecnico(chamadoId){
@@ -54,7 +48,6 @@ function pararRastreamentoTecnico(chamadoId){
 
 acCh=async function(id){
  const c=D.ch.find(x=>x.id===id);if(!c||SB_PROFILE?.tipo!=='tecnico')return;
- if(!confirm('Ao aceitar, o NexoField solicitará sua localização e manterá o rastreamento ativo somente durante este atendimento. Deseja continuar?'))return;
  const agora=new Date().toISOString();
  try{
   const {data,error}=await SB.from('chamados').update({status:'andamento',aceito_em:agora,iniciado_em:agora,atualizado_em:agora}).eq('id',id).eq('tecnico_id',SB_PROFILE.id).select('id,status,aceito_em,iniciado_em').single();
