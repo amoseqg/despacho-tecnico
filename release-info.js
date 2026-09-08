@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.3.2',date:'2026-09-08',title:'Correção do encerramento administrativo',
+  changes:['Sessão administrativa revalidada automaticamente antes de encerrar chamados.','Perfil do administrador recuperado quando a aba permanece aberta ou conclui o carregamento com atraso.']
+ },{
   version:'1.3.1',date:'2026-09-05',title:'Rastreamento automático e formulário simplificado',
   changes:['Campo Motivo do chamado removido das telas.','Rastreamento inicia diretamente após o aceite, sem confirmação adicional do NexoField.','Consulta das posições restrita aos administradores.']
  },{

@@ -1,5 +1,8 @@
 import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
 const src=fs.readFileSync('app.part3','utf8');const ctx={S:{n:'Técnico teste'}};
+assert.ok(!src.includes("if(!SB_PROFILE||SB_PROFILE.tipo!=='admin'){alert('Somente administradores podem encerrar chamados.');return;}"),'O encerramento não pode depender apenas do perfil local antes de revalidar a sessão.');
+assert.ok(src.indexOf('const admin=await sbExigirSessaoAdmin();')<src.indexOf('const encerramento=prompt(`Informe obrigatoriamente o encerramento/solução'),'A sessão administrativa deve ser revalidada antes de solicitar o encerramento.');
+assert.match(src,/SB_PROFILE=\{\.\.\.\(SB_PROFILE\|\|\{\}\),\.\.\.perfil\};/,'A validação deve recuperar o perfil administrativo local usando o perfil confirmado pelo servidor.');
 for(const name of ['mascaraEncerramento','corrigirIdentificadoresEncerramento']){
  const fn=src.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))?.[0];assert.ok(fn);vm.runInNewContext(fn,ctx);
 }
