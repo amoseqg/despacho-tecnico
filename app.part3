@@ -490,7 +490,7 @@ async function prepararEmailAssistido({prefixo, assunto, corpo, arquivos=[]}) {
   const texto = `${corpo}\n\nRemetente corporativo informado: ${remetente}`;
   const url = `mailto:${encodeURIComponent(destinatario)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;
   window.location.href = url;
-  if (arquivos.length) setTimeout(() => alert(`${arquivos.length} anexo(s) preparado(s). No programa de e-mail, confirme a conta ${remetente} e anexe os arquivos que foram baixados.`), 500);
+  if (arquivos.length) setTimeout(() => alert(`Anexo preparado com sucesso!\n\n${arquivos.length} arquivo(s) foi(ram) salvo(s) na pasta Downloads. Agora, no programa de e-mail, confirme a conta ${remetente}, anexe o(s) arquivo(s) baixado(s) e conclua o envio.`), 500);
 }
 
 async function enviarChamadosRealizadosEmail() {
@@ -3664,9 +3664,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 </script>
-<script src="/vistorias.js?v=1.4.0"></script>
-<script src="/tracking.js?v=1.4.0"></script>
-<script src="/release-info.js?v=1.4.0"></script>
+<script src="/vistorias.js?v=1.4.1"></script>
+<script src="/tracking.js?v=1.4.1"></script>
+<script src="/release-info.js?v=1.4.1"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>
