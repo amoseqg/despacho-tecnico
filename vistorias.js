@@ -54,7 +54,7 @@ function renderVistorias(){
   const busca=(el('busca-vistorias-'+tipo)?.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   if(tipo==='admin'&&!busca.trim()){box.innerHTML='<div class="empty">Os relatórios estão ocultos. Digite um chamado, site ou técnico para pesquisar.</div>';continue;}
   const lista=NF_VISTORIAS.filter(r=>tipo==='admin'||r.tecnico_id===SB_PROFILE.id).map(r=>({r,c:D.ch.find(c=>c.id===r.chamado_id)})).filter(({r,c})=>`${c?.pr||''} ${c?.si||''} ${sbNameById(r.tecnico_id)} ${r.nome_original}`.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(busca)).sort((a,b)=>b.r.criado_em.localeCompare(a.r.criado_em));
-  box.innerHTML=lista.map(({r,c})=>`<div class="os"><strong>${esc(c?.pr||'Chamado registrado')} — ${esc(c?.si||'')}</strong><div class="os-r">Técnico: ${esc(sbNameById(r.tecnico_id)||'Técnico responsável')} • ${new Date(r.criado_em).toLocaleString('pt-BR')}</div><div class="os-r">${esc(r.nome_original)} • ${(r.tamanho_bytes/1024/1024).toFixed(2)} MB</div>${c?.ex?.obs?`<div class="os-r"><b>Observação do relatório:</b> ${esc(c.ex.obs)}</div>`:''}<button type="button" class="btn btn-p nf-baixar-vistoria" data-id="${esc(r.id)}">Baixar PDF</button></div>`).join('')||'<div class="empty">Nenhum relatório de vistoria encontrado.</div>';
+  box.innerHTML=lista.map(({r,c})=>`<div class="os"><strong>${esc(c?.pr||'Chamado registrado')} — ${esc(c?.si||'')}</strong><div class="os-r">Técnico: ${esc(sbNameById(r.tecnico_id)||'Técnico responsável')} • ${new Date(r.criado_em).toLocaleString('pt-BR')}</div><div class="os-r">${esc(r.nome_original)} • ${(r.tamanho_bytes/1024/1024).toFixed(2)} MB</div>${c?.ex?.obs?`<div class="os-r"><b>Observação do relatório:</b> ${esc(c.ex.obs)}</div>`:''}<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-p nf-baixar-vistoria" data-id="${esc(r.id)}">Baixar PDF</button>${tipo==='admin'?`<button type="button" class="btn btn-s nf-email-vistoria" data-id="${esc(r.id)}">✉️ Enviar por e-mail</button>`:''}</div></div>`).join('')||'<div class="empty">Nenhum relatório de vistoria encontrado.</div>';
  }
 }
 async function enviarVistoria(event){
@@ -86,10 +86,20 @@ async function baixarVistoria(id,botao){
   const url=URL.createObjectURL(data),a=document.createElement('a');a.href=url;a.download=r.nome_original;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);
  }catch(err){sbShowError('Não foi possível baixar o PDF',err);}finally{botao.disabled=false;}
 }
+async function enviarVistoriaEmail(id,botao){
+ const r=NF_VISTORIAS.find(item=>item.id===id),c=r&&D.ch.find(item=>item.id===r.chamado_id);if(!r)return;
+ botao.disabled=true;
+ try{
+  dadosEmailSecao('vistoria');
+  const {data,error}=await SB.storage.from('relatorios-vistoria').download(r.caminho);if(error)throw error;
+  const arquivo=new File([data],r.nome_original||'relatorio-vistoria.pdf',{type:'application/pdf'});
+  await prepararEmailAssistido({prefixo:'vistoria',assunto:`NexoField — Relatório de vistoria ${c?.pr||''}`.trim(),corpo:`Segue o relatório de vistoria.\nChamado: ${c?.pr||'Não informado'}\nSite: ${c?.si||'Não informado'}\nTécnico: ${sbNameById(r.tecnico_id)||'Não informado'}`,arquivos:[arquivo]});
+ }finally{botao.disabled=false;}
+}
 document.addEventListener('DOMContentLoaded',()=>{
  el('form-vistoria').addEventListener('submit',enviarVistoria);
  for(const tipo of ['admin','tecnico'])el('busca-vistorias-'+tipo)?.addEventListener('input',renderVistorias);
  el('busca-arquivados-admin')?.addEventListener('input',renderArquivoChamados);
  el('btn-exportar-arquivados')?.addEventListener('click',exportarChamadosArquivados);
- document.addEventListener('click',e=>{const restaurar=e.target.closest('.nf-restaurar-ch'),baixar=e.target.closest('.nf-baixar-vistoria');if(restaurar)alterarArquivoChamado(restaurar.dataset.id,true);if(baixar)baixarVistoria(baixar.dataset.id,baixar);});
+ document.addEventListener('click',e=>{const restaurar=e.target.closest('.nf-restaurar-ch'),baixar=e.target.closest('.nf-baixar-vistoria'),email=e.target.closest('.nf-email-vistoria');if(restaurar)alterarArquivoChamado(restaurar.dataset.id,true);if(baixar)baixarVistoria(baixar.dataset.id,baixar);if(email)enviarVistoriaEmail(email.dataset.id,email).catch(err=>sbShowError('Não foi possível preparar o e-mail',err));});
 });
