@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.4.1',date:'2026-09-08',title:'Confirmação clara dos anexos de e-mail',
+  changes:['Mensagem de sucesso esclarece que o anexo foi preparado e salvo na pasta Downloads.','Orientação de envio reformulada para não parecer uma mensagem de erro.']
+ },{
   version:'1.4.0',date:'2026-09-08',title:'Envio assistido de relatórios por e-mail',
   changes:['Campos de remetente corporativo e destinatário adicionados para chamados realizados, relatórios de vistorias e registros fotográficos.','O e-mail cadastrado do administrador é carregado automaticamente e pode ser informado manualmente.','Relatórios e anexos são preparados para envio pelo programa de e-mail configurado no aparelho.']
  },{
