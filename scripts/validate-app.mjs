@@ -11,6 +11,7 @@ const html = Buffer.concat(partes).toString('utf8');
 
 assert.match(html, /^<!doctype html>/i, 'O HTML recomposto não começa com DOCTYPE.');
 assert.match(html, /<\/html>\s*$/i, 'O HTML recomposto não termina corretamente.');
+assert.doesNotMatch(html, /Warning: truncated output|Total output lines:/, 'Os arquivos contêm marcadores de conteúdo truncado.');
 
 const idsObrigatorios = [
   'card-adm', 'btn-add-ch', 'c-descricao-colada', 'c-pr', 'c-sdm',
@@ -64,7 +65,8 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='1\.3\.2'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='1\.3\.3'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of nomes)assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 
 // Executa funções reais da aplicação com respostas controladas do servidor.

@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.3.3',date:'2026-09-08',title:'Restauração dos acessos iniciais',
+  changes:['Abertura dos cards Administrador, Técnico e Logística restaurada.','Carregamento agora interrompe arquivos incompletos antes que a tela fique sem resposta.','Validação preventiva adicionada para detectar código truncado antes da publicação.']
+ },{
   version:'1.3.2',date:'2026-09-08',title:'Correção do encerramento administrativo',
   changes:['Sessão administrativa revalidada automaticamente antes de encerrar chamados.','Perfil do administrador recuperado quando a aba permanece aberta ou conclui o carregamento com atraso.']
  },{
