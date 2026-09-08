@@ -456,6 +456,58 @@ function usuarioAtual() {
   return ((S.t === 'adm' || S.t === 'log') ? D.ad : D.tc).find(x => x.u === S.u) || null;
 }
 
+function emailAdministradorLogado() {
+  return String(SB_PROFILE?.email || usuarioAtual()?.e || '').trim().toLowerCase();
+}
+
+function preencherRemetentesEmail() {
+  const email = emailAdministradorLogado();
+  document.querySelectorAll('.nf-email-remetente').forEach(campo => {
+    if (!campo.value && email) campo.value = email;
+  });
+}
+
+function dadosEmailSecao(prefixo) {
+  preencherRemetentesEmail();
+  const remetente = (el(`email-${prefixo}-remetente`)?.value || '').trim().toLowerCase();
+  const destinatario = (el(`email-${prefixo}-destinatario`)?.value || '').trim().toLowerCase();
+  if (!emailValido(remetente)) throw new Error('Informe um e-mail corporativo válido como remetente.');
+  if (!remetente.endsWith('@metodotelecom.com.br')) throw new Error('O remetente deve usar o domínio @metodotelecom.com.br.');
+  if (!emailValido(destinatario)) throw new Error('Informe um destinatário válido.');
+  return {remetente, destinatario};
+}
+
+function baixarAnexoEmail(arquivo) {
+  const url = URL.createObjectURL(arquivo), link = document.createElement('a');
+  link.href = url; link.download = arquivo.name || 'anexo'; document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+async function prepararEmailAssistido({prefixo, assunto, corpo, arquivos=[]}) {
+  if (SB_PROFILE?.tipo !== 'admin') throw new Error('Somente administradores podem preparar este envio.');
+  const {remetente, destinatario} = dadosEmailSecao(prefixo);
+  arquivos.forEach(baixarAnexoEmail);
+  const texto = `${corpo}\n\nRemetente corporativo informado: ${remetente}`;
+  const url = `mailto:${encodeURIComponent(destinatario)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;
+  window.location.href = url;
+  if (arquivos.length) setTimeout(() => alert(`${arquivos.length} anexo(s) preparado(s). No programa de e-mail, confirme a conta ${remetente} e anexe os arquivos que foram baixados.`), 500);
+}
+
+async function enviarChamadosRealizadosEmail() {
+  const dt1 = el('rl-enc-dt1')?.value || RL_DT1_ATUAL || '';
+  const dt2 = el('rl-enc-dt2')?.value || RL_DT2_ATUAL || '';
+  let chamados = D.ch.filter(c => c.st === 'concluida');
+  if (dt1) chamados = chamados.filter(c => new Date(c.cc || c.dtexec || 0) >= new Date(dt1 + 'T00:00:00'));
+  if (dt2) chamados = chamados.filter(c => new Date(c.cc || c.dtexec || 0) <= new Date(dt2 + 'T23:59:59'));
+  if (!chamados.length) throw new Error('Nenhum chamado realizado foi encontrado no período selecionado.');
+  const cabecalho = ['Protocolo','SDM','Site','Circuito','Técnico','Encerrado em','Relatório técnico'];
+  const csv = [cabecalho, ...chamados.map(c => [c.pr||'',c.sdm||'',c.si||'',c.ci||'',nt(c.te)||'',c.cc?new Date(c.cc).toLocaleString('pt-BR'):'',c.ex?.relatorio||c.ex?.obs||''])]
+    .map(linha => linha.map(v => `"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n');
+  const periodo = `${dt1 || 'início'} a ${dt2 || 'atual'}`;
+  const arquivo = new File([new Uint8Array([0xEF,0xBB,0xBF]),csv], `chamados_realizados_${new Date().toISOString().slice(0,10)}.csv`, {type:'text/csv;charset=utf-8'});
+  await prepararEmailAssistido({prefixo:'chamados',assunto:`NexoField — Chamados realizados (${periodo})`,corpo:`Segue o relatório com ${chamados.length} chamado(s) realizado(s) no período ${periodo}.`,arquivos:[arquivo]});
+}
+
 function abrirMinhaSenha() {
   const u = usuarioAtual(); if (!u) return;
   el('ms-email').value = u.e || ''; el('ms-atual').value = ''; el('ms-nova').value = ''; el('ms-conf').value = '';
@@ -2244,13 +2296,27 @@ async function abrirFotosChamado(id){
   let m=el('m-fotos-atividade');if(!m){m=document.createElement('div');m.id='m-fotos-atividade';m.className='modal';m.innerHTML='<div class="modal-box" style="max-width:850px"><div class="modal-hd"><h3>📷 Fotos da atividade</h3><button class="close" id="cls-fotos-atividade">×</button></div><div class="modal-bd" id="fotos-atividade-grid"></div></div>';document.body.appendChild(m);el('cls-fotos-atividade').onclick=()=>m.classList.remove('a');}
   el('fotos-atividade-grid').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">${urls.map(u=>`<a href="${u}" target="_blank" rel="noopener"><img src="${u}" alt="Evidência da atividade" style="width:100%;height:180px;object-fit:cover;border-radius:8px"></a>`).join('')}</div>`;m.classList.add('a');
 }
+async function enviarFotosChamadoEmail(id,botao){
+  const c=D.ch.find(x=>String(x.id)===String(id)),fotos=SB_FOTOS_MAP.get(id)||[];
+  if(!c||!fotos.length)throw new Error('Este chamado não possui registros fotográficos.');
+  if(botao)botao.disabled=true;
+  try{
+    dadosEmailSecao('fotos');
+    const arquivos=[];
+    for(const [indice,f] of fotos.entries()){
+      const {data,error}=await SB.storage.from('fotos-atividades').download(f.caminho);if(error)throw error;
+      arquivos.push(new File([data],f.nome_original||`foto-${indice+1}.jpg`,{type:f.tipo_mime||data.type||'image/jpeg'}));
+    }
+    await prepararEmailAssistido({prefixo:'fotos',assunto:`NexoField — Registros fotográficos do chamado ${c.pr}`,corpo:`Seguem os registros fotográficos do chamado ${c.pr}.\nSite: ${c.si||'Não informado'}\nTécnico: ${nt(c.te)||'Não informado'}`,arquivos});
+  }finally{if(botao)botao.disabled=false;}
+}
 function renderFotosAdmin(){
   const box=el('fotos-admin');if(!box||SB_PROFILE?.tipo!=='admin')return;
   const busca=normalizarRotuloDescricao(el('busca-fotos-admin')?.value||'').toLowerCase();
   const lista=D.ch.filter(c=>c.st==='concluida'&&(SB_FOTOS_MAP.get(c.id)||[]).length)
     .filter(c=>!busca||normalizarRotuloDescricao(`${c.pr} ${c.si} ${nt(c.te)}`).toLowerCase().includes(busca))
     .sort((a,b)=>new Date(b.cc||0)-new Date(a.cc||0));
-  box.innerHTML=lista.map(c=>`<div class="os"><div class="os-h"><strong>${esc(c.pr)} — ${esc(c.si||'')}</strong><span class="badge b-concluida">${(SB_FOTOS_MAP.get(c.id)||[]).length} foto(s)</span></div><div class="os-r"><b>Técnico:</b> ${esc(nt(c.te)||'—')} • <b>Encerrado:</b> ${c.cc?new Date(c.cc).toLocaleString('pt-BR'):'—'}</div><button class="btn btn-p btn-fotos" data-id="${esc(c.id)}">📷 Ver registros fotográficos</button></div>`).join('')||'<div class="empty">Nenhum registro fotográfico encontrado.</div>';
+  box.innerHTML=lista.map(c=>`<div class="os"><div class="os-h"><strong>${esc(c.pr)} — ${esc(c.si||'')}</strong><span class="badge b-concluida">${(SB_FOTOS_MAP.get(c.id)||[]).length} foto(s)</span></div><div class="os-r"><b>Técnico:</b> ${esc(nt(c.te)||'—')} • <b>Encerrado:</b> ${c.cc?new Date(c.cc).toLocaleString('pt-BR'):'—'}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-fotos" data-id="${esc(c.id)}">📷 Ver registros fotográficos</button><button class="btn btn-s btn-email-fotos" data-id="${esc(c.id)}">✉️ Enviar por e-mail</button></div></div>`).join('')||'<div class="empty">Nenhum registro fotográfico encontrado.</div>';
 }
 async function opEx(id) {
   EID = id;
@@ -2714,6 +2780,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const expDb=el('btn-db-exp-concluidos');if(expDb)expDb.addEventListener('click',()=>exportarChamadosEncerrados(el('db-dt1').value,el('db-dt2').value));
   const expBaseFechados=el('btn-db-exp-base-fechados');if(expBaseFechados)expBaseFechados.addEventListener('click',()=>exportarBaseChamadosFechados(el('db-base-dt1').value,el('db-base-dt2').value));
   const expEnc=el('btn-rl-exp-encerrados');if(expEnc)expEnc.addEventListener('click',()=>exportarChamadosEncerrados(el('rl-enc-dt1').value,el('rl-enc-dt2').value));
+  el('btn-email-chamados')?.addEventListener('click',()=>enviarChamadosRealizadosEmail().catch(err=>sbShowError('Não foi possível preparar o e-mail',err)));
+  document.querySelectorAll('.nf-email-remetente').forEach(campo=>campo.addEventListener('focus',preencherRemetentesEmail));
 
   // Filtros de período - Admin
   const btnFilRl = el('btn-fil-rl');
@@ -2760,7 +2828,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
@@ -2772,6 +2840,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-ex')) { opEx(t.dataset.id); }
     if(t.classList.contains('btn-ajustar')) { reabrirAjuste(t.dataset.id); }
     if(t.classList.contains('btn-fotos')) { abrirFotosChamado(t.dataset.id).catch(err=>sbShowError('Não foi possível abrir as fotos',err)); }
+    if(t.classList.contains('btn-email-fotos')) { enviarFotosChamadoEmail(t.dataset.id,t).catch(err=>sbShowError('Não foi possível preparar o e-mail',err)); }
     if(t.classList.contains('btn-reset-senha')) { enviarRedefinicaoSenhaAdmin(t.dataset.u, t.dataset.email); }
     if(t.classList.contains('btn-rm-tec')) { rmTc(t.dataset.u); }
     if(t.classList.contains('btn-endereco-tec')) { editarEnderecoTecnico(t.dataset.u); }
@@ -3595,9 +3664,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 </script>
-<script src="/vistorias.js?v=1.3.4"></script>
-<script src="/tracking.js?v=1.3.4"></script>
-<script src="/release-info.js?v=1.3.4"></script>
+<script src="/vistorias.js?v=1.4.0"></script>
+<script src="/tracking.js?v=1.4.0"></script>
+<script src="/release-info.js?v=1.4.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>
