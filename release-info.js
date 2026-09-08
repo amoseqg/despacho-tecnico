@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.4.0',date:'2026-09-08',title:'Envio assistido de relatórios por e-mail',
+  changes:['Campos de remetente corporativo e destinatário adicionados para chamados realizados, relatórios de vistorias e registros fotográficos.','O e-mail cadastrado do administrador é carregado automaticamente e pode ser informado manualmente.','Relatórios e anexos são preparados para envio pelo programa de e-mail configurado no aparelho.']
+ },{
   version:'1.3.4',date:'2026-09-08',title:'Encerramento administrativo e revisão de integridade',
   changes:['Políticas de segurança corrigidas para permitir o encerramento por administradores ativos.','Código completo revisado contra erros de sintaxe, módulos ausentes, funções globais indefinidas e elementos inexistentes.','Validação automática de integridade adicionada às verificações anteriores à publicação.']
  },{
