@@ -2436,7 +2436,7 @@ async function opEx(id) {
   const card = el('ex-pr').closest('.card');
   let extra = el('ex-site-extra');
   if (!extra) { extra = document.createElement('div'); extra.id = 'ex-site-extra'; card.insertBefore(extra, card.lastElementChild); }
-  extra.innerHTML = `<div class="os-r"><b>Cidade:</b> ${valorInfo(c.cid)}</div><div class="os-r"><b>Contato:</b> ${valorInfo(c.contato)}</div><div class="os-r"><b>Horário:</b> ${valorInfo(c.horario)}</div><div class="grid-3"><div class="os-r"><b>Velocidade:</b> ${valorInfo(c.velocidade)}</div><div class="os-r"><b>PRTM:</b> ${valorInfo(c.prtm)}</div><div class="os-r"><b>PVF Total:</b> ${valorInfo(c.pvfTotal)}</div></div>`;
+  extra.innerHTML = `<div class="os-r"><b>Cidade:</b> ${valorInfo(c.cid)}</div><div class="os-r"><b>Contato:</b> ${valorInfo(c.contato)}</div><div class="os-r"><b>Horário:</b> ${valorInfo(c.horario)}</div><div class="grid-3"><div class="os-r"><b>Velocidade:</b> ${valorInfo(c.velocidade)}</div><div class="os-r"><b>PRTM:</b> ${valorInfo(c.prtm)}</div><div class="os-r"><b>PVF Total:</b> ${valorInfo(c.pvfTotal)}</div></div>${c.exclusaoPortal?`<div class="info" style="border-left:4px solid var(--r)"><b>Chamado excluído pelo operador:</b> ${esc(c.exclusaoPortal.nome)} — ${new Date(c.exclusaoPortal.data).toLocaleString('pt-BR')}</div>`:''}`;
 
   const opts = '<option value="">Selecione...</option>' + cidades.map(ci => `<option>${ci}</option>`).join('');
   el('ex-co').innerHTML = opts;
@@ -2466,10 +2466,14 @@ async function opEx(id) {
   localStorage.setItem(chaveExecucaoAtiva(),String(id));
   await restaurarRascunhoExecucao(c);
 
-  if(c.validacaoOperador){
+  if(c.validacaoOperador?.resultado==='validado'){
     el('ex-validacao').value=c.validacaoOperador.validacao||'';el('ex-senha').value=c.validacaoOperador.senha||'';sincronizarCamposEncerramento();
     el('ex-validacao-status').innerHTML=`<b>✓ Validado pelo operador</b><br>${new Date(c.validacaoOperador.validadoEm).toLocaleString('pt-BR')}`;
     el('ex-validacao-status').style.borderLeft='4px solid var(--g)';el('btn-cf-ex').textContent='✅ Encerrar Chamado';el('btn-cf-ex').disabled=false;
+  }else if(c.validacaoOperador?.resultado==='nao_validado'){
+    el('ex-validacao').value='Não validado';el('ex-senha').value='';sincronizarCamposEncerramento();
+    el('ex-validacao-status').innerHTML=`<b>Não validado pelo operador.</b><br><b>Motivo:</b> ${esc(c.validacaoOperador.motivoNaoValidacao||'Não informado')}<br>Corrija a máscara e envie novamente.`;
+    el('ex-validacao-status').style.borderLeft='4px solid var(--r)';el('btn-cf-ex').textContent='📨 Reenviar ao operador';el('btn-cf-ex').disabled=false;
   }else if(c.ex?.enviadoValidacaoEm){
     el('ex-validacao').value='';el('ex-senha').value='';sincronizarCamposEncerramento();
     el('ex-validacao-status').innerHTML='<b>Aguardando validação do operador.</b><br>O encerramento só será liberado após a senha e a validação.';
@@ -2517,7 +2521,7 @@ async function cfEx() {
     relatorio: el('ex-relatorio').value,
     total: 'R$ ' + total.toFixed(2).replace('.', ',')
   };
-  if(!anterior.ex?.enviadoValidacaoEm){
+  if(!anterior.ex?.enviadoValidacaoEm||c.validacaoOperador?.resultado==='nao_validado'){
     try{
       if(btn){btn.disabled=true;btn.textContent='Enviando ao operador...';}
       const fotos=await sbEnviarFotos(c);c.ex.fotos=[...(anterior.ex?.fotos||[]),...fotos];
@@ -3222,7 +3226,7 @@ async function sbCarregarTodasEscolas(){
 async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
-  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     SB.from('chamados').select('*').order('criado_em',{ascending:true}),
     SB.from('execucoes').select('*'),
@@ -3232,9 +3236,10 @@ async function sbLoadAll(){
     SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true}),
     sbCarregarTodasEscolas(),
     SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true}),
-    SB.from('validacoes_encerramento').select('*')
+    SB.from('validacoes_encerramento').select('*'),
+    SB.from('exclusoes_chamados_portal').select('*')
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR]) if(r.error) throw r.error;
   SB_ESCOLAS=escR.data||[];
   SB_FOTOS_MAP=new Map();
   (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
@@ -3247,11 +3252,12 @@ async function sbLoadAll(){
 
   const exMap=new Map((eR.data||[]).map(x=>[x.chamado_id,x]));
   const validacaoMap=new Map((vR.data||[]).map(x=>[x.chamado_id,x]));
+  const exclusaoPortalMap=new Map((xR.data||[]).map(x=>[x.chamado_id,x]));
   const apMap=new Map((aR.data||[]).map(x=>[x.chamado_id,x]));
   const trMap=new Map();
   (tR.data||[]).forEach(x=>{ if(!trMap.has(x.chamado_id)) trMap.set(x.chamado_id,[]); trMap.get(x.chamado_id).push(x); });
   D.ch=(cR.data||[]).map(c=>{
-    const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
+    const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
       id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', si:c.site_nome||'', ci:c.circuito||'',
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', dtexec:c.data_execucao||'',
@@ -3261,7 +3267,8 @@ async function sbLoadAll(){
       dt:c.liberacao_area?{tipo:'liberacao-area',admin:sbNameById(c.liberacao_area_admin),d:c.liberacao_area_em,area:c.area,regiaoOperacional:c.regiao_operacional}:null,
       cr:c.criado_em, ae:c.aceito_em, am:c.iniciado_em, cc:c.concluido_em,
       tr:trRows.map(x=>({de:sbUserById(x.de_tecnico_id),para:sbUserById(x.para_tecnico_id),m:x.motivo||'',d:x.criado_em,admin:sbNameById(x.realizado_por)||'Administrador',adminId:x.realizado_por,_dbid:x.id})),
-      ex:null, ap:null,validacaoOperador:validacao?{validacao:validacao.validacao,senha:validacao.senha,validadoEm:validacao.validado_em,solicitanteId:validacao.solicitante_id}:null
+      ex:null, ap:null,validacaoOperador:validacao?{validacao:validacao.validacao,senha:validacao.senha,resultado:validacao.resultado||'validado',motivoNaoValidacao:validacao.motivo_nao_validacao||'',validadoEm:validacao.validado_em,solicitanteId:validacao.solicitante_id}:null,
+      exclusaoPortal:exclusaoPortal?{nome:exclusaoPortal.excluido_por_nome,email:exclusaoPortal.excluido_por_email,data:exclusaoPortal.excluido_em,statusAnterior:exclusaoPortal.status_anterior}:null
     };
     legacy._trLoadedCount=legacy.tr.length;
     if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',total:'R$ '+Number(ex.valor_total||0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
@@ -3866,7 +3873,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=1.7.0"></script>
+<script src="/release-info.js?v=1.9.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

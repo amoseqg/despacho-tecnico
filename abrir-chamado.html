@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b172a">
   <title>Abertura de Chamados | NexoField</title>
   <link rel="preload" as="image" type="image/webp" href="/nexofield-teleoperadores-futurista.webp">
-  <link rel="stylesheet" href="/portal-chamados.css?v=1.8.0">
+  <link rel="stylesheet" href="/portal-chamados.css?v=1.9.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -99,7 +99,7 @@
         </form>
 
         <aside class="cartao historico">
-          <div class="titulo-form"><div><span class="passo">Acompanhamento</span><h2>Meus chamados</h2></div><button id="btn-atualizar" class="botao botao-claro" type="button">Atualizar</button></div>
+          <div class="titulo-form"><div><span class="passo">Acompanhamento</span><h2>Meus chamados</h2></div><div class="acoes-acompanhamento"><button id="btn-exportar-validacoes" class="botao botao-claro" type="button">Extrair relatório</button><button id="btn-atualizar" class="botao botao-claro" type="button">Atualizar</button></div></div>
           <div id="lista-chamados" class="lista"><div class="vazio">Carregando seus chamados...</div></div>
         </aside>
       </div>
@@ -115,6 +115,6 @@
     <button id="btn-fechar-confirmacao" class="botao botao-primario" type="button">Concluir</button>
   </dialog>
 
-  <script src="/portal-chamados.js?v=1.8.0"></script>
+  <script src="/portal-chamados.js?v=1.9.0"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@ const html=fs.readFileSync('abrir-chamado.html','utf8');
 const js=fs.readFileSync('portal-chamados.js','utf8');
 const css=fs.readFileSync('portal-chamados.css','utf8');
 const app=fs.readFileSync('app.part1','utf8')+fs.readFileSync('app.part3','utf8');
-const sql=fs.readFileSync('database/portal-abertura-chamados.sql','utf8')+fs.readFileSync('database/portal-novos-circuitos-protocolo-1000.sql','utf8')+fs.readFileSync('database/fluxo-validacao-operador.sql','utf8');
+const sql=fs.readFileSync('database/portal-abertura-chamados.sql','utf8')+fs.readFileSync('database/portal-novos-circuitos-protocolo-1000.sql','utf8')+fs.readFileSync('database/fluxo-validacao-operador.sql','utf8')+fs.readFileSync('database/validacao_exclusao_portal.sql','utf8');
 
 assert.match(html,/id="form-login"/);
 assert.match(html,/id="form-chamado"/);
@@ -26,6 +26,9 @@ assert.match(js,/function salvarNovoCircuito\(/);
 assert.match(js,/from\('sites'\)\.insert/);
 assert.match(js,/validarEncerramentoOperador/);
 assert.match(js,/from\('validacoes_encerramento'\)\.upsert/);
+assert.match(js,/resultado==='nao_validado'/);
+assert.match(js,/rpc\('excluir_chamado_portal'/);
+assert.match(js,/function exportarValidacoes\(/);
 assert.match(app,/id="btn-add-solicitante"/);
 assert.match(app,/function adicionarSolicitanteChamados\(/);
 assert.match(app,/function dadosAberturaPortal\(/);
@@ -43,6 +46,9 @@ assert.match(sql,/greatest\(\(select last_value from public\.protocolo_abertura_
 assert.match(sql,/create table if not exists public\.validacoes_encerramento/);
 assert.match(sql,/exigir_validacao_operador_antes_conclusao/);
 assert.match(sql,/operadora in \('vectra','um_telecom','metodo'\)/);
+assert.match(sql,/create table if not exists public\.exclusoes_chamados_portal/);
+assert.match(sql,/create or replace function public\.excluir_chamado_portal/);
+assert.match(sql,/v\.resultado = 'validado'/);
 assert.match(css,/@media\(max-width:600px\)/);
 
 console.log('Portal validado: acesso separado, circuito automático, protocolo, vencimento, RLS e fila administrativa.');

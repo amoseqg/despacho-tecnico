@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.9.0',date:'2026-09-09',title:'Autorização e auditoria pelo operador',
+  changes:['Operador decide entre Validado e Não validado; senha é exigida somente para autorizar o encerramento.','Não validação exige motivo e aparece automaticamente para o técnico corrigir e reenviar.','Exclusão no acompanhamento cancela o chamado sem apagar o histórico e registra nome, e-mail e data do responsável.','Relatório dos chamados validados e não validados disponível para exportação.']
+ },{
   version:'1.7.0',date:'2026-09-09',title:'Validação de encerramento pelo operador',
   changes:['O técnico envia a máscara de encerramento ao operador antes de concluir o chamado.','O operador informa validação e senha no acompanhamento; técnico e administrador recebem a atualização automaticamente.','O técnico encerra somente após a validação, e o administrador mantém a aprovação final.','Cadastro de operador identifica Vectra, UM Telecom ou Método; chamados e relatórios ficam separados por operadora.']
  },{
