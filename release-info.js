@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.5.0',date:'2026-09-09',title:'Laboratório operacional simultâneo',
+  changes:['Simulação isolada do fluxo completo para todos os técnicos ativos, sem utilizar senhas ou dados operacionais reais.','Protocolos e SDMs fictícios, acompanhamento visual por etapa e diagnóstico com correções sugeridas.','Execução manual pelo administrador e execução automática diária no banco de testes.']
+ },{
   version:'1.4.1',date:'2026-09-08',title:'Confirmação clara dos anexos de e-mail',
   changes:['Mensagem de sucesso esclarece que o anexo foi preparado e salvo na pasta Downloads.','Orientação de envio reformulada para não parecer uma mensagem de erro.']
  },{
