@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b172a">
   <title>Abertura de Chamados | NexoField</title>
-  <link rel="stylesheet" href="/portal-chamados.css?v=1.7.0">
+  <link rel="preload" as="image" type="image/webp" href="/nexofield-teleoperadores-futurista.webp">
+  <link rel="stylesheet" href="/portal-chamados.css?v=1.8.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -20,11 +21,18 @@
   <main>
     <section id="tela-login" class="painel login">
       <div class="chamada">
+        <div class="status-operacao"><span></span> Central de atendimento conectada</div>
         <span class="rotulo">Acesso autorizado</span>
         <h1>Abra e acompanhe seus chamados</h1>
         <p>Use o e-mail cadastrado por um administrador do NexoField.</p>
+        <div class="recursos-login" aria-label="Recursos do portal">
+          <span>Protocolo imediato</span>
+          <span>Acompanhamento em tempo real</span>
+        </div>
       </div>
       <form id="form-login" class="cartao">
+        <span class="cartao-sinal" aria-hidden="true"></span>
+        <span class="passo">Portal do operador</span>
         <h2>Entrar no portal</h2>
         <label>E-mail<input id="login-email" type="email" autocomplete="username" required placeholder="seuemail@empresa.com"></label>
         <label>Senha<input id="login-senha" type="password" autocomplete="current-password" required minlength="6" placeholder="Digite sua senha"></label>
@@ -107,6 +115,6 @@
     <button id="btn-fechar-confirmacao" class="botao botao-primario" type="button">Concluir</button>
   </dialog>
 
-  <script src="/portal-chamados.js?v=1.7.0"></script>
+  <script src="/portal-chamados.js?v=1.8.0"></script>
 </body>
 </html>
