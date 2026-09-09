@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b172a">
+  <title>Abertura de Chamados | NexoField</title>
+  <link rel="stylesheet" href="/portal-chamados.css?v=1.6.0">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="topo">
+    <a class="marca" href="/abrir-chamado.html" aria-label="NexoField Abertura de Chamados">
+      <span class="logo">NF</span>
+      <span><strong>NexoField</strong><small>Portal de Abertura de Chamados</small></span>
+    </a>
+    <button id="btn-sair" class="botao botao-claro oculto" type="button">Sair</button>
+  </header>
+
+  <main>
+    <section id="tela-login" class="painel login">
+      <div class="chamada">
+        <span class="rotulo">Acesso autorizado</span>
+        <h1>Abra e acompanhe seus chamados</h1>
+        <p>Use o e-mail cadastrado por um administrador do NexoField.</p>
+      </div>
+      <form id="form-login" class="cartao">
+        <h2>Entrar no portal</h2>
+        <label>E-mail<input id="login-email" type="email" autocomplete="username" required placeholder="seuemail@empresa.com"></label>
+        <label>Senha<input id="login-senha" type="password" autocomplete="current-password" required minlength="6" placeholder="Digite sua senha"></label>
+        <button class="botao botao-primario" type="submit">Entrar</button>
+        <button id="btn-recuperar" class="link" type="button">Esqueci minha senha</button>
+        <p id="login-status" class="status" role="status"></p>
+      </form>
+      <form id="form-nova-senha" class="cartao oculto">
+        <h2>Definir nova senha</h2>
+        <p class="texto-apoio">Digite e confirme a nova senha do portal.</p>
+        <label>Nova senha<input id="nova-senha" type="password" autocomplete="new-password" required minlength="6"></label>
+        <label>Confirme a nova senha<input id="nova-senha-confirmacao" type="password" autocomplete="new-password" required minlength="6"></label>
+        <button class="botao botao-primario" type="submit">Salvar nova senha</button>
+        <p id="senha-status" class="status" role="status"></p>
+      </form>
+    </section>
+
+    <section id="tela-portal" class="oculto">
+      <div class="boas-vindas">
+        <div><span class="rotulo">Solicitante autorizado</span><h1>Olá, <span id="nome-solicitante"></span></h1><p>Preencha o chamado. Os dados oficiais do local serão carregados pelo circuito.</p></div>
+        <div class="email-ativo" id="email-solicitante"></div>
+      </div>
+
+      <div class="layout">
+        <form id="form-chamado" class="cartao formulario">
+          <div class="titulo-form"><div><span class="passo">Novo chamado</span><h2>Dados da solicitação</h2></div><span class="protocolo-previo">Protocolo gerado ao enviar</span></div>
+
+          <div class="grade dois">
+            <label>SDM<input id="sdm" maxlength="80" required placeholder="Informe o número SDM"></label>
+            <label>Circuito<input id="circuito" list="lista-circuitos" autocomplete="off" required placeholder="Digite o número do circuito"></label>
+          </div>
+          <datalist id="lista-circuitos"></datalist>
+          <p id="circuito-status" class="ajuda">Digite o circuito completo ou somente a parte numérica.</p>
+
+          <div class="grade dois dados-site">
+            <label>Cliente<input id="cliente" readonly></label>
+            <label>Cidade<input id="cidade" readonly></label>
+            <label class="coluna-inteira">Endereço<input id="endereco" readonly></label>
+            <label class="coluna-inteira">Horário de atendimento<input id="horario" readonly></label>
+          </div>
+
+          <div class="grade dois">
+            <label>Contato<input id="contato" maxlength="200" required placeholder="Nome e telefone para contato"></label>
+            <label>Vencimento<input id="vencimento" type="datetime-local" required></label>
+            <label>Data de abertura<input id="data-abertura" readonly></label>
+            <label>Aberto por<input id="aberto-por" readonly></label>
+          </div>
+
+          <label>Observações<textarea id="observacoes" rows="5" maxlength="4000" placeholder="Descreva o problema e inclua informações importantes para o atendimento"></textarea></label>
+          <div class="acoes"><button id="btn-enviar" class="botao botao-primario" type="submit">Abrir chamado</button></div>
+          <p id="chamado-status" class="status" role="status"></p>
+        </form>
+
+        <aside class="cartao historico">
+          <div class="titulo-form"><div><span class="passo">Acompanhamento</span><h2>Meus chamados</h2></div><button id="btn-atualizar" class="botao botao-claro" type="button">Atualizar</button></div>
+          <div id="lista-chamados" class="lista"><div class="vazio">Carregando seus chamados...</div></div>
+        </aside>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="confirmacao">
+    <div class="confirmacao-icone">✓</div>
+    <h2>Chamado aberto com sucesso</h2>
+    <p>Seu protocolo de abertura é:</p>
+    <strong id="protocolo-gerado"></strong>
+    <p>O chamado já está disponível para distribuição na área administrativa.</p>
+    <button id="btn-fechar-confirmacao" class="botao botao-primario" type="button">Concluir</button>
+  </dialog>
+
+  <script src="/portal-chamados.js?v=1.6.0"></script>
+</body>
+</html>

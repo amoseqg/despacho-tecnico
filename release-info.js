@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.6.0',date:'2026-09-09',title:'Portal externo de abertura de chamados',
+  changes:['Link separado para solicitantes autorizados abrirem e acompanharem chamados sem acessar as áreas internas.','Cadastro de solicitantes por nome, e-mail e senha inicial disponível aos administradores.','Preenchimento automático de cliente, endereço, cidade e horário pelo circuito, protocolo automático e envio para distribuição administrativa.','Registro do solicitante, data de abertura e vencimento exibido ao administrador.']
+ },{
   version:'1.5.0',date:'2026-09-09',title:'Laboratório operacional simultâneo',
   changes:['Simulação isolada do fluxo completo para todos os técnicos ativos, sem utilizar senhas ou dados operacionais reais.','Protocolos e SDMs fictícios, acompanhamento visual por etapa e diagnóstico com correções sugeridas.','Execução manual pelo administrador e execução automática diária no banco de testes.']
  },{

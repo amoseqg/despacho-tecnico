@@ -1,0 +1,33 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const html=fs.readFileSync('abrir-chamado.html','utf8');
+const js=fs.readFileSync('portal-chamados.js','utf8');
+const css=fs.readFileSync('portal-chamados.css','utf8');
+const app=fs.readFileSync('app.part1','utf8')+fs.readFileSync('app.part3','utf8');
+const sql=fs.readFileSync('database/portal-abertura-chamados.sql','utf8');
+
+assert.match(html,/id="form-login"/);
+assert.match(html,/id="form-chamado"/);
+assert.match(html,/id="circuito"[^>]+required/);
+assert.match(html,/id="sdm"[^>]+required/);
+assert.match(html,/id="vencimento"[^>]+required/);
+assert.match(html,/id="cliente"[^>]+readonly/);
+assert.match(html,/id="endereco"[^>]+readonly/);
+assert.match(html,/id="horario"[^>]+readonly/);
+assert.match(html,/id="form-nova-senha"/);
+assert.match(js,/from\('solicitantes_chamados'\)/);
+assert.match(js,/from\('chamados'\)\.insert/);
+assert.match(js,/solicitante_id:solicitante\.user_id/);
+assert.match(js,/select\('id,protocolo,status,criado_em,vencimento_em'\)/);
+assert.match(app,/id="btn-add-solicitante"/);
+assert.match(app,/function adicionarSolicitanteChamados\(/);
+assert.match(app,/function dadosAberturaPortal\(/);
+assert.doesNotMatch(app,/id="card-solicitante"|showLogin\('solicitante'\)/);
+assert.match(sql,/enable row level security/);
+assert.match(sql,/trg_preparar_chamado_portal/);
+assert.match(sql,/new\.protocolo := 'NEX-'/);
+assert.match(sql,/new\.tecnico_id := null/);
+assert.match(css,/@media\(max-width:600px\)/);
+
+console.log('Portal validado: acesso separado, circuito automático, protocolo, vencimento, RLS e fila administrativa.');

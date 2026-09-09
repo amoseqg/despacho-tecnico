@@ -265,6 +265,11 @@ function dadosSite(c) {
     <div class="os-r"><b>PVF Total:</b> ${valorInfo(c.pvfTotal)}</div>`;
 }
 
+function dadosAberturaPortal(c){
+  if(!c.solicitanteId && c.abertura!=='Portal de Abertura')return '';
+  return `<div class="info" style="margin-top:8px;border-left:4px solid var(--a)"><b>📨 Abertura pelo portal</b><br><b>Aberto por:</b> ${valorInfo(c.solicitanteNome)} (${valorInfo(c.solicitanteEmail)})<br><b>Data de abertura:</b> ${c.cr?new Date(c.cr).toLocaleString('pt-BR'):'Não informada'}<br><b>Vencimento:</b> ${c.vencimento?new Date(c.vencimento).toLocaleString('pt-BR'):'Não informado'}</div>`;
+}
+
 function sv() { lsSet('dd', D); }
 function ss() { lsSet('ss', S); }
 function ag() { return new Date().toLocaleString('pt-BR'); }
@@ -1188,6 +1193,69 @@ function rAd() {
       : `<button class="btn btn-s btn-reset-senha" data-u="${a.u}" data-email="${a.e || ''}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${a.p ? '' : `<button class="btn btn-r btn-rm-adm" data-u="${a.u}" style="padding:4px 8px;font-size:.6rem" title="Excluir administrador">🗑️</button>`}`;
     return `<tr><td>${a.n}${a.tipo==='logistica' ? ' <span class="badge b-andamento">Logística</span>' : (a.p ? ' <span class="badge b-pendente">Geral</span>' : '')}</td><td>${a.u}</td><td>${a.e || 'Não cadastrado'}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${acoes}</div></td></tr>`;
   }).join('');
+  carregarSolicitantesChamados();
+}
+
+function renderSolicitantesChamados(){
+  const tb=el('tb-solicitantes');if(!tb)return;
+  tb.innerHTML=SB_SOLICITANTES_CHAMADOS.map(s=>`<tr><td>${esc(s.nome)}</td><td>${esc(s.email)}</td><td><span class="badge ${s.ativo?'b-concluida':'b-recusado'}">${s.ativo?'Ativo':'Bloqueado'}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn btn-s btn-reset-solicitante" data-email="${esc(s.email)}" style="padding:4px 8px;font-size:.6rem">🔑 Redefinir</button><button type="button" class="btn ${s.ativo?'btn-r':'btn-g'} btn-status-solicitante" data-id="${esc(s.id)}" data-ativo="${s.ativo?'1':'0'}" style="padding:4px 8px;font-size:.6rem">${s.ativo?'Bloquear':'Reativar'}</button></div></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Nenhum e-mail autorizado.</td></tr>';
+}
+
+async function carregarSolicitantesChamados(){
+  if(!window.SB||!SB_PROFILE||SB_PROFILE.tipo!=='admin'||SB_CARREGANDO_SOLICITANTES)return;
+  SB_CARREGANDO_SOLICITANTES=true;
+  try{
+    const {data,error}=await SB.from('solicitantes_chamados').select('id,user_id,nome,email,ativo,criado_em').order('nome');
+    if(error)throw error;SB_SOLICITANTES_CHAMADOS=data||[];renderSolicitantesChamados();
+  }catch(err){
+    console.error('Erro ao carregar solicitantes:',err);
+    const tb=el('tb-solicitantes');if(tb)tb.innerHTML=`<tr><td colspan="4" class="empty" style="color:var(--r)">Não foi possível carregar os acessos: ${esc(err?.message||'erro desconhecido')}</td></tr>`;
+  }finally{SB_CARREGANDO_SOLICITANTES=false;}
+}
+
+async function adicionarSolicitanteChamados(){
+  const nome=el('sol-n').value.trim(),email=el('sol-e').value.trim().toLowerCase(),senha=el('sol-s').value,confirmacao=el('sol-sc').value;
+  if(!nome||!email||!senha||!confirmacao){alert('Preencha nome, e-mail e senha inicial.');return;}
+  if(!emailValido(email)){alert('Informe um e-mail válido.');return;}
+  if(senha.length<6){alert('A senha deve ter pelo menos 6 caracteres.');return;}
+  if(senha!==confirmacao){alert('A confirmação da senha não confere.');return;}
+  if(SB_SOLICITANTES_CHAMADOS.some(s=>s.email===email)){alert('Este e-mail já está cadastrado no portal de abertura.');return;}
+  const btn=el('btn-add-solicitante'),rotulo=btn?.innerHTML;if(btn){btn.disabled=true;btn.textContent='Criando acesso...';}
+  try{
+    await sbExigirSessaoAdmin();
+    const {data:authData,error:authError}=await SB_ACCOUNT_CREATOR.auth.signUp({email,password:senha,options:{data:{nome,portal:'abertura_chamados'}}});
+    if(authError)throw authError;
+    if(!authData?.user?.id)throw new Error('O servidor de autenticação não retornou a identificação da conta.');
+    const {error}=await SB.from('solicitantes_chamados').insert({user_id:authData.user.id,nome,email,ativo:true,criado_por:SB_PROFILE.id});
+    if(error)throw new Error('A conta foi criada, mas a autorização não pôde ser salva: '+error.message);
+    await SB_ACCOUNT_CREATOR.auth.signOut().catch(()=>{});
+    ['sol-n','sol-e','sol-s','sol-sc'].forEach(id=>el(id).value='');
+    await carregarSolicitantesChamados();
+    alert(authData.session?'E-mail autorizado. O solicitante já pode entrar no portal.':'E-mail autorizado. O Supabase pode solicitar a confirmação do e-mail antes do primeiro acesso.');
+  }catch(err){sbShowError('Não foi possível autorizar o solicitante',err);}
+  finally{if(btn){btn.disabled=false;btn.innerHTML=rotulo||'➕ Autorizar e-mail';}}
+}
+
+async function eventoSolicitanteChamados(evento){
+  const statusBtn=evento.target.closest('.btn-status-solicitante');
+  if(statusBtn){
+    const ativar=statusBtn.dataset.ativo!=='1';
+    if(!confirm(`${ativar?'Reativar':'Bloquear'} este acesso ao portal de abertura?`))return;
+    try{await sbExigirSessaoAdmin();const {error}=await SB.from('solicitantes_chamados').update({ativo:ativar,atualizado_em:new Date().toISOString()}).eq('id',statusBtn.dataset.id);if(error)throw error;await carregarSolicitantesChamados();}catch(err){sbShowError('Não foi possível alterar o acesso',err);}
+    return;
+  }
+  const resetBtn=evento.target.closest('.btn-reset-solicitante');
+  if(resetBtn){
+    const email=resetBtn.dataset.email;if(!confirm(`Enviar um link de redefinição de senha para ${email}?`))return;
+    const {error}=await SB.auth.resetPasswordForEmail(email,{redirectTo:location.origin+'/abrir-chamado.html'});
+    if(error)sbShowError('Não foi possível enviar a redefinição',error);else alert('Link de redefinição enviado para '+email+'.');
+  }
+}
+
+async function copiarLinkPortalChamados(){
+  const link=location.origin+'/abrir-chamado.html';
+  try{await navigator.clipboard.writeText(link);alert('Link copiado: '+link);}
+  catch(_err){prompt('Copie o link do portal:',link);}
 }
 
 const JANELA_REINCIDENCIA_MS = 30 * 24 * 60 * 60 * 1000;
@@ -1257,6 +1325,7 @@ function rCh() {
     const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : 'Não definida';
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aberto</span></div>
     ${dadosSite(c)}
+    ${dadosAberturaPortal(c)}
     <div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
@@ -1356,7 +1425,7 @@ function chamadosEncerradosPorPeriodo(dt1,dt2){
 function exportarChamadosEncerrados(dt1,dt2){
   let chamados;try{chamados=chamadosEncerradosPorPeriodo(dt1,dt2);}catch(err){alert(err.message);return;}
   if(!chamados.length){alert('Nenhum chamado encerrado no período informado.');return;}
-  const rows=chamados.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Quem abriu o chamado':c.abertura||'Não informado','Circuito':c.ci||'','Site / Cliente':c.si||'','Cidade':c.cid||'','Região':nomeRegiao(c.re).replace(/^[^ ]+ /,''),'Técnico':nt(c.te)||'','Abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'','Encerramento':dataEncerramentoChamado(c)?new Date(dataEncerramentoChamado(c)).toLocaleString('pt-BR'):'','Atividade':c.ex?.atv||'','Relatório de encerramento':c.ex?.relatorio||c.ex?.obs||'','Valor total':c.ex?.total||''}));
+  const rows=chamados.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Quem abriu o chamado':c.solicitanteNome||c.abertura||'Não informado','E-mail do solicitante':c.solicitanteEmail||'','Circuito':c.ci||'','Site / Cliente':c.si||'','Cidade':c.cid||'','Região':nomeRegiao(c.re).replace(/^[^ ]+ /,''),'Técnico':nt(c.te)||'','Abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'','Vencimento':c.vencimento?new Date(c.vencimento).toLocaleString('pt-BR'):'','Encerramento':dataEncerramentoChamado(c)?new Date(dataEncerramentoChamado(c)).toLocaleString('pt-BR'):'','Atividade':c.ex?.atv||'','Relatório de encerramento':c.ex?.relatorio||c.ex?.obs||'','Valor total':c.ex?.total||''}));
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),50)}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Chamados encerrados');XLSX.writeFile(wb,`chamados_encerrados_${dt1}_a_${dt2}.xlsx`);
 }
 
@@ -1371,7 +1440,8 @@ function exportarBaseChamadosFechados(dt1,dt2){
     'Protocolo':c.pr||'',
     'SDM':c.sdm||'',
     'OS Peconecta':c.osPeconecta||c.os||'',
-    'Quem abriu o chamado':c.abertura||'Não informado',
+    'Quem abriu o chamado':c.solicitanteNome||c.abertura||'Não informado',
+    'E-mail do solicitante':c.solicitanteEmail||'',
     'Circuito':c.ci||'',
     'Site / Cliente':c.si||'',
     'Endereço':c.en||'',
@@ -1379,6 +1449,7 @@ function exportarBaseChamadosFechados(dt1,dt2){
     'Região':nomeRegiao(c.re).replace(/^[^ ]+ /,''),
     'Técnico responsável':nt(c.te)||'',
     'Data de abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'',
+    'Vencimento':c.vencimento?new Date(c.vencimento).toLocaleString('pt-BR'):'',
     'Data de fechamento':new Date(dataEncerramentoChamado(c)).toLocaleString('pt-BR'),
     'Atividade executada':c.ex?.atv||'',
     'Relatório de encerramento':c.ex?.relatorio||c.ex?.obs||'',
@@ -2695,10 +2766,14 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnAddTec = el('btn-add-tec');
   const btnAddAdm = el('btn-add-adm');
   const btnAddLog = el('btn-add-log');
+  const btnAddSolicitante = el('btn-add-solicitante');
   const btnAddCh = el('btn-add-ch');
   if(btnAddTec) btnAddTec.addEventListener('click', addTec);
   if(btnAddAdm) btnAddAdm.addEventListener('click', addAdm);
   if(btnAddLog) btnAddLog.addEventListener('click', addLog);
+  if(btnAddSolicitante) btnAddSolicitante.addEventListener('click', adicionarSolicitanteChamados);
+  el('btn-copiar-link-portal')?.addEventListener('click', copiarLinkPortalChamados);
+  el('tb-solicitantes')?.addEventListener('click', eventoSolicitanteChamados);
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
   const pesquisaTec=el('tc-pesquisa');if(pesquisaTec)pesquisaTec.addEventListener('input',renderTc);
   const btnAddMaterial=el('btn-add-material'); if(btnAddMaterial) btnAddMaterial.addEventListener('click',addMaterial);
@@ -3029,6 +3104,8 @@ let SB_LOADED_MR = new Set();
 let SB_ESCOLAS = [];
 let SB_FOTOS_MAP = new Map();
 let EX_FOTOS_NOVAS = [];
+let SB_SOLICITANTES_CHAMADOS = [];
+let SB_CARREGANDO_SOLICITANTES = false;
 
 function sbUUID(v){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||'')); }
 function sbNum(v){
@@ -3129,6 +3206,7 @@ async function sbLoadAll(){
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
+      solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', vencimento:c.vencimento_em||'',
       dt:c.liberacao_area?{tipo:'liberacao-area',admin:sbNameById(c.liberacao_area_admin),d:c.liberacao_area_em,area:c.area,regiaoOperacional:c.regiao_operacional}:null,
       cr:c.criado_em, ae:c.aceito_em, am:c.iniciado_em, cc:c.concluido_em,
       tr:trRows.map(x=>({de:sbUserById(x.de_tecnico_id),para:sbUserById(x.para_tecnico_id),m:x.motivo||'',d:x.criado_em,admin:sbNameById(x.realizado_por)||'Administrador',adminId:x.realizado_por,_dbid:x.id})),
@@ -3187,6 +3265,23 @@ async function sbSeedSchoolsIfNeeded(){
   }
 }
 
+async function sbSeedSitesIfNeeded(){
+  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin' || !Array.isArray(SITES_PEII)) return;
+  const {count,error}=await SB.from('sites').select('*',{count:'exact',head:true});
+  if(error)throw error;
+  if((count||0)>=SITES_PEII.length)return;
+  const sites=SITES_PEII.map(x=>({
+    circuito:String(x[0]||'').trim(),site:String(x[1]||'').trim(),cidade:String(x[2]||'').trim()||null,
+    endereco:String(x[3]||'').trim()||null,contato:String(x[4]||'').trim()||null,horario_expediente:String(x[5]||'').trim()||null,
+    velocidade:String(x[6]||'').trim()||null,prtm:String(x[7]||'').trim()||null,pvf_total:Number(x[8])||null,
+    regiao_operacional:String(x[9]||'').trim()||null,tecnicos_indicados:String(x[10]||'').trim()||null,ativo:true,atualizado_em:new Date().toISOString()
+  })).filter(x=>x.circuito&&x.site);
+  for(let i=0;i<sites.length;i+=250){
+    const {error:upsertError}=await SB.from('sites').upsert(sites.slice(i,i+250),{onConflict:'circuito'});
+    if(upsertError)throw upsertError;
+  }
+}
+
 function sbChamadoRow(c){
   return {
     protocolo:c.pr, sdm:c.sdm||null, abertura_origem:c.abertura||null, circuito:c.ci||'', site_nome:c.si||null, cidade:c.cid||null,
@@ -3194,6 +3289,7 @@ function sbChamadoRow(c){
     pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null, regiao_operacional:c.regiaoOperacional||null, tecnicos_indicados:c.tecnicosIndicados||null,
     regiao:c.re, skill:c.skill, area:c.re==='capital'?(c.area||null):null, tecnico_id:sbIdByUser(c.te), criado_por:SB_PROFILE?.id||null,
     descricao:c.de||null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
+    solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, vencimento_em:sbIso(c.vencimento),
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:sbIso(c.cr)||new Date().toISOString(), aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
   };
@@ -3407,7 +3503,7 @@ doLogin = async function(){
     if(loginType==='adm' && p.tipo!=='admin') throw new Error('Este usuário não possui perfil de administrador.');
     if(loginType==='log' && !temLogistica) throw new Error('Este usuário não possui acesso à área logística.');
     if(loginType==='tec' && p.tipo!=='tecnico') throw new Error('Este usuário não possui perfil de técnico.');
-    SB_PROFILE=p;await sbSeedMaterialsIfNeeded();await sbSeedSchoolsIfNeeded();await sbLoadAll();
+    SB_PROFILE=p;await sbSeedMaterialsIfNeeded();await sbSeedSitesIfNeeded();await sbSeedSchoolsIfNeeded();await sbLoadAll();
     if(loginType==='log') S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
     else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
@@ -3661,6 +3757,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   // Realtime: recarrega os dados quando outro navegador altera tabelas operacionais.
   SB.channel('despacho-tecnico-realtime')
     .on('postgres_changes',{event:'*',schema:'public',table:'perfis'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'solicitantes_chamados'},()=>carregarSolicitantesChamados())
     .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'aprovacoes'},sbRecarregarDados)
@@ -3721,7 +3818,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=1.5.0"></script>
+<script src="/release-info.js?v=1.6.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>
