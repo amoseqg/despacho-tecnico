@@ -591,7 +591,7 @@ function enterTec() {
 function admTab(btn, a) {
   document.querySelectorAll('#nv button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','tc','ch','at','rl','ml','ad','vi','ft','aq'].forEach(x => {
+  ['db','tc','ch','at','rl','ml','ad','vi','ft','aq','lab'].forEach(x => {
     const e = el('v-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -605,6 +605,7 @@ function admTab(btn, a) {
   if (a === 'vi') renderVistorias();
   if (a === 'ft') renderFotosAdmin();
   if (a === 'aq') renderArquivoChamados();
+  if (a === 'lab' && window.NexoFieldLab) window.NexoFieldLab.render();
 }
 
 function tecTab(btn, a) {
@@ -3666,8 +3667,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=1.4.1"></script>
+<script src="/release-info.js?v=1.5.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
+<script src="/test-lab.js?v=1.5.0"></script>
 </body>
 </html>
