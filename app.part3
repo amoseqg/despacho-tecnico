@@ -1181,9 +1181,13 @@ async function rTc() {
 function rAd() {
   const tb = el('tb-ad');
   if(!tb) return;
-  tb.innerHTML = D.ad.map(a =>
-    `<tr><td>${a.n}${a.tipo==='logistica' ? ' <span class="badge b-andamento">Logística</span>' : (a.p ? ' <span class="badge b-pendente">Geral</span>' : '')}</td><td>${a.u}</td><td>${a.e || 'Não cadastrado'}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-s btn-reset-senha" data-u="${a.u}" data-email="${a.e || ''}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${a.p ? '' : `<button class="btn btn-r btn-rm-adm" data-u="${a.u}" style="padding:4px 8px;font-size:.6rem" title="Excluir administrador">🗑️</button>`}</div></td></tr>`
-  ).join('');
+  tb.innerHTML = D.ad.map(a => {
+    const perfilGeralDeOutroUsuario = !!a.p && (!S || a.u !== S.u);
+    const acoes = perfilGeralDeOutroUsuario
+      ? '<span class="badge b-andamento" title="Somente o próprio Administrador Geral pode gerenciar este perfil">🔒 Perfil protegido</span>'
+      : `<button class="btn btn-s btn-reset-senha" data-u="${a.u}" data-email="${a.e || ''}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${a.p ? '' : `<button class="btn btn-r btn-rm-adm" data-u="${a.u}" style="padding:4px 8px;font-size:.6rem" title="Excluir administrador">🗑️</button>`}`;
+    return `<tr><td>${a.n}${a.tipo==='logistica' ? ' <span class="badge b-andamento">Logística</span>' : (a.p ? ' <span class="badge b-pendente">Geral</span>' : '')}</td><td>${a.u}</td><td>${a.e || 'Não cadastrado'}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${acoes}</div></td></tr>`;
+  }).join('');
 }
 
 const JANELA_REINCIDENCIA_MS = 30 * 24 * 60 * 60 * 1000;
@@ -1787,7 +1791,12 @@ async function rmTc(u) {
     rTc();
   }
 }
-function rmAd(u) { if (!confirm('Remover administrador?')) return; D.ad = D.ad.filter(a => a.u !== u); sv(); rAd(); }
+function rmAd(u) {
+  const alvo=D.ad.find(a=>a.u===u);
+  if(alvo?.p && (!S || alvo.u!==S.u)){ alert('O perfil do Administrador Geral é protegido e não pode ser removido por outro administrador.'); return; }
+  if (!confirm('Remover administrador?')) return;
+  D.ad = D.ad.filter(a => a.u !== u); sv(); rAd();
+}
 
 // ========== RENDER TÉCNICO ==========
 function rTdb() {
@@ -3433,6 +3442,8 @@ recuperarSenha = async function(){
 
 async function enviarRedefinicaoSenhaAdmin(usuario,email){
   if(!SB_PROFILE || SB_PROFILE.tipo!=='admin'){ alert('Somente administradores podem enviar redefinição de senha.'); return; }
+  const alvo=D.ad.find(a=>a.u===usuario)||D.tc.find(a=>a.u===usuario);
+  if(alvo?.p && alvo._id!==SB_PROFILE.id){ alert('Acesso negado. Somente o próprio Administrador Geral pode redefinir a senha deste perfil.'); return; }
   email=String(email||'').trim().toLowerCase();
   if(!emailValido(email)){ alert('Este usuário não possui um e-mail válido cadastrado.'); return; }
   const nome=usuario||email;
@@ -3453,6 +3464,7 @@ const SB_ACCOUNT_CREATOR = window.supabase.createClient(SUPABASE_URL, SUPABASE_P
 
 async function sbCriarContaPerfil({nome,usuario,email,senha,tipo,regiao=null,skills=[],areas=[],adminGeral=false,enderecoEntrega=null}){
   if(!SB_PROFILE || SB_PROFILE.tipo!=='admin') throw new Error('Somente um administrador autenticado pode criar novas contas.');
+  if(adminGeral && !SB_PROFILE.admin_geral) throw new Error('Somente o Administrador Geral pode criar ou reativar outro perfil com esse nível de acesso.');
 
   // Verifica perfis ativos e também permite reativar uma conta excluída.
   const {data:existentes,error:buscaErr}=await SB.from('perfis')
@@ -3579,6 +3591,7 @@ addLog = async function(){
     if(buscaErr)throw buscaErr;
     if(existente){
       if(existente.tipo==='admin'){
+        if(existente.admin_geral && existente.id!==SB_PROFILE.id) throw new Error('O perfil do Administrador Geral é protegido. Somente o próprio titular pode alterar seus acessos.');
         const areas=Array.from(new Set([...(existente.areas||[]),'logistica']));
         const {error:updateErr}=await SB.from('perfis').update({areas,atualizado_em:new Date().toISOString()}).eq('id',existente.id);
         if(updateErr)throw updateErr;
