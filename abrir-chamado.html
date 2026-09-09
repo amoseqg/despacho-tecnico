@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#0b172a">
   <title>Abertura de Chamados | NexoField</title>
-  <link rel="stylesheet" href="/portal-chamados.css?v=1.6.0">
+  <link rel="stylesheet" href="/portal-chamados.css?v=1.6.1">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -59,11 +59,23 @@
           <datalist id="lista-circuitos"></datalist>
           <p id="circuito-status" class="ajuda">Digite o circuito completo ou somente a parte numérica.</p>
 
-          <div class="grade dois dados-site">
+          <div class="novo-circuito-acoes">
+            <button id="btn-novo-circuito" class="botao botao-claro" type="button">Adicionar novo circuito</button>
+            <button id="btn-cancelar-circuito" class="link oculto" type="button">Cancelar cadastro</button>
+          </div>
+          <div id="novo-circuito-aviso" class="aviso-novo oculto">
+            Preencha os dados abaixo e salve o circuito antes de abrir o chamado.
+          </div>
+
+          <div id="dados-site" class="grade dois dados-site">
             <label>Cliente<input id="cliente" readonly></label>
             <label>Cidade<input id="cidade" readonly></label>
             <label class="coluna-inteira">Endereço<input id="endereco" readonly></label>
             <label class="coluna-inteira">Horário de atendimento<input id="horario" readonly></label>
+          </div>
+
+          <div id="salvar-circuito-acoes" class="acoes circuito-salvar oculto">
+            <button id="btn-salvar-circuito" class="botao botao-primario" type="button">Salvar novo circuito</button>
           </div>
 
           <div class="grade dois">
@@ -95,6 +107,6 @@
     <button id="btn-fechar-confirmacao" class="botao botao-primario" type="button">Concluir</button>
   </dialog>
 
-  <script src="/portal-chamados.js?v=1.6.0"></script>
+  <script src="/portal-chamados.js?v=1.6.1"></script>
 </body>
 </html>

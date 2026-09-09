@@ -7,7 +7,7 @@
     db:{schema:'public'}
   });
   const $=id=>document.getElementById(id);
-  let solicitante=null,sites=[],siteSelecionado=null,temporizadorBusca=null;
+  let solicitante=null,sites=[],siteSelecionado=null,temporizadorBusca=null,modoNovoCircuito=false;
 
   function texto(v){return String(v??'').trim();}
   function normalizar(v){return texto(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
@@ -50,15 +50,37 @@
   }
 
   function limparSite(){siteSelecionado=null;['cliente','cidade','endereco','horario'].forEach(id=>$(id).value='');}
+  function definirModoNovoCircuito(ativo){
+    modoNovoCircuito=ativo;siteSelecionado=null;
+    ['cliente','cidade','endereco','horario'].forEach(id=>{$(id).readOnly=!ativo;if(!ativo)$(id).value='';});
+    $('dados-site')?.classList.toggle('modo-cadastro',ativo);
+    $('novo-circuito-aviso').classList.toggle('oculto',!ativo);$('salvar-circuito-acoes').classList.toggle('oculto',!ativo);$('btn-cancelar-circuito').classList.toggle('oculto',!ativo);$('btn-novo-circuito').classList.toggle('oculto',ativo);
+    $('circuito-status').textContent=ativo?'Informe um número de circuito que ainda não esteja cadastrado.':'Digite o circuito completo ou somente a parte numérica.';$('circuito-status').className='ajuda';
+    if(ativo)$('circuito').focus();
+  }
   function escolherSite(site){
-    siteSelecionado=site;$('circuito').value=site.circuito;$('cliente').value=site.site||'';$('cidade').value=site.cidade||'';$('endereco').value=site.endereco||'';$('horario').value=site.horario_expediente||'';
+    modoNovoCircuito=false;siteSelecionado=site;['cliente','cidade','endereco','horario'].forEach(id=>$(id).readOnly=true);$('dados-site')?.classList.remove('modo-cadastro');$('novo-circuito-aviso').classList.add('oculto');$('salvar-circuito-acoes').classList.add('oculto');$('btn-cancelar-circuito').classList.add('oculto');$('btn-novo-circuito').classList.remove('oculto');$('circuito').value=site.circuito;$('cliente').value=site.site||'';$('cidade').value=site.cidade||'';$('endereco').value=site.endereco||'';$('horario').value=site.horario_expediente||'';
     if(!$('contato').value)$('contato').value=site.contato||'';$('circuito-status').textContent='Circuito encontrado. Os dados do local foram preenchidos automaticamente.';$('circuito-status').className='ajuda ok';
   }
   function buscarCircuito(){
+    if(modoNovoCircuito)return;
     const busca=texto($('circuito').value);if(!busca){limparSite();$('circuito-status').textContent='Digite o circuito completo ou somente a parte numérica.';$('circuito-status').className='ajuda';return;}
     const chave=normalizar(busca),n=numero(busca);const exato=sites.find(s=>normalizar(s.circuito)===chave);if(exato){escolherSite(exato);return;}
     const candidatos=n?sites.filter(s=>numero(s.circuito)===n):[];if(candidatos.length===1){escolherSite(candidatos[0]);return;}
     limparSite();$('circuito-status').textContent=candidatos.length>1?'Há mais de um circuito com esse número. Digite também as letras iniciais.':'Circuito não encontrado na base do NexoField.';$('circuito-status').className='ajuda erro';
+  }
+
+  async function salvarNovoCircuito(){
+    const circuito=texto($('circuito').value),cliente=texto($('cliente').value),cidade=texto($('cidade').value),endereco=texto($('endereco').value),horario=texto($('horario').value),contato=texto($('contato').value),botao=$('btn-salvar-circuito');
+    if(!circuito||!cliente||!cidade||!endereco||!horario||!contato){status($('chamado-status'),'Preencha circuito, cliente, cidade, endereço, horário e contato.');return;}
+    const existente=sites.find(s=>normalizar(s.circuito)===normalizar(circuito));if(existente){escolherSite(existente);status($('chamado-status'),'Este circuito já existia e foi selecionado.',true);return;}
+    bloquear(botao,true,'Salvando...');status($('chamado-status'),'');
+    try{
+      const linha={circuito,site:cliente,cidade,endereco,contato,horario_expediente:horario,ativo:true,cadastrado_por_solicitante:solicitante.user_id};
+      const {data,error}=await sb.from('sites').insert(linha).select('id,circuito,site,cidade,endereco,contato,horario_expediente').single();if(error)throw error;
+      sites.push(data);escolherSite(data);status($('chamado-status'),'Novo circuito salvo e selecionado. Agora você pode abrir o chamado.',true);
+    }catch(e){status($('chamado-status'),e.code==='23505'?'Este número de circuito já está cadastrado.':'Não foi possível salvar o circuito: '+e.message);}
+    finally{bloquear(botao,false,'Salvar novo circuito');}
   }
 
   async function entrar(evento){
@@ -86,7 +108,7 @@
     try{
       const linha={protocolo:'GERADO-AUTOMATICAMENTE',sdm:texto($('sdm').value),site_id:siteSelecionado.id,circuito:siteSelecionado.circuito,site_nome:siteSelecionado.site||null,cidade:siteSelecionado.cidade||null,endereco:siteSelecionado.endereco||null,contato:texto($('contato').value),horario_expediente:siteSelecionado.horario_expediente||null,regiao:'interior',skill:'voz',descricao:texto($('observacoes').value)||null,status:'aberto',solicitante_id:solicitante.user_id,vencimento_em:vencimento.toISOString()};
       const {data,error}=await sb.from('chamados').insert(linha).select('id,protocolo,status,criado_em,vencimento_em').single();if(error)throw error;
-      $('protocolo-gerado').textContent=data.protocolo;$('confirmacao').showModal();$('form-chamado').reset();siteSelecionado=null;['cliente','cidade','endereco','horario'].forEach(id=>$(id).value='');$('aberto-por').value=solicitante.nome;atualizarDataAbertura();definirVencimentoInicial();buscarCircuito();await carregarChamados();
+      $('protocolo-gerado').textContent=data.protocolo;$('confirmacao').showModal();$('form-chamado').reset();definirModoNovoCircuito(false);$('aberto-por').value=solicitante.nome;atualizarDataAbertura();definirVencimentoInicial();buscarCircuito();await carregarChamados();
     }catch(e){status($('chamado-status'),'Não foi possível abrir o chamado: '+e.message);}
     finally{bloquear(botao,false,'Abrir chamado');}
   }
@@ -98,7 +120,7 @@
     box.innerHTML=data.map(c=>`<article class="item ${escapar(c.status)}"><div class="item-topo"><strong>${escapar(c.protocolo)}</strong><span class="badge">${escapar(nomes[c.status]||c.status)}</span></div><p><b>SDM:</b> ${escapar(c.sdm||'—')}<br><b>Circuito:</b> ${escapar(c.circuito)}<br><b>Cliente:</b> ${escapar(c.site_nome||'—')}<br><b>Abertura:</b> ${escapar(dataLocal(c.criado_em))}<br><b>Vencimento:</b> ${escapar(dataLocal(c.vencimento_em))}</p></article>`).join('');
   }
 
-  $('form-login').addEventListener('submit',entrar);$('form-nova-senha').addEventListener('submit',salvarNovaSenha);$('btn-recuperar').addEventListener('click',recuperar);$('btn-sair').addEventListener('click',sair);$('form-chamado').addEventListener('submit',abrirChamado);$('btn-atualizar').addEventListener('click',()=>carregarChamados().catch(e=>status($('chamado-status'),e.message)));$('btn-fechar-confirmacao').addEventListener('click',()=>$('confirmacao').close());
+  $('form-login').addEventListener('submit',entrar);$('form-nova-senha').addEventListener('submit',salvarNovaSenha);$('btn-recuperar').addEventListener('click',recuperar);$('btn-sair').addEventListener('click',sair);$('form-chamado').addEventListener('submit',abrirChamado);$('btn-atualizar').addEventListener('click',()=>carregarChamados().catch(e=>status($('chamado-status'),e.message)));$('btn-fechar-confirmacao').addEventListener('click',()=>$('confirmacao').close());$('btn-novo-circuito').addEventListener('click',()=>definirModoNovoCircuito(true));$('btn-cancelar-circuito').addEventListener('click',()=>definirModoNovoCircuito(false));$('btn-salvar-circuito').addEventListener('click',salvarNovoCircuito);
   $('circuito').addEventListener('input',()=>{clearTimeout(temporizadorBusca);temporizadorBusca=setTimeout(buscarCircuito,160);});$('circuito').addEventListener('change',buscarCircuito);
   sb.auth.onAuthStateChange(evento=>{if(evento==='PASSWORD_RECOVERY'){$('tela-login').classList.remove('oculto');$('tela-portal').classList.add('oculto');$('form-login').classList.add('oculto');$('form-nova-senha').classList.remove('oculto');}});
   validarAcesso().catch(e=>mostrarLogin('Não foi possível carregar o portal: '+e.message));

@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.6.1',date:'2026-09-09',title:'Cadastro de circuitos no portal',
+  changes:['Solicitantes autorizados podem cadastrar um circuito novo com cliente, cidade, endereço, contato e horário de atendimento.','Protocolos do portal passam a seguir a sequência numérica a partir de 1000.']
+ },{
   version:'1.6.0',date:'2026-09-09',title:'Portal externo de abertura de chamados',
   changes:['Link separado para solicitantes autorizados abrirem e acompanharem chamados sem acessar as áreas internas.','Cadastro de solicitantes por nome, e-mail e senha inicial disponível aos administradores.','Preenchimento automático de cliente, endereço, cidade e horário pelo circuito, protocolo automático e envio para distribuição administrativa.','Registro do solicitante, data de abertura e vencimento exibido ao administrador.']
  },{
