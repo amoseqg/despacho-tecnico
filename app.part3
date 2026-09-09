@@ -267,7 +267,8 @@ function dadosSite(c) {
 
 function dadosAberturaPortal(c){
   if(!c.solicitanteId && c.abertura!=='Portal de Abertura')return '';
-  return `<div class="info" style="margin-top:8px;border-left:4px solid var(--a)"><b>📨 Abertura pelo portal</b><br><b>Aberto por:</b> ${valorInfo(c.solicitanteNome)} (${valorInfo(c.solicitanteEmail)})<br><b>Data de abertura:</b> ${c.cr?new Date(c.cr).toLocaleString('pt-BR'):'Não informada'}<br><b>Vencimento:</b> ${c.vencimento?new Date(c.vencimento).toLocaleString('pt-BR'):'Não informado'}</div>`;
+  const operadoras={vectra:'Vectra',um_telecom:'UM Telecom',metodo:'Método'};
+  return `<div class="info" style="margin-top:8px;border-left:4px solid var(--a)"><b>📨 Abertura pelo portal</b><br><b>Operadora:</b> ${valorInfo(operadoras[c.operadora]||c.operadora)}<br><b>Aberto por:</b> ${valorInfo(c.solicitanteNome)} (${valorInfo(c.solicitanteEmail)})<br><b>Data de abertura:</b> ${c.cr?new Date(c.cr).toLocaleString('pt-BR'):'Não informada'}<br><b>Vencimento:</b> ${c.vencimento?new Date(c.vencimento).toLocaleString('pt-BR'):'Não informado'}</div>`;
 }
 
 function sv() { lsSet('dd', D); }
@@ -1198,24 +1199,25 @@ function rAd() {
 
 function renderSolicitantesChamados(){
   const tb=el('tb-solicitantes');if(!tb)return;
-  tb.innerHTML=SB_SOLICITANTES_CHAMADOS.map(s=>`<tr><td>${esc(s.nome)}</td><td>${esc(s.email)}</td><td><span class="badge ${s.ativo?'b-concluida':'b-recusado'}">${s.ativo?'Ativo':'Bloqueado'}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn btn-s btn-reset-solicitante" data-email="${esc(s.email)}" style="padding:4px 8px;font-size:.6rem">🔑 Redefinir</button><button type="button" class="btn ${s.ativo?'btn-r':'btn-g'} btn-status-solicitante" data-id="${esc(s.id)}" data-ativo="${s.ativo?'1':'0'}" style="padding:4px 8px;font-size:.6rem">${s.ativo?'Bloquear':'Reativar'}</button></div></td></tr>`).join('')||'<tr><td colspan="4" class="empty">Nenhum e-mail autorizado.</td></tr>';
+  const nomes={vectra:'Vectra',um_telecom:'UM Telecom',metodo:'Método'};
+  tb.innerHTML=SB_SOLICITANTES_CHAMADOS.map(s=>`<tr><td>${esc(s.nome)}</td><td>${esc(s.email)}</td><td><span class="badge b-andamento">${esc(nomes[s.operadora]||'Não definida')}</span></td><td><span class="badge ${s.ativo?'b-concluida':'b-recusado'}">${s.ativo?'Ativo':'Bloqueado'}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button type="button" class="btn btn-s btn-reset-solicitante" data-email="${esc(s.email)}" style="padding:4px 8px;font-size:.6rem">🔑 Redefinir</button><button type="button" class="btn ${s.ativo?'btn-r':'btn-g'} btn-status-solicitante" data-id="${esc(s.id)}" data-ativo="${s.ativo?'1':'0'}" style="padding:4px 8px;font-size:.6rem">${s.ativo?'Bloquear':'Reativar'}</button><button type="button" class="btn btn-r btn-excluir-solicitante" data-id="${esc(s.id)}" data-nome="${esc(s.nome)}" style="padding:4px 8px;font-size:.6rem">🗑️ Excluir conta</button></div></td></tr>`).join('')||'<tr><td colspan="5" class="empty">Nenhum e-mail autorizado.</td></tr>';
 }
 
 async function carregarSolicitantesChamados(){
   if(!window.SB||!SB_PROFILE||SB_PROFILE.tipo!=='admin'||SB_CARREGANDO_SOLICITANTES)return;
   SB_CARREGANDO_SOLICITANTES=true;
   try{
-    const {data,error}=await SB.from('solicitantes_chamados').select('id,user_id,nome,email,ativo,criado_em').order('nome');
+    const {data,error}=await SB.from('solicitantes_chamados').select('id,user_id,nome,email,operadora,ativo,criado_em').order('nome');
     if(error)throw error;SB_SOLICITANTES_CHAMADOS=data||[];renderSolicitantesChamados();
   }catch(err){
     console.error('Erro ao carregar solicitantes:',err);
-    const tb=el('tb-solicitantes');if(tb)tb.innerHTML=`<tr><td colspan="4" class="empty" style="color:var(--r)">Não foi possível carregar os acessos: ${esc(err?.message||'erro desconhecido')}</td></tr>`;
+    const tb=el('tb-solicitantes');if(tb)tb.innerHTML=`<tr><td colspan="5" class="empty" style="color:var(--r)">Não foi possível carregar os acessos: ${esc(err?.message||'erro desconhecido')}</td></tr>`;
   }finally{SB_CARREGANDO_SOLICITANTES=false;}
 }
 
 async function adicionarSolicitanteChamados(){
-  const nome=el('sol-n').value.trim(),email=el('sol-e').value.trim().toLowerCase(),senha=el('sol-s').value,confirmacao=el('sol-sc').value;
-  if(!nome||!email||!senha||!confirmacao){alert('Preencha nome, e-mail e senha inicial.');return;}
+  const nome=el('sol-n').value.trim(),email=el('sol-e').value.trim().toLowerCase(),operadora=el('sol-operadora').value,senha=el('sol-s').value,confirmacao=el('sol-sc').value;
+  if(!nome||!email||!operadora||!senha||!confirmacao){alert('Preencha nome, e-mail, operadora e senha inicial.');return;}
   if(!emailValido(email)){alert('Informe um e-mail válido.');return;}
   if(senha.length<6){alert('A senha deve ter pelo menos 6 caracteres.');return;}
   if(senha!==confirmacao){alert('A confirmação da senha não confere.');return;}
@@ -1226,10 +1228,10 @@ async function adicionarSolicitanteChamados(){
     const {data:authData,error:authError}=await SB_ACCOUNT_CREATOR.auth.signUp({email,password:senha,options:{data:{nome,portal:'abertura_chamados'}}});
     if(authError)throw authError;
     if(!authData?.user?.id)throw new Error('O servidor de autenticação não retornou a identificação da conta.');
-    const {error}=await SB.from('solicitantes_chamados').insert({user_id:authData.user.id,nome,email,ativo:true,criado_por:SB_PROFILE.id});
+    const {error}=await SB.from('solicitantes_chamados').insert({user_id:authData.user.id,nome,email,operadora,ativo:true,criado_por:SB_PROFILE.id});
     if(error)throw new Error('A conta foi criada, mas a autorização não pôde ser salva: '+error.message);
     await SB_ACCOUNT_CREATOR.auth.signOut().catch(()=>{});
-    ['sol-n','sol-e','sol-s','sol-sc'].forEach(id=>el(id).value='');
+    ['sol-n','sol-e','sol-operadora','sol-s','sol-sc'].forEach(id=>el(id).value='');
     await carregarSolicitantesChamados();
     alert(authData.session?'E-mail autorizado. O solicitante já pode entrar no portal.':'E-mail autorizado. O Supabase pode solicitar a confirmação do e-mail antes do primeiro acesso.');
   }catch(err){sbShowError('Não foi possível autorizar o solicitante',err);}
@@ -1237,6 +1239,12 @@ async function adicionarSolicitanteChamados(){
 }
 
 async function eventoSolicitanteChamados(evento){
+  const excluirBtn=evento.target.closest('.btn-excluir-solicitante');
+  if(excluirBtn){
+    if(!confirm(`Excluir a conta de ${excluirBtn.dataset.nome}? O operador perderá imediatamente o acesso ao portal.`))return;
+    try{await sbExigirSessaoAdmin();const {error}=await SB.from('solicitantes_chamados').delete().eq('id',excluirBtn.dataset.id);if(error)throw error;await carregarSolicitantesChamados();alert('Conta removida do portal com sucesso.');}catch(err){sbShowError('Não foi possível excluir a conta',err);}
+    return;
+  }
   const statusBtn=evento.target.closest('.btn-status-solicitante');
   if(statusBtn){
     const ativar=statusBtn.dataset.ativo!=='1';
@@ -1429,6 +1437,17 @@ function exportarChamadosEncerrados(dt1,dt2){
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),50)}));const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Chamados encerrados');XLSX.writeFile(wb,`chamados_encerrados_${dt1}_a_${dt2}.xlsx`);
 }
 
+function exportarChamadosPorOperadora(){
+  const nomes={vectra:'Vectra',um_telecom:'UM Telecom',metodo:'Método'},statusNomes={aberto:'Aberto',pendente:'Distribuído',andamento:'Em atendimento',concluida:'Concluído',recusado:'Recusado',cancelado:'Cancelado'};
+  const chamados=D.ch.filter(c=>c.operadora&&nomes[c.operadora]);if(!chamados.length){alert('Ainda não existem chamados vinculados a uma operadora.');return;}
+  const wb=XLSX.utils.book_new();
+  for(const [codigo,nome] of Object.entries(nomes)){
+    const rows=chamados.filter(c=>c.operadora===codigo).map(c=>({'Operadora':nome,'Protocolo':c.pr||'','SDM':c.sdm||'','Circuito':c.ci||'','Cliente':c.si||'','Cidade':c.cid||'','Operador':c.solicitanteNome||'','E-mail do operador':c.solicitanteEmail||'','Técnico':nt(c.te)||'','Status':statusNomes[c.st]||c.st||'','Abertura':c.cr?new Date(c.cr).toLocaleString('pt-BR'):'','Vencimento':c.vencimento?new Date(c.vencimento).toLocaleString('pt-BR'):'','Encerramento enviado ao operador':c.ex?.enviadoValidacaoEm?new Date(c.ex.enviadoValidacaoEm).toLocaleString('pt-BR'):'','Validação do operador':c.validacaoOperador?.validacao||'','Validado em':c.validacaoOperador?.validadoEm?new Date(c.validacaoOperador.validadoEm).toLocaleString('pt-BR'):'','Conclusão':c.cc?new Date(c.cc).toLocaleString('pt-BR'):'','Aprovação administrativa':c.ap?.status||'Pendente'}));
+    const dados=rows.length?rows:[{'Operadora':nome,'Status':'Nenhum chamado'}],ws=XLSX.utils.json_to_sheet(dados);ws['!cols']=Object.keys(dados[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),52)}));XLSX.utils.book_append_sheet(wb,ws,nome);
+  }
+  XLSX.writeFile(wb,`chamados_por_operadora_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
 function exportarBaseChamadosFechados(dt1,dt2){
   if(dt1&&dt2&&new Date(dt1)>new Date(dt2)){alert('A data inicial não pode ser maior que a data final.');return;}
   let chamados=D.ch.filter(c=>c.st==='concluida'&&dataEncerramentoChamado(c));
@@ -1469,7 +1488,8 @@ function rAt() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento');
   tb.innerHTML = list.map(c => {
     const t = tm(c.am, c.re);
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button><button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>${localizacaoChamadoHtml(c)}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
+    const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-pendente">Aguardando operador</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
+    return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
@@ -1905,11 +1925,13 @@ function rTat() {
   const al = el('t-al');
   if(al) al.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am, c.re);
+    const validacaoStatus=c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-pendente">Aguardando operador</span>':'');
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}">${t.t}</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
-    <div style="margin-top:8px"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">📝 Executar</button></div></div>`;
+    ${validacaoStatus?`<div style="margin-top:8px">${validacaoStatus}</div>`:''}
+    <div style="margin-top:8px"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button></div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
 
@@ -2123,6 +2145,7 @@ function camposObrigatoriosEncerramento() {
     {id:'ex-senha',label:'SENHA',re:/^SENHA[ \t]*:/i}
   ];
 }
+function camposTecnicosEncerramento(){return camposObrigatoriosEncerramento().filter(c=>['ex-causa','ex-solucao'].includes(c.id));}
 function trechoCampoEncerramento(texto,campo) {
   const linhas=String(texto||'').split(/\r?\n/);
   const inicio=linhas.findIndex(l=>campo.re.test(l));
@@ -2149,8 +2172,8 @@ function sincronizarCamposEncerramento() {
   }
   el('ex-relatorio').value=texto;
 }
-function validarCamposEncerramento() {
-  for(const campo of camposObrigatoriosEncerramento()){
+function validarCamposEncerramento(campos=camposTecnicosEncerramento()) {
+  for(const campo of campos){
     const input=el(campo.id);
     const valido=input.value.trim()&&(campo.id!=='ex-causa'||['Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso','Vistoria'].includes(input.value));
     input.setCustomValidity(valido?'':'Preencha este campo obrigatório.');
@@ -2443,6 +2466,18 @@ async function opEx(id) {
   localStorage.setItem(chaveExecucaoAtiva(),String(id));
   await restaurarRascunhoExecucao(c);
 
+  if(c.validacaoOperador){
+    el('ex-validacao').value=c.validacaoOperador.validacao||'';el('ex-senha').value=c.validacaoOperador.senha||'';sincronizarCamposEncerramento();
+    el('ex-validacao-status').innerHTML=`<b>✓ Validado pelo operador</b><br>${new Date(c.validacaoOperador.validadoEm).toLocaleString('pt-BR')}`;
+    el('ex-validacao-status').style.borderLeft='4px solid var(--g)';el('btn-cf-ex').textContent='✅ Encerrar Chamado';el('btn-cf-ex').disabled=false;
+  }else if(c.ex?.enviadoValidacaoEm){
+    el('ex-validacao').value='';el('ex-senha').value='';sincronizarCamposEncerramento();
+    el('ex-validacao-status').innerHTML='<b>Aguardando validação do operador.</b><br>O encerramento só será liberado após a senha e a validação.';
+    el('ex-validacao-status').style.borderLeft='4px solid var(--y)';el('btn-cf-ex').textContent='Aguardando operador';el('btn-cf-ex').disabled=true;
+  }else{
+    el('ex-validacao-status').textContent='Preencha os dados técnicos e envie ao operador.';el('ex-validacao-status').style.borderLeft='';el('btn-cf-ex').textContent='📨 Enviar ao operador';el('btn-cf-ex').disabled=false;
+  }
+
   if (TI) clearInterval(TI);
   TI = setInterval(() => {
     const t = tm(c.am, c.re);
@@ -2482,6 +2517,19 @@ async function cfEx() {
     relatorio: el('ex-relatorio').value,
     total: 'R$ ' + total.toFixed(2).replace('.', ',')
   };
+  if(!anterior.ex?.enviadoValidacaoEm){
+    try{
+      if(btn){btn.disabled=true;btn.textContent='Enviando ao operador...';}
+      const fotos=await sbEnviarFotos(c);c.ex.fotos=[...(anterior.ex?.fotos||[]),...fotos];
+      await sbEnviarParaValidacaoOperador(c);await limparRascunhoExecucao(c.id);lsSet('dd',D);clsEx();rTat();
+      alert('Informações de encerramento enviadas ao operador. Aguarde a senha e a validação para encerrar o chamado.');
+    }catch(err){c.ex=anterior.ex;lsSet('dd',D);sbShowError('Não foi possível enviar o encerramento ao operador',err);}
+    finally{if(btn){btn.disabled=false;btn.textContent=textoBtn||'📨 Enviar ao operador';}}
+    return;
+  }
+  if(!c.validacaoOperador){
+    c.ex=anterior.ex;alert('Aguarde o operador informar a senha e validar o encerramento.');return;
+  }
   c.st = 'concluida'; c.cc = new Date().toISOString();
   if (eraAjuste) {
     c.ap = { status: 'pendente', obs: '', data: ag(), reenviado: true };
@@ -2865,6 +2913,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const fecharDb=el('btn-fechar-db-detalhes');if(fecharDb)fecharDb.addEventListener('click',()=>el('db-card-detalhes').classList.add('hidden'));
   const expDb=el('btn-db-exp-concluidos');if(expDb)expDb.addEventListener('click',()=>exportarChamadosEncerrados(el('db-dt1').value,el('db-dt2').value));
   const expBaseFechados=el('btn-db-exp-base-fechados');if(expBaseFechados)expBaseFechados.addEventListener('click',()=>exportarBaseChamadosFechados(el('db-base-dt1').value,el('db-base-dt2').value));
+  el('btn-rl-exp-operadoras')?.addEventListener('click',exportarChamadosPorOperadora);
   const expEnc=el('btn-rl-exp-encerrados');if(expEnc)expEnc.addEventListener('click',()=>exportarChamadosEncerrados(el('rl-enc-dt1').value,el('rl-enc-dt2').value));
   el('btn-email-chamados')?.addEventListener('click',()=>enviarChamadosRealizadosEmail().catch(err=>sbShowError('Não foi possível preparar o e-mail',err)));
   document.querySelectorAll('.nf-email-remetente').forEach(campo=>campo.addEventListener('focus',preencherRemetentesEmail));
@@ -3173,7 +3222,7 @@ async function sbCarregarTodasEscolas(){
 async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
-  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     SB.from('chamados').select('*').order('criado_em',{ascending:true}),
     SB.from('execucoes').select('*'),
@@ -3182,9 +3231,10 @@ async function sbLoadAll(){
     SB.from('materiais').select('*').eq('ativo',true).order('nome'),
     SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true}),
     sbCarregarTodasEscolas(),
-    SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true})
+    SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true}),
+    SB.from('validacoes_encerramento').select('*')
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR]) if(r.error) throw r.error;
   SB_ESCOLAS=escR.data||[];
   SB_FOTOS_MAP=new Map();
   (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
@@ -3196,24 +3246,25 @@ async function sbLoadAll(){
   });
 
   const exMap=new Map((eR.data||[]).map(x=>[x.chamado_id,x]));
+  const validacaoMap=new Map((vR.data||[]).map(x=>[x.chamado_id,x]));
   const apMap=new Map((aR.data||[]).map(x=>[x.chamado_id,x]));
   const trMap=new Map();
   (tR.data||[]).forEach(x=>{ if(!trMap.has(x.chamado_id)) trMap.set(x.chamado_id,[]); trMap.get(x.chamado_id).push(x); });
   D.ch=(cR.data||[]).map(c=>{
-    const ex=exMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
+    const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
       id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', si:c.site_nome||'', ci:c.circuito||'',
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
-      solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', vencimento:c.vencimento_em||'',
+      solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', operadora:c.operadora||'', vencimento:c.vencimento_em||'',
       dt:c.liberacao_area?{tipo:'liberacao-area',admin:sbNameById(c.liberacao_area_admin),d:c.liberacao_area_em,area:c.area,regiaoOperacional:c.regiao_operacional}:null,
       cr:c.criado_em, ae:c.aceito_em, am:c.iniciado_em, cc:c.concluido_em,
       tr:trRows.map(x=>({de:sbUserById(x.de_tecnico_id),para:sbUserById(x.para_tecnico_id),m:x.motivo||'',d:x.criado_em,admin:sbNameById(x.realizado_por)||'Administrador',adminId:x.realizado_por,_dbid:x.id})),
-      ex:null, ap:null
+      ex:null, ap:null,validacaoOperador:validacao?{validacao:validacao.validacao,senha:validacao.senha,validadoEm:validacao.validado_em,solicitanteId:validacao.solicitante_id}:null
     };
     legacy._trLoadedCount=legacy.tr.length;
-    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',total:'R$ '+Number(ex.valor_total||0).toFixed(2).replace('.',','),fotos:SB_FOTOS_MAP.get(c.id)||[]};
+    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',total:'R$ '+Number(ex.valor_total||0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
     return legacy;
   });
@@ -3333,33 +3384,29 @@ async function sbPersistirAprovacoes(chamados,status,observacao){
   return atualizadoEm;
 }
 
+function sbDadosExecucao(c,extras={}){
+  return {
+    chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex?.co||null,cidade_destino:c.ex?.cd||null,cidade_retorno:c.ex?.cr||null,
+    origem_escola_id:c.ex?.esco||null,destino_escola_id:c.ex?.escd||null,retorno_escola_id:c.ex?.escr||null,
+    km_total:sbNum(c.ex?.km),valor_km:sbNum(c.ex?.vkm),atividade:c.ex?.atv||null,valor_atividade:sbNum(c.ex?.vatv),valor_avulso:sbNum(c.ex?.avulso),
+    utp_metros:sbNum(c.ex?.utp),cci_metros:sbNum(c.ex?.cci),canaleta_metros:sbNum(c.ex?.can),valor_materiais:sbNum(c.ex?.tmat),observacao:c.ex?.obs||null,
+    relatorio_encerramento:c.ex?.relatorio||null,valor_total:sbNum(c.ex?.total),atualizado_em:new Date().toISOString(),...extras
+  };
+}
+
+async function sbEnviarParaValidacaoOperador(c){
+  if(!SB_PROFILE||SB_PROFILE.tipo!=='tecnico'||c.te!==SB_PROFILE.usuario)throw new Error('Sessão do técnico inválida.');
+  const enviadoEm=new Date().toISOString();
+  const {data,error}=await SB.from('execucoes').upsert(sbDadosExecucao(c,{enviado_validacao_em:enviadoEm}),{onConflict:'chamado_id'}).select('chamado_id,enviado_validacao_em').single();
+  if(error)throw error;if(!data?.enviado_validacao_em)throw new Error('O servidor não confirmou o envio ao operador.');
+  c.ex.enviadoValidacaoEm=data.enviado_validacao_em;sbSetConnectionBadge('Encerramento enviado ao operador',true);return data;
+}
+
 async function sbPersistirFinalizacao(c){
   if(!SB_PROFILE || SB_PROFILE.tipo!=='tecnico') throw new Error('Sessão do técnico inválida.');
   if(!sbUUID(c.id)) throw new Error('Chamado ainda não possui identificação válida no servidor.');
   if(c.te!==SB_PROFILE.usuario) throw new Error('Este chamado não está atribuído ao técnico conectado.');
-  const execucao={
-    chamado_id:c.id,
-    tecnico_id:SB_PROFILE.id,
-    cidade_origem:c.ex?.co||null,
-    cidade_destino:c.ex?.cd||null,
-    cidade_retorno:c.ex?.cr||null,
-    origem_escola_id:c.ex?.esco||null,
-    destino_escola_id:c.ex?.escd||null,
-    retorno_escola_id:c.ex?.escr||null,
-    km_total:sbNum(c.ex?.km),
-    valor_km:sbNum(c.ex?.vkm),
-    atividade:c.ex?.atv||null,
-    valor_atividade:sbNum(c.ex?.vatv),
-    valor_avulso:sbNum(c.ex?.avulso),
-    utp_metros:sbNum(c.ex?.utp),
-    cci_metros:sbNum(c.ex?.cci),
-    canaleta_metros:sbNum(c.ex?.can),
-    valor_materiais:sbNum(c.ex?.tmat),
-    observacao:c.ex?.obs||null,
-    relatorio_encerramento:c.ex?.relatorio||null,
-    valor_total:sbNum(c.ex?.total),
-    atualizado_em:new Date().toISOString()
-  };
+  const execucao=sbDadosExecucao(c);
   const {error:execErr}=await SB.from('execucoes').upsert(execucao,{onConflict:'chamado_id'});
   if(execErr) throw execErr;
   const {data,error}=await SB.from('chamados').update({
@@ -3760,6 +3807,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitantes_chamados'},()=>carregarSolicitantesChamados())
     .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'validacoes_encerramento'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'aprovacoes'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbRecarregarDados)
@@ -3818,7 +3866,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=1.6.1"></script>
+<script src="/release-info.js?v=1.7.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

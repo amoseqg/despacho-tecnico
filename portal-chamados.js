@@ -23,7 +23,7 @@
   }
   function mostrarPortal(){
     $('tela-login').classList.add('oculto');$('tela-portal').classList.remove('oculto');$('btn-sair').classList.remove('oculto');
-    $('nome-solicitante').textContent=solicitante.nome;$('email-solicitante').textContent=solicitante.email;$('aberto-por').value=solicitante.nome;
+    const operadoras={vectra:'Vectra',um_telecom:'UM Telecom',metodo:'Método'};$('nome-solicitante').textContent=solicitante.nome;$('email-solicitante').textContent=solicitante.email+' • '+(operadoras[solicitante.operadora]||'Operadora não definida');$('aberto-por').value=solicitante.nome;
     atualizarDataAbertura();definirVencimentoInicial();
   }
   function atualizarDataAbertura(){$('data-abertura').value=new Date().toLocaleString('pt-BR');}
@@ -32,7 +32,7 @@
   async function validarAcesso(){
     const {data:{user},error:userError}=await sb.auth.getUser();
     if(userError||!user){mostrarLogin();return false;}
-    const {data,error}=await sb.from('solicitantes_chamados').select('id,user_id,nome,email,ativo').eq('user_id',user.id).maybeSingle();
+    const {data,error}=await sb.from('solicitantes_chamados').select('id,user_id,nome,email,operadora,ativo').eq('user_id',user.id).maybeSingle();
     if(error)throw error;
     if(!data?.ativo){await sb.auth.signOut();mostrarLogin('Este e-mail não está autorizado para abrir chamados. Procure um administrador do NexoField.');return false;}
     solicitante=data;mostrarPortal();await Promise.all([carregarSites(),carregarChamados()]);return true;
@@ -114,14 +114,23 @@
   }
 
   async function carregarChamados(){
-    const {data,error}=await sb.from('chamados').select('id,protocolo,sdm,circuito,site_nome,status,criado_em,vencimento_em').eq('solicitante_id',solicitante.user_id).order('criado_em',{ascending:false}).limit(50);
+    const {data,error}=await sb.from('chamados').select('id,protocolo,sdm,circuito,site_nome,operadora,status,criado_em,vencimento_em').eq('solicitante_id',solicitante.user_id).order('criado_em',{ascending:false}).limit(50);
     if(error)throw error;const box=$('lista-chamados');if(!data?.length){box.innerHTML='<div class="vazio">Você ainda não abriu chamados.</div>';return;}
+    const ids=data.map(c=>c.id),[{data:execucoes,error:execErro},{data:validacoes,error:valErro}]=await Promise.all([sb.from('execucoes').select('chamado_id,relatorio_encerramento,enviado_validacao_em').in('chamado_id',ids),sb.from('validacoes_encerramento').select('chamado_id,validacao,senha,validado_em').in('chamado_id',ids)]);if(execErro)throw execErro;if(valErro)throw valErro;
+    const exMap=new Map((execucoes||[]).map(e=>[e.chamado_id,e])),valMap=new Map((validacoes||[]).map(v=>[v.chamado_id,v]));
     const nomes={aberto:'Aberto',pendente:'Distribuído',andamento:'Em atendimento',recusado:'Recusado',concluida:'Concluído',cancelado:'Cancelado'};
-    box.innerHTML=data.map(c=>`<article class="item ${escapar(c.status)}"><div class="item-topo"><strong>${escapar(c.protocolo)}</strong><span class="badge">${escapar(nomes[c.status]||c.status)}</span></div><p><b>SDM:</b> ${escapar(c.sdm||'—')}<br><b>Circuito:</b> ${escapar(c.circuito)}<br><b>Cliente:</b> ${escapar(c.site_nome||'—')}<br><b>Abertura:</b> ${escapar(dataLocal(c.criado_em))}<br><b>Vencimento:</b> ${escapar(dataLocal(c.vencimento_em))}</p></article>`).join('');
+    box.innerHTML=data.map(c=>{const ex=exMap.get(c.id),val=valMap.get(c.id),aguarda=!!ex?.enviado_validacao_em&&!val&&c.status==='andamento';return `<article class="item ${escapar(c.status)}"><div class="item-topo"><strong>${escapar(c.protocolo)}</strong><span class="badge">${escapar(nomes[c.status]||c.status)}</span></div><p><b>SDM:</b> ${escapar(c.sdm||'—')}<br><b>Circuito:</b> ${escapar(c.circuito)}<br><b>Cliente:</b> ${escapar(c.site_nome||'—')}<br><b>Abertura:</b> ${escapar(dataLocal(c.criado_em))}<br><b>Vencimento:</b> ${escapar(dataLocal(c.vencimento_em))}</p>${ex?.enviado_validacao_em?`<div class="encerramento-operador"><div class="item-topo"><strong>Encerramento recebido do técnico</strong><span class="badge ${val?'validado':'aguardando'}">${val?'Validado':'Aguardando validação'}</span></div><pre>${escapar(ex.relatorio_encerramento||'Sem informações de encerramento.')}</pre>${aguarda?`<label>Validação<input class="validacao-operador" data-id="${c.id}" maxlength="300" placeholder="Nome ou confirmação da validação"></label><label>Senha<input class="senha-operador" data-id="${c.id}" maxlength="160" autocomplete="off" placeholder="Informe a senha de encerramento"></label><button type="button" class="botao botao-primario btn-validar-encerramento" data-id="${c.id}">Validar encerramento</button>`:`${val?`<p class="validacao-ok"><b>✓ Validado em:</b> ${escapar(dataLocal(val.validado_em))}<br><b>Validação:</b> ${escapar(val.validacao)}</p>`:''}`}</div>`:''}</article>`;}).join('');
+  }
+
+  async function validarEncerramentoOperador(chamadoId,botao){
+    const validacao=texto(document.querySelector(`.validacao-operador[data-id="${chamadoId}"]`)?.value),senha=texto(document.querySelector(`.senha-operador[data-id="${chamadoId}"]`)?.value);if(!validacao||!senha){status($('chamado-status'),'Informe a validação e a senha antes de confirmar.');return;}
+    bloquear(botao,true,'Validando...');try{const agora=new Date().toISOString();const {error}=await sb.from('validacoes_encerramento').upsert({chamado_id:chamadoId,solicitante_id:solicitante.user_id,validacao,senha,validado_em:agora,atualizado_em:agora},{onConflict:'chamado_id'});if(error)throw error;status($('chamado-status'),'Encerramento validado. O técnico já pode concluir o chamado.',true);await carregarChamados();}catch(e){status($('chamado-status'),'Não foi possível validar: '+e.message);}finally{bloquear(botao,false,'Validar encerramento');}
   }
 
   $('form-login').addEventListener('submit',entrar);$('form-nova-senha').addEventListener('submit',salvarNovaSenha);$('btn-recuperar').addEventListener('click',recuperar);$('btn-sair').addEventListener('click',sair);$('form-chamado').addEventListener('submit',abrirChamado);$('btn-atualizar').addEventListener('click',()=>carregarChamados().catch(e=>status($('chamado-status'),e.message)));$('btn-fechar-confirmacao').addEventListener('click',()=>$('confirmacao').close());$('btn-novo-circuito').addEventListener('click',()=>definirModoNovoCircuito(true));$('btn-cancelar-circuito').addEventListener('click',()=>definirModoNovoCircuito(false));$('btn-salvar-circuito').addEventListener('click',salvarNovoCircuito);
   $('circuito').addEventListener('input',()=>{clearTimeout(temporizadorBusca);temporizadorBusca=setTimeout(buscarCircuito,160);});$('circuito').addEventListener('change',buscarCircuito);
+  $('lista-chamados').addEventListener('click',e=>{const botao=e.target.closest('.btn-validar-encerramento');if(botao)validarEncerramentoOperador(botao.dataset.id,botao);});
+  sb.channel('portal-acompanhamento').on('postgres_changes',{event:'*',schema:'public',table:'chamados'},()=>solicitante&&carregarChamados()).on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},()=>solicitante&&carregarChamados()).on('postgres_changes',{event:'*',schema:'public',table:'validacoes_encerramento'},()=>solicitante&&carregarChamados()).subscribe();
   sb.auth.onAuthStateChange(evento=>{if(evento==='PASSWORD_RECOVERY'){$('tela-login').classList.remove('oculto');$('tela-portal').classList.add('oculto');$('form-login').classList.add('oculto');$('form-nova-senha').classList.remove('oculto');}});
   validarAcesso().catch(e=>mostrarLogin('Não foi possível carregar o portal: '+e.message));
 })();

@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'1.7.0',date:'2026-09-09',title:'Validação de encerramento pelo operador',
+  changes:['O técnico envia a máscara de encerramento ao operador antes de concluir o chamado.','O operador informa validação e senha no acompanhamento; técnico e administrador recebem a atualização automaticamente.','O técnico encerra somente após a validação, e o administrador mantém a aprovação final.','Cadastro de operador identifica Vectra, UM Telecom ou Método; chamados e relatórios ficam separados por operadora.']
+ },{
   version:'1.6.1',date:'2026-09-09',title:'Cadastro de circuitos no portal',
   changes:['Solicitantes autorizados podem cadastrar um circuito novo com cliente, cidade, endereço, contato e horário de atendimento.','Protocolos do portal passam a seguir a sequência numérica a partir de 1000.']
  },{
