@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.0.1',date:'2026-09-10',title:'Confirmação segura do despacho técnico',
+  changes:['Despacho e redirecionamento agora são gravados diretamente no Supabase antes da mensagem de sucesso.','O servidor confirma o status Distribuído e o identificador do técnico selecionado.','A área técnica é recarregada automaticamente e funciona para todos os técnicos ativos.']
+ },{
   version:'2.0.0',date:'2026-09-09',title:'Pendências operacionais e SLA por região',
   changes:['SLA automático de 6 horas para Capital e 8 horas para Interior na abertura do chamado.','Operador pode pendenciar, aprazar e programar a saída usando somente as situações autorizadas.','Técnico pode solicitar pendência; operador e administrador visualizam, mas somente o operador autoriza ou rejeita.','Cronômetro do SLA fica pausado durante a pendência autorizada e retoma automaticamente na data programada.']
  },{

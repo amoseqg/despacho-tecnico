@@ -1786,11 +1786,13 @@ async function excluirChamado(id) {
   return alterarArquivoChamado(id);
 }
 
-function cfDp() {
+async function cfDp() {
   const tu = el('d-te').value;
   if (!tu) { alert('Selecione um técnico'); return; }
   const c = D.ch.find(x => x.id === CID);
   if(!c) return;
+  const tecnico=D.tc.find(t=>t.u===tu);
+  if(!tecnico?._id){alert('O cadastro do técnico selecionado não possui vínculo válido com o servidor. Atualize a página e tente novamente.');return;}
   const hoje = new Date().toISOString().split('T')[0];
   const ini = D.ch.filter(ch => ch.te === tu && ch.st === 'andamento' && ch.am && ch.am.startsWith(hoje)).length;
   let dt = null;
@@ -1804,13 +1806,35 @@ function cfDp() {
     }
     dt = { q, m, d: ag() };
   }
-  if (DPMODE === 'redirecionar') c.tr.push({ de: c.te, para: tu, m: 'Redirecionado pelo administrador '+S.n, admin:S.n, adminId:SB_PROFILE?.id||null, d: ag() });
-  c.st = 'pendente'; c.te = tu; c.dt = dt; c.ae = null; c.am = null; c.mr = '';
-  sv();
-  el('m-dp').classList.remove('a');
-  rCh();
-  rAt(); rDb();
-  alert(DPMODE === 'redirecionar' ? 'Chamado redirecionado com sucesso!' : 'Chamado despachado com sucesso!');
+  const botao=el('btn-cf-dp'),textoBotao=botao?.textContent,tecnicoAnterior=c.te,modo=DPMODE;
+  try{
+    if(botao){botao.disabled=true;botao.textContent='Confirmando no servidor...';}
+    const admin=await sbExigirSessaoAdmin();
+    const agora=new Date().toISOString();
+    const {data,error}=await SB.from('chamados').update({
+      tecnico_id:tecnico._id,status:'pendente',motivo_recusa:null,
+      aceito_em:null,iniciado_em:null,atualizado_em:agora,
+      liberacao_area:!!dt,liberacao_area_admin:dt?admin.id:null,liberacao_area_em:dt?agora:null
+    }).eq('id',c.id).select('id,status,tecnico_id,atualizado_em').single();
+    if(error)throw error;
+    if(!data?.id||data.status!=='pendente'||data.tecnico_id!==tecnico._id)throw new Error('O servidor não confirmou a atribuição ao técnico selecionado.');
+    if(modo==='redirecionar'){
+      const anteriorId=sbIdByUser(tecnicoAnterior);
+      const {error:historicoErro}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:anteriorId,para_tecnico_id:tecnico._id,motivo:'Redirecionado pelo administrador '+admin.nome,realizado_por:admin.id,criado_em:agora});
+      if(historicoErro)console.warn('Chamado redirecionado; histórico adicional não gravado:',historicoErro);
+    }
+    el('m-dp').classList.remove('a');
+    await sbRecarregarDados();
+    const confirmado=D.ch.find(x=>x.id===c.id);
+    if(!confirmado||confirmado.st!=='pendente'||confirmado.te!==tu)throw new Error('O despacho foi gravado, mas não voltou corretamente na conferência da tela. Atualize a página.');
+    sbSetConnectionBadge('Despacho confirmado no Supabase',true);
+    alert(modo==='redirecionar'?`Chamado redirecionado para ${tecnico.n} e confirmado no servidor!`:`Chamado despachado para ${tecnico.n} e confirmado no servidor!`);
+  }catch(err){
+    sbShowError(modo==='redirecionar'?'Não foi possível redirecionar o chamado':'Não foi possível despachar o chamado',err);
+    await sbRecarregarDados();
+  }finally{
+    if(botao){botao.disabled=false;botao.textContent=textoBotao||(modo==='redirecionar'?'Confirmar redirecionamento':'Despachar');}
+  }
 }
 
 async function encerrarChamadoAdmin(id){
@@ -3878,8 +3902,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.0.0"></script>
-<script src="/pendencias.js?v=2.0.0"></script>
+<script src="/release-info.js?v=2.0.1"></script>
+<script src="/pendencias.js?v=2.0.1"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>
