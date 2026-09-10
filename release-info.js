@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.0.2',date:'2026-09-10',title:'Decisão de pendência no acompanhamento',
+  changes:['Operador visualiza a situação e a mensagem recebida do técnico no acompanhamento do chamado.','Opções Pendenciar chamado e Não pendenciar chamado aparecem juntas para a decisão do operador.','O não pendenciamento exige motivo, que fica visível ao técnico e ao administrador.']
+ },{
   version:'2.0.1',date:'2026-09-10',title:'Confirmação segura do despacho técnico',
   changes:['Despacho e redirecionamento agora são gravados diretamente no Supabase antes da mensagem de sucesso.','O servidor confirma o status Distribuído e o identificador do técnico selecionado.','A área técnica é recarregada automaticamente e funciona para todos os técnicos ativos.']
  },{
