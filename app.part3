@@ -3905,6 +3905,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/release-info.js?v=2.0.3"></script>
 <script src="/pendencias.js?v=2.0.3"></script>
 <script src="/appearance.js?v=1"></script>
-<script src="/admin-alerts.js?v=1"></script>
+<script src="/admin-alerts.js?v=1"></script>\n<script src="/health-monitor.js?v=1.0.0"></script>
 </body>
 </html>
