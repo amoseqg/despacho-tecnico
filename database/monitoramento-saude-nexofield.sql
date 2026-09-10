@@ -1,0 +1,3 @@
+-- Aplicada no Supabase em 2026-09-10 como migration monitoramento_saude_nexofield.
+-- Estruturas: public.app_error_events, public.health_scan_runs e
+-- public.run_nexofield_health_scan(text). Mantido no repositório para auditoria.
