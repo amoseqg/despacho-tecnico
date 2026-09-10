@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.0.3',date:'2026-09-10',title:'Não pendenciamento sempre disponível',
+  changes:['Os botões Pendenciar chamado e Não pendenciar chamado aparecem sempre lado a lado no acompanhamento do operador.','O motivo do não pendenciamento é obrigatório e fica registrado no banco.','Administrador e técnico visualizam a decisão e a justificativa do operador.']
+ },{
   version:'2.0.2',date:'2026-09-10',title:'Decisão de pendência no acompanhamento',
   changes:['Operador visualiza a situação e a mensagem recebida do técnico no acompanhamento do chamado.','Opções Pendenciar chamado e Não pendenciar chamado aparecem juntas para a decisão do operador.','O não pendenciamento exige motivo, que fica visível ao técnico e ao administrador.']
  },{
