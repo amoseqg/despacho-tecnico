@@ -65,9 +65,9 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='1\.5\.0-5'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.0\.1-1'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
-for(const parte of nomes)assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
+for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 
 // Executa funções reais da aplicação com respostas controladas do servidor.
 function funcao(nome){
