@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.0.0',date:'2026-09-09',title:'Pendências operacionais e SLA por região',
+  changes:['SLA automático de 6 horas para Capital e 8 horas para Interior na abertura do chamado.','Operador pode pendenciar, aprazar e programar a saída usando somente as situações autorizadas.','Técnico pode solicitar pendência; operador e administrador visualizam, mas somente o operador autoriza ou rejeita.','Cronômetro do SLA fica pausado durante a pendência autorizada e retoma automaticamente na data programada.']
+ },{
   version:'1.9.0',date:'2026-09-09',title:'Autorização e auditoria pelo operador',
   changes:['Operador decide entre Validado e Não validado; senha é exigida somente para autorizar o encerramento.','Não validação exige motivo e aparece automaticamente para o técnico corrigir e reenviar.','Exclusão no acompanhamento cancela o chamado sem apagar o histórico e registra nome, e-mail e data do responsável.','Relatório dos chamados validados e não validados disponível para exportação.']
  },{

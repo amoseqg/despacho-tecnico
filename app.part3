@@ -407,9 +407,10 @@ function atualizarCamposRegiao() {
   atualizarTecnicosChamado();
 }
 
-function tm(iso, reg) {
+function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='') {
   if (!iso) return { t: '00:00:00', c: 't-g', s: 0 };
-  const d = Math.floor((Date.now() - new Date(iso)) / 1000);
+  const pausaAtiva=pendenciaDesde?Math.max(0,Math.floor((Date.now()-new Date(pendenciaDesde))/1000)):0;
+  const d = Math.max(0,Math.floor((Date.now() - new Date(iso)) / 1000)-Number(pausadoSegundos||0)-pausaAtiva);
   const s = SLA[reg] || SLA.capital;
   let c = 't-g';
   if (d > s.r) c = 't-c';
@@ -597,7 +598,7 @@ function enterTec() {
 function admTab(btn, a) {
   document.querySelectorAll('#nv button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','tc','ch','at','rl','ml','ad','vi','ft','aq','lab'].forEach(x => {
+  ['db','tc','ch','at','rl','ml','ad','vi','ft','aq','pn','lab'].forEach(x => {
     const e = el('v-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -611,6 +612,7 @@ function admTab(btn, a) {
   if (a === 'vi') renderVistorias();
   if (a === 'ft') renderFotosAdmin();
   if (a === 'aq') renderArquivoChamados();
+  if (a === 'pn' && window.NexoFieldPendencias) window.NexoFieldPendencias.renderAdmin();
   if (a === 'lab' && window.NexoFieldLab) window.NexoFieldLab.render();
 }
 
@@ -1372,8 +1374,10 @@ function rDb() {
     if(!c.am || !['andamento','concluida'].includes(c.st)) return null;
     const inicio = new Date(c.am).getTime();
     const fim = c.st === 'concluida' && c.cc ? new Date(c.cc).getTime() : agora;
+    const pausaAtiva=c.pendenciaAtiva&&c.pendenciaDesde?Math.max(0,fim-new Date(c.pendenciaDesde).getTime()):0;
+    const tempoPausado=Number(c.prazoPausadoSegundos||0)*1000+pausaAtiva;
     if(!Number.isFinite(inicio) || !Number.isFinite(fim) || fim < inicio || fim < inicioPainel) return null;
-    return { chamado:c, duracao:fim-inicio, perda:fim-inicio>limitePrazo };
+    return { chamado:c, duracao:Math.max(0,fim-inicio-tempoPausado), perda:Math.max(0,fim-inicio-tempoPausado)>limitePrazo };
   }).filter(Boolean);
   const dentroPrazo = avaliados.filter(x => x.chamado.st === 'concluida' && !x.perda);
   const perdas = avaliados.filter(x => x.perda);
@@ -1401,7 +1405,7 @@ function chamadosDoCardDashboard(tipo){
   if(['pendente','andamento','concluida','recusado'].includes(tipo))return D.ch.filter(c=>c.st===tipo);
   const inicioPainel=inicioIndicadoresPainel();
   if(tipo==='dentro-prazo')return D.ch.filter(c=>c.st==='concluida'&&c.am&&c.cc&&new Date(c.cc).getTime()>=inicioPainel&&(new Date(c.cc)-new Date(c.am))<=LIMITE_PRAZO_MS);
-  if(tipo==='perda-prazo')return D.ch.filter(c=>['andamento','concluida'].includes(c.st)&&c.am&&((c.st==='concluida'&&c.cc)?new Date(c.cc).getTime():agora)>=inicioPainel&&(((c.st==='concluida'&&c.cc)?new Date(c.cc).getTime():agora)-new Date(c.am).getTime())>LIMITE_PRAZO_MS);
+  if(tipo==='perda-prazo')return D.ch.filter(c=>{if(!['andamento','concluida'].includes(c.st)||!c.am)return false;const fim=(c.st==='concluida'&&c.cc)?new Date(c.cc).getTime():agora;if(fim<inicioPainel)return false;const pausa=Number(c.prazoPausadoSegundos||0)*1000+(c.pendenciaAtiva&&c.pendenciaDesde?Math.max(0,fim-new Date(c.pendenciaDesde).getTime()):0);return fim-new Date(c.am).getTime()-pausa>LIMITE_PRAZO_MS;});
   if(tipo==='reincidencia')return dadosIndicadoresTecnicos().reincidencias.map(x=>x.chamado);
   return [];
 }
@@ -1487,7 +1491,7 @@ function rAt() {
   if(!tb) return;
   const list = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento');
   tb.innerHTML = list.map(c => {
-    const t = tm(c.am, c.re);
+    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-pendente">Aguardando operador</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
     return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
@@ -1899,7 +1903,7 @@ function rTdb() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'andamento');
   const tmEl = el('t-tm');
   if(tmEl) tmEl.innerHTML = list.length ? list.map(c => {
-    const t = tm(c.am, c.re);
+    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}">${t.t}</span></div><div class="os-r"><b>Site:</b> ${c.si}</div></div>`;
   }).join('') : '<div class="empty">Nenhum chamado em atendimento</div>';
 }
@@ -1924,14 +1928,15 @@ function rTat() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'andamento');
   const al = el('t-al');
   if(al) al.innerHTML = list.length ? list.map(c => {
-    const t = tm(c.am, c.re);
-    const validacaoStatus=c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-pendente">Aguardando operador</span>':'');
+    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+    const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-pendente">Aguardando operador</span>':''));
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}">${t.t}</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
     ${validacaoStatus?`<div style="margin-top:8px">${validacaoStatus}</div>`:''}
-    <div style="margin-top:8px"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button></div></div>`;
+    ${window.NexoFieldPendencias?.resumoTecnico(c.id)||''}
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${c.solicitanteId&&!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
 
@@ -2484,7 +2489,7 @@ async function opEx(id) {
 
   if (TI) clearInterval(TI);
   TI = setInterval(() => {
-    const t = tm(c.am, c.re);
+    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const elm = el('ex-tm');
     if (elm) { elm.textContent = t.t; elm.className = 'timer ' + t.c; }
   }, 1000);
@@ -3263,7 +3268,7 @@ async function sbLoadAll(){
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
-      solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', operadora:c.operadora||'', vencimento:c.vencimento_em||'',
+      solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', operadora:c.operadora||'', vencimento:c.vencimento_em||'',pendenciaAtiva:!!c.pendencia_ativa,pendenciaDesde:c.pendencia_desde||'',prazoPausadoSegundos:Number(c.prazo_pausado_segundos||0),
       dt:c.liberacao_area?{tipo:'liberacao-area',admin:sbNameById(c.liberacao_area_admin),d:c.liberacao_area_em,area:c.area,regiaoOperacional:c.regiao_operacional}:null,
       cr:c.criado_em, ae:c.aceito_em, am:c.iniciado_em, cc:c.concluido_em,
       tr:trRows.map(x=>({de:sbUserById(x.de_tecnico_id),para:sbUserById(x.para_tecnico_id),m:x.motivo||'',d:x.criado_em,admin:sbNameById(x.realizado_por)||'Administrador',adminId:x.realizado_por,_dbid:x.id})),
@@ -3873,7 +3878,8 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=1.9.0"></script>
+<script src="/release-info.js?v=2.0.0"></script>
+<script src="/pendencias.js?v=2.0.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>
 </body>

@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b172a">
   <title>Abertura de Chamados | NexoField</title>
   <link rel="preload" as="image" type="image/webp" href="/nexofield-teleoperadores-futurista.webp">
-  <link rel="stylesheet" href="/portal-chamados.css?v=1.9.0">
+  <link rel="stylesheet" href="/portal-chamados.css?v=2.0.0">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
@@ -88,7 +88,7 @@
 
           <div class="grade dois">
             <label>Contato<input id="contato" maxlength="200" required placeholder="Nome e telefone para contato"></label>
-            <label>Vencimento<input id="vencimento" type="datetime-local" required></label>
+            <label>Vencimento pelo SLA<input id="vencimento" type="datetime-local" required readonly></label>
             <label>Data de abertura<input id="data-abertura" readonly></label>
             <label>Aberto por<input id="aberto-por" readonly></label>
           </div>
@@ -115,6 +115,6 @@
     <button id="btn-fechar-confirmacao" class="botao botao-primario" type="button">Concluir</button>
   </dialog>
 
-  <script src="/portal-chamados.js?v=1.9.0"></script>
+  <script src="/portal-chamados.js?v=2.0.0"></script>
 </body>
 </html>
