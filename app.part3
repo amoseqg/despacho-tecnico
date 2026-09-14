@@ -725,12 +725,25 @@ function rMlEstoque(){
  }
  const b=el('ml-estoque-lista');
  if(!b)return;
- b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Situação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td><b>${m.estoque||0}</b></td><td><span class="badge ${(m.estoque||0)>0?'b-concluida':'b-recusado'}">${(m.estoque||0)>0?'Disponível':'Sem estoque'}</span></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
+ b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Situação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr onclick="selecionarMaterialEstoquePorId(\'ml-estoque-material\',\'busca-material-estoque\',\'${escM(m.id)}\')" style="cursor:pointer" title="Clique para selecionar este material"><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td><b>${m.estoque||0}</b></td><td><span class="badge ${(m.estoque||0)>0?'b-concluida':'b-recusado'}">${(m.estoque||0)>0?'Disponível':'Sem estoque'}</span></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
 }
 
 function rMateriaisCadastro(){const b=el('mat-cadastro-lista');if(!b)return;b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th></th></tr></thead><tbody>'+D.mat.map(m=>`<tr><td>${escM(m.nome)}</td><td>${m.unidade}</td><td>${m.estoque||0}</td><td><button class="btn btn-r btn-rm-mat" data-id="${m.id}">Excluir</button></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Cadastre os materiais disponíveis.</div>'}
 function addMaterial(){const nome=el('mat-nome').value.trim(),un=el('mat-un').value;if(!nome){alert('Informe o material');return;}if(D.mat.some(m=>m.nome.toLowerCase()===nome.toLowerCase())){alert('Material já cadastrado');return;}D.mat.push({id:'MAT-'+Date.now(),nome,unidade:un,estoque:0,c:ag()});sv();el('mat-nome').value='';rMl();alert('Material cadastrado com sucesso!');}
-function ajusteEstoque(){const id=el('ml-estoque-material').value,q=Number(el('ml-estoque-qtd').value);const m=materialById(id);if(!m||q<0){alert('Selecione o material e informe uma quantidade válida');return;}m.estoque=q;sv();rMl();alert('Estoque atualizado.');}
+function normalizarBuscaMaterial(valor){return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();}
+function resolverMaterialEstoque(selectId,inputId){
+ const s=el(selectId),busca=el(inputId);
+ const ids=[s?.value,s?.dataset.selectedValue,busca?.dataset.materialId].filter(Boolean).map(String);
+ let m=D.mat.find(item=>ids.includes(String(item.id)));
+ if(!m&&busca){
+   const termo=normalizarBuscaMaterial(busca.value);
+   const encontrados=termo?D.mat.filter(item=>normalizarBuscaMaterial(item.nome).includes(termo)):[];
+   m=encontrados.find(item=>normalizarBuscaMaterial(item.nome)===termo)||(encontrados.length===1?encontrados[0]:null);
+ }
+ if(m&&typeof selecionarMaterialEstoquePorId==='function')selecionarMaterialEstoquePorId(selectId,inputId,m.id);
+ return m||null;
+}
+function ajusteEstoque(){const m=resolverMaterialEstoque('ml-estoque-material','busca-material-estoque'),q=Number(el('ml-estoque-qtd').value);if(!m||!Number.isFinite(q)||q<0){alert('Selecione o material na busca ou clique na linha da tabela e informe uma quantidade válida');return;}m.estoque=q;sv();rMl();alert('Estoque atualizado.');}
 async function direcionarMaterial(id){
   const r=D.mr.find(x=>x.id===id);
   if(!r)return;
@@ -831,7 +844,7 @@ function rLogEstoque(){
  const selecionado=s.value||'',q=el('lg-estoque-qtd'),qtdAtual=q?q.value:'';
  s.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${m.id}">${escM(m.nome)} (${escM(m.unidade)})</option>`).join('');
  if(selecionado&&D.mat.some(m=>String(m.id)===String(selecionado))){s.value=selecionado;if(q&&qtdAtual!=='')q.value=qtdAtual;}
- b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Situação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td><b>${m.estoque||0}</b></td><td><span class="badge ${(m.estoque||0)>0?'b-concluida':'b-recusado'}">${(m.estoque||0)>0?'Disponível':'Sem estoque'}</span></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
+ b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Situação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr onclick="selecionarMaterialEstoquePorId(\'lg-estoque-material\',\'busca-material-logistica\',\'${escM(m.id)}\')" style="cursor:pointer" title="Clique para selecionar este material"><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td><b>${m.estoque||0}</b></td><td><span class="badge ${(m.estoque||0)>0?'b-concluida':'b-recusado'}">${(m.estoque||0)>0?'Disponível':'Sem estoque'}</span></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
  rLogCadastroMateriais();
 }
 function rLogCadastroMateriais(){
@@ -868,8 +881,8 @@ async function removerMaterial(id){
  }catch(e){sbShowError('Não foi possível remover o material',e);await sbRecarregarDados();}
 }
 async function ajusteEstoqueLogistica(){
- const id=el('lg-estoque-material')?.value,q=Number(el('lg-estoque-qtd')?.value),m=materialById(id),btn=el('btn-lg-ajuste');
- if(!m||!Number.isFinite(q)||q<0){alert('Selecione o material e informe uma quantidade válida');return;}
+ const m=resolverMaterialEstoque('lg-estoque-material','busca-material-logistica'),q=Number(el('lg-estoque-qtd')?.value),btn=el('btn-lg-ajuste');
+ if(!m||!Number.isFinite(q)||q<0){alert('Selecione o material na busca ou clique na linha da tabela e informe uma quantidade válida');return;}
  const texto=btn?.innerHTML;
  try{
    if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
