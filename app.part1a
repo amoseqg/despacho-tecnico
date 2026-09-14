@@ -11,16 +11,35 @@ function fixarSelecaoMaterial(selectId, valor) {
   const s = document.getElementById(selectId);
   if (!s) return;
   const v = String(valor ?? '');
-  s.value = v;
   // Se a lista foi reconstruída, garante que a opção continue disponível.
   if (v && !Array.from(s.options).some(o => o.value === v)) {
     const opt = document.createElement('option');
     opt.value = v;
     opt.textContent = v;
     s.appendChild(opt);
-    s.value = v;
   }
+  s.value = v;
+  s.dataset.selectedValue = v;
 }
+
+function selecionarMaterialEstoquePorId(selectId, inputId, valor) {
+  const s = document.getElementById(selectId);
+  const busca = document.getElementById(inputId);
+  const id = String(valor ?? '');
+  if (!s || !id) return false;
+  const materiais = typeof D !== 'undefined' && Array.isArray(D.mat) ? D.mat : [];
+  const material = materiais.find(m => String(m.id) === id);
+  if (!material) return false;
+  fixarSelecaoMaterial(selectId, id);
+  if (busca) {
+    busca.value = material.nome || '';
+    busca.dataset.materialId = id;
+  }
+  s.dispatchEvent(new Event('change', {bubbles:true}));
+  s.dispatchEvent(new Event('input', {bubbles:true}));
+  return true;
+}
+window.selecionarMaterialEstoquePorId = selecionarMaterialEstoquePorId;
 
 
 (function(){
@@ -48,16 +67,13 @@ function fixarSelecaoMaterial(selectId, valor) {
     }
 
     function selecionar(id, nome){
-      select.value = String(id);
-      busca.value = nome;
       resultados.style.display = 'none';
-      select.dispatchEvent(new Event('change', {bubbles:true}));
-      select.dispatchEvent(new Event('input', {bubbles:true}));
-      const qtd = selectId === 'ml-estoque-material' ? document.getElementById('ml-estoque-qtd')
-        : (selectId === 'lg-estoque-material' ? document.getElementById('lg-estoque-qtd') : null);
-      if(qtd && typeof D !== 'undefined' && typeof materialById === 'function'){
-        const m = materialById(id);
-        if(m) qtd.value = m.estoque || 0;
+      if (!selecionarMaterialEstoquePorId(selectId, inputId, id)) {
+        fixarSelecaoMaterial(selectId, id);
+        busca.value = nome;
+        busca.dataset.materialId = String(id);
+        select.dispatchEvent(new Event('change', {bubbles:true}));
+        select.dispatchEvent(new Event('input', {bubbles:true}));
       }
     }
 
@@ -99,6 +115,11 @@ function fixarSelecaoMaterial(selectId, valor) {
     busca.addEventListener('input', function(){
       const valor=this.value.trim().toLowerCase();
       const materiais=obterMateriais();
+      const selecionado=materiais.find(m=>String(m.id)===String(this.dataset.materialId||''));
+      if(selecionado && String(selecionado.nome).trim().toLowerCase()!==valor){
+        this.dataset.materialId='';
+        fixarSelecaoMaterial(selectId,'');
+      }
       const exato=materiais.find(m=>String(m.nome).trim().toLowerCase()===valor);
       if(exato) selecionar(exato.id,exato.nome);
       else mostrar();
