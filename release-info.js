@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.0.4',date:'2026-09-15',title:'Correção da quantidade no estoque logístico',
+  changes:['A quantidade digitada é preservada antes da confirmação do material.','O estoque só informa sucesso quando o servidor devolve exatamente o valor solicitado.','A lista e o selo Disponível são atualizados imediatamente após a confirmação.']
+ },{
   version:'2.0.3',date:'2026-09-10',title:'Não pendenciamento sempre disponível',
   changes:['Os botões Pendenciar chamado e Não pendenciar chamado aparecem sempre lado a lado no acompanhamento do operador.','O motivo do não pendenciamento é obrigatório e fica registrado no banco.','Administrador e técnico visualizam a decisão e a justificativa do operador.']
  },{

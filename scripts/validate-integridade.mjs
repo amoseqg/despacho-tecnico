@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
-const partes = ['app.part1', 'app.part2', 'app.part3'];
+const partes = ['app.part1a', 'app.part1b', 'app.part2', 'app.part3'];
 const buffers = partes.map((arquivo, indice) => {
   const bytes = fs.readFileSync(arquivo);
   return indice < partes.length - 1 && bytes.at(-1) === 10 ? bytes.subarray(0, -1) : bytes;

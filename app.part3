@@ -881,14 +881,18 @@ async function removerMaterial(id){
  }catch(e){sbShowError('Não foi possível remover o material',e);await sbRecarregarDados();}
 }
 async function ajusteEstoqueLogistica(){
- const m=resolverMaterialEstoque('lg-estoque-material','busca-material-logistica'),q=Number(el('lg-estoque-qtd')?.value),btn=el('btn-lg-ajuste');
+ // Captura a quantidade antes de resolver novamente o material. A resolução
+ // dispara o evento change do seletor e recarrega o estoque anterior no campo.
+ const qCampo=el('lg-estoque-qtd'),q=Number(qCampo?.value),m=resolverMaterialEstoque('lg-estoque-material','busca-material-logistica'),btn=el('btn-lg-ajuste');
  if(!m||!Number.isFinite(q)||q<0){alert('Selecione o material na busca ou clique na linha da tabela e informe uma quantidade válida');return;}
  const texto=btn?.innerHTML;
  try{
    if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
    const {data,error}=await SB.from('materiais').update({estoque:q,atualizado_em:new Date().toISOString()}).eq('id',m.id).select('id,estoque').single();
    if(error)throw error;
-   m.estoque=Number(data.estoque||0);lsSet('dd',D);rLogEstoque();
+   const confirmado=Number(data?.estoque);
+   if(!Number.isFinite(confirmado)||confirmado!==q)throw new Error(`O servidor retornou ${Number.isFinite(confirmado)?confirmado:'um valor inválido'}, mas foi solicitado ${q}. A quantidade anterior foi preservada.`);
+   m.estoque=confirmado;lsSet('dd',D);rLogEstoque();
    alert('Quantidade do estoque confirmada no servidor.');
  }catch(e){sbShowError('Não foi possível atualizar o estoque',e);await sbRecarregarDados();}
  finally{if(btn){btn.disabled=false;btn.innerHTML=texto||'💾 Salvar Quantidade';}}
@@ -3915,7 +3919,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.0.3"></script>
+<script src="/release-info.js?v=2.0.4"></script>
 <script src="/pendencias.js?v=2.0.3"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>\n<script src="/health-monitor.js?v=1.0.0"></script>
