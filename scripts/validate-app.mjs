@@ -65,11 +65,16 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.0\.4'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.0\.5'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
-assert.ok(parte3.indexOf("q=Number(qCampo?.value)")<parte3.indexOf("m=resolverMaterialEstoque('lg-estoque-material'"),'A quantidade deve ser capturada antes de resolver novamente o material.');
-assert.match(parte3,/confirmado!==q/,'O estoque logístico deve comparar o retorno do servidor com a quantidade solicitada.');
+const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
+assert.ok(salvarEstoque.indexOf('q=Number(qCampo?.value)')<salvarEstoque.indexOf('m=resolverMaterialEstoque(selectId,buscaId)'),'A quantidade deve ser capturada antes de resolver novamente o material.');
+assert.match(salvarEstoque,/\['adm','log'\]\.includes\(S\?\.t\)/,'Somente Administrador e Logística podem ajustar o estoque.');
+assert.match(salvarEstoque,/String\(data\?\.id\)!==String\(m\.id\)/,'O material retornado pelo servidor deve ser conferido.');
+assert.match(salvarEstoque,/confirmado!==q/,'O retorno do servidor deve ser comparado com a quantidade solicitada.');
+assert.match(parte3,/function ajusteEstoque\(\)\{return salvarQuantidadeEstoqueConfirmada/,'O Administrador deve usar a gravação confirmada.');
+assert.match(parte3,/async function ajusteEstoqueLogistica\(\)\{\s*return salvarQuantidadeEstoqueConfirmada/,'A Logística deve usar a gravação confirmada.');
 
 // Executa funções reais da aplicação com respostas controladas do servidor.
 function funcao(nome){
@@ -84,6 +89,28 @@ const ctx={D:{mr:[],ch:[]},SB_PROFILE:{id:'operador'},S:{t:'log'},el:()=>({disab
 vm.createContext(ctx);
 for(const nome of ['logMeta','logObsBase','logObs','materialEntregueArquivado','limparMateriaisEntregues','materiaisLiberadosTecnicos','sbNum','normalizarCircuito','numeroCircuito','dataChamadoMs','chaveCircuitoReincidencia','historicoAnteriorCircuito','sbPersistirAprovacoes']) vm.runInContext(funcao(nome),ctx);
 vm.runInContext('let limpezaEntreguesEmCurso=false; const JANELA_REINCIDENCIA_MS=30*24*60*60*1000;',ctx);
+vm.runInContext(funcao('salvarQuantidadeEstoqueConfirmada'),ctx);
+const campoQtd={value:'40'},botaoEstoque={disabled:false,innerHTML:'Salvar',textContent:'Salvar'},materialEstoque={id:'mat-1',estoque:0};
+ctx.el=id=>id==='qtd'?campoQtd:id==='btn'?botaoEstoque:null;
+ctx.resolverMaterialEstoque=()=>{campoQtd.value='0';return materialEstoque;};
+ctx.SB={from:tabela=>{
+ assert.equal(tabela,'materiais');
+ return {update:campos=>{
+  assert.equal(campos.estoque,40);
+  const q={eq:(chave,valor)=>{assert.equal(chave,'id');assert.equal(valor,'mat-1');return q;},select:()=>q,single:async()=>({data:{id:'mat-1',estoque:40}})};
+  return q;
+ }};
+}};
+let renderizacoesEstoque=0;
+for(const perfil of ['adm','log']){
+ ctx.S={t:perfil};campoQtd.value='40';materialEstoque.estoque=0;
+ await ctx.salvarQuantidadeEstoqueConfirmada({selectId:'sel',buscaId:'busca',qtdId:'qtd',botaoId:'btn',renderizar:()=>renderizacoesEstoque++});
+ assert.equal(materialEstoque.estoque,40,`${perfil} deve aplicar somente o valor confirmado pelo servidor`);
+}
+const chamadasPermitidas=renderizacoesEstoque;
+for(const perfil of ['tec','ope']){ctx.S={t:perfil};campoQtd.value='40';await ctx.salvarQuantidadeEstoqueConfirmada({selectId:'sel',buscaId:'busca',qtdId:'qtd',botaoId:'btn',renderizar:()=>renderizacoesEstoque++});}
+assert.equal(renderizacoesEstoque,chamadasPermitidas,'Técnico e operador não podem atualizar o estoque.');
+ctx.S={t:'log'};
 for(const [entrada,esperado] of [[12.5,12.5],['12.5',12.5],['12,5',12.5],['R$ 1.234,56',1234.56],['R$ 1.234',1234],['',0],[null,0],['inválido',0]]) assert.equal(ctx.sbNum(entrada),esperado);
 const entregue={id:'1',status:'entregue',obs:'Observação\n[[LOGISTICA]]{"rastreamento":"BR123"}'};
 const pendente={id:'2',status:'separado',obs:'[[LOGISTICA]]{"etapa":"aguardando_aceite"}'};

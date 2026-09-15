@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.0.5',date:'2026-09-15',title:'Proteção global nas atualizações de estoque',
+  changes:['Administrador e Logística usam a mesma gravação confirmada pelo servidor.','A quantidade digitada é preservada antes de qualquer atualização automática da tela.','Técnicos e operadores continuam impedidos de alterar estoque, e os testes bloqueiam regressões desse fluxo.']
+ },{
   version:'2.0.4',date:'2026-09-15',title:'Correção da quantidade no estoque logístico',
   changes:['A quantidade digitada é preservada antes da confirmação do material.','O estoque só informa sucesso quando o servidor devolve exatamente o valor solicitado.','A lista e o selo Disponível são atualizados imediatamente após a confirmação.']
  },{
