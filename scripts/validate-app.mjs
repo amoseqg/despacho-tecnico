@@ -79,7 +79,8 @@ const estoque=fs.readFileSync('stock-export.js','utf8');
 assert.match(estoque,/function exportarEstoqueLogistico\(\)/,'A exportação do estoque em Excel deve existir.');
 assert.match(estoque,/configurarEstoque\('ml-estoque-lista'\)/,'O estoque do administrador deve ser ocultado.');
 assert.match(estoque,/configurarEstoque\('lg-estoque-lista'\)/,'O estoque da logística deve ser ocultado.');
-assert.match(carregador,/stock-export\.js\?v='\+versao/,'O módulo do estoque deve ser carregado sem cache antigo.');
+assert.match(carregador,/fetch\('\/stock-export\.js\?v='\+versao/,'O módulo do estoque deve ser carregado sem cache antigo.');
+assert.match(carregador,/replace\('<\/body>','<script>'\+stock/,'O módulo do estoque deve ser incorporado ao aplicativo antes da abertura.');
 
 // Executa funções reais da aplicação com respostas controladas do servidor.
 function funcao(nome){
