@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.1.0',date:'2026-09-17',title:'Exportação e pesquisa do estoque logístico',
+  changes:['Administrador e Logística podem exportar todo o estoque em Excel.','A planilha contém material, unidade, quantidade e situação, com filtro no cabeçalho.','Os nomes dos materiais ficam ocultos na tela e aparecem somente durante a pesquisa no campo Material.']
+ },{
   version:'2.0.5',date:'2026-09-15',title:'Proteção global nas atualizações de estoque',
   changes:['Administrador e Logística usam a mesma gravação confirmada pelo servidor.','A quantidade digitada é preservada antes de qualquer atualização automática da tela.','Técnicos e operadores continuam impedidos de alterar estoque, e os testes bloqueiam regressões desse fluxo.']
  },{

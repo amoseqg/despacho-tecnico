@@ -65,7 +65,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.0\.5'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.1\.0'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
@@ -75,6 +75,11 @@ assert.match(salvarEstoque,/String\(data\?\.id\)!==String\(m\.id\)/,'O material 
 assert.match(salvarEstoque,/confirmado!==q/,'O retorno do servidor deve ser comparado com a quantidade solicitada.');
 assert.match(parte3,/function ajusteEstoque\(\)\{return salvarQuantidadeEstoqueConfirmada/,'O Administrador deve usar a gravação confirmada.');
 assert.match(parte3,/async function ajusteEstoqueLogistica\(\)\{\s*return salvarQuantidadeEstoqueConfirmada/,'A Logística deve usar a gravação confirmada.');
+const estoque=fs.readFileSync('stock-export.js','utf8');
+assert.match(estoque,/function exportarEstoqueLogistico\(\)/,'A exportação do estoque em Excel deve existir.');
+assert.match(estoque,/configurarEstoque\('ml-estoque-lista'\)/,'O estoque do administrador deve ser ocultado.');
+assert.match(estoque,/configurarEstoque\('lg-estoque-lista'\)/,'O estoque da logística deve ser ocultado.');
+assert.match(carregador,/stock-export\.js\?v='\+versao/,'O módulo do estoque deve ser carregado sem cache antigo.');
 
 // Executa funções reais da aplicação com respostas controladas do servidor.
 function funcao(nome){
