@@ -939,14 +939,25 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div id="lg-estoque-lista"></div>
     </div>
     <div class="card" style="margin-top:12px">
-      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">➕ Cadastro de Materiais</h3>
-      <div class="info">Cadastre novos itens ou remova materiais que não devem mais aparecer no estoque.</div>
-      <div class="grid-3">
-        <div class="form-group"><label class="label">Modelo / Material</label><input id="lg-mat-nome" class="input" placeholder="Ex.: FortiAP, cabo UTP..."></div>
-        <div class="form-group"><label class="label">Unidade</label><select id="lg-mat-un" class="select"><option value="UN">UN</option><option value="M">M</option><option value="KIT">KIT</option><option value="CX">CX</option><option value="OUTRO">OUTRO</option></select></div>
-        <div class="form-group" style="display:flex;align-items:flex-end"><button class="btn btn-g" id="btn-lg-add-material" style="width:100%">➕ Cadastrar Material</button></div>
-      </div>
-      <div id="lg-mat-cadastro-lista"></div>
+      <details id="lg-retirados" open>
+        <summary style="font-size:.9rem;color:var(--p);font-weight:700;cursor:pointer;padding:8px 0">♻️ Materiais retirados da planta</summary>
+        <div class="info">Registre equipamentos retirados dos locais atendidos. Quando o item estiver recuperado, encaminhe-o ao estoque logístico para somar a quantidade disponível.</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="label">Material</label><select id="lg-ret-material" class="select"><option value="">Selecione...</option></select></div>
+          <div class="form-group"><label class="label">Quantidade retirada</label><input type="number" min="0.01" step="0.01" id="lg-ret-qtd" class="input" placeholder="0"></div>
+          <div class="form-group"><label class="label">Site / planta</label><input id="lg-ret-site" class="input" placeholder="Informe o local da retirada"></div>
+          <div class="form-group"><label class="label">Protocolo / OS</label><input id="lg-ret-protocolo" class="input" placeholder="Protocolo ou OS relacionada"></div>
+          <div class="form-group"><label class="label">Condição</label><select id="lg-ret-condicao" class="select"><option value="aguardando_avaliacao">Aguardando avaliação</option><option value="avariado">Avariado</option><option value="reparavel">Reparável</option><option value="recuperado">Recuperado</option></select></div>
+          <div class="form-group"><label class="label">Observação</label><input id="lg-ret-obs" class="input" placeholder="Modelo, série ou informação adicional"></div>
+        </div>
+        <button type="button" class="btn btn-p" id="btn-lg-retirada">Registrar material retirado</button>
+        <div id="lg-retirados-lista" style="margin-top:12px"></div>
+      </details>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">🕘 Últimas alterações da logística</h3>
+      <div class="info">Histórico com o responsável, data, material e quantidade de cada alteração.</div>
+      <div id="lg-auditoria-lista"></div>
     </div>
   </div>
 </div>
