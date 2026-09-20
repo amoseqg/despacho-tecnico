@@ -752,7 +752,7 @@ async function salvarQuantidadeEstoqueConfirmada({selectId,buscaId,qtdId,botaoId
  const texto=btn?.innerHTML;
  try{
    if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
-   const {data,error}=await SB.from('materiais').update({estoque:q,atualizado_em:new Date().toISOString()}).eq('id',m.id).select('id,estoque').single();
+   const {data,error}=await SB.rpc('ajustar_estoque_logistico',{p_material_id:m.id,p_nova_quantidade:q,p_observacao:'Ajuste manual na Área Logística'}).single();
    if(error)throw error;
    const confirmado=Number(data?.estoque);
    if(String(data?.id)!==String(m.id)||!Number.isFinite(confirmado)||confirmado!==q)throw new Error(`O servidor não confirmou a quantidade ${q}. O valor anterior foi preservado.`);
@@ -863,7 +863,36 @@ function rLogEstoque(){
  s.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${m.id}">${escM(m.nome)} (${escM(m.unidade)})</option>`).join('');
  if(selecionado&&D.mat.some(m=>String(m.id)===String(selecionado))){s.value=selecionado;if(q&&qtdAtual!=='')q.value=qtdAtual;}
  b.innerHTML=D.mat.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Material</th><th>Unidade</th><th>Estoque</th><th>Situação</th></tr></thead><tbody>'+D.mat.map(m=>`<tr onclick="selecionarMaterialEstoquePorId(\'lg-estoque-material\',\'busca-material-logistica\',\'${escM(m.id)}\')" style="cursor:pointer" title="Clique para selecionar este material"><td>${escM(m.nome)}</td><td>${escM(m.unidade)}</td><td><b>${m.estoque||0}</b></td><td><span class="badge ${(m.estoque||0)>0?'b-concluida':'b-recusado'}">${(m.estoque||0)>0?'Disponível':'Sem estoque'}</span></td></tr>`).join('')+'</tbody></table></div>':'<div class="empty">Nenhum material cadastrado.</div>';
- rLogCadastroMateriais();
+ rLogRetirados();rLogAuditoria();
+}
+function rLogRetirados(){
+ const s=el('lg-ret-material'),box=el('lg-retirados-lista');if(!s||!box)return;
+ const selecionado=s.value||'';
+ s.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${m.id}">${escM(m.nome)} (${escM(m.unidade)})</option>`).join('');
+ if(D.mat.some(m=>String(m.id)===String(selecionado)))s.value=selecionado;
+ const condicoes={aguardando_avaliacao:'Aguardando avaliação',avariado:'Avariado',reparavel:'Reparável',recuperado:'Recuperado'};
+ const lista=(SB_RETIRADOS||[]).slice().sort((a,b)=>new Date(b.retiradoEm)-new Date(a.retiradoEm));
+ box.innerHTML=lista.length?lista.map(r=>{const m=materialById(r.materialId),recuperado=r.status==='recuperado_estoque';return `<div class="os"><div class="os-h"><span class="os-id">♻️ ${escM(m?.nome||'Material')} — ${r.quantidade} ${escM(m?.unidade||'')}</span><span class="badge ${recuperado?'b-concluida':'b-pendente'}">${recuperado?'No estoque':'Retirado da planta'}</span></div><div class="os-r"><b>Site / planta:</b> ${escM(r.sitePlanta)} &nbsp; <b>Protocolo / OS:</b> ${escM(r.protocoloOs||'—')}</div><div class="os-r"><b>Condição:</b> ${escM(condicoes[r.condicao]||r.condicao)} &nbsp; <b>Retirado por:</b> ${escM(sbNameById(r.retiradoPor)||'Usuário')}</div><div class="os-r"><b>Data:</b> ${rastreioData(r.retiradoEm)}${r.observacao?' &nbsp; <b>Observação:</b> '+escM(r.observacao):''}</div>${recuperado?`<div class="os-r"><b>Recuperado por:</b> ${escM(sbNameById(r.recuperadoPor)||'Usuário')} em ${rastreioData(r.recuperadoEm)}</div>`:`<div style="margin-top:8px"><button type="button" class="btn btn-g btn-recuperar-material" data-id="${r.id}">✅ Material recuperado — enviar ao estoque</button></div>`}</div>`}).join(''):'<div class="empty"><h3>Nenhum material retirado da planta</h3></div>';
+}
+function rLogAuditoria(){
+ const box=el('lg-auditoria-lista');if(!box)return;
+ const nomes={ajuste:'Ajuste de estoque',retirada_planta:'Retirada da planta',recuperado_estoque:'Recuperado para estoque',separacao:'Separação'};
+ const lista=(SB_MOVIMENTOS||[]).slice(0,30);
+ box.innerHTML=lista.length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Data</th><th>Alteração</th><th>Material</th><th>Quantidade</th><th>Estoque</th><th>Realizado por</th></tr></thead><tbody>'+lista.map(m=>{const mat=materialById(m.materialId);return `<tr><td>${rastreioData(m.criadoEm)}</td><td>${escM(nomes[m.tipo]||m.tipo)}</td><td>${escM(mat?.nome||'Material')}</td><td>${Number(m.quantidade||0)}</td><td>${m.estoqueAnterior==null?'—':Number(m.estoqueAnterior)} → ${m.estoqueNovo==null?'—':Number(m.estoqueNovo)}</td><td><b>${escM(sbNameById(m.realizadoPor)||'Usuário')}</b></td></tr>`}).join('')+'</tbody></table></div>':'<div class="empty">Nenhuma alteração registrada.</div>';
+}
+async function registrarMaterialRetirado(){
+ const materialId=el('lg-ret-material')?.value,q=Number(el('lg-ret-qtd')?.value),site=el('lg-ret-site')?.value.trim(),protocolo=el('lg-ret-protocolo')?.value.trim()||'',condicao=el('lg-ret-condicao')?.value||'aguardando_avaliacao',obs=el('lg-ret-obs')?.value.trim()||'',btn=el('btn-lg-retirada');
+ if(!materialId||!Number.isFinite(q)||q<=0||!site){alert('Selecione o material e informe a quantidade e o site/planta.');return;}
+ const texto=btn?.textContent;
+ try{if(btn){btn.disabled=true;btn.textContent='Registrando...';}const {error}=await SB.rpc('registrar_retirada_planta',{p_material_id:materialId,p_quantidade:q,p_site_planta:site,p_protocolo_os:protocolo,p_condicao:condicao,p_observacao:obs});if(error)throw error;['lg-ret-qtd','lg-ret-site','lg-ret-protocolo','lg-ret-obs'].forEach(id=>{if(el(id))el(id).value='';});if(el('lg-ret-material'))el('lg-ret-material').value='';await sbRecarregarDados();alert('Material retirado registrado com o responsável pela alteração.');}
+ catch(e){sbShowError('Não foi possível registrar o material retirado',e);}
+ finally{if(btn){btn.disabled=false;btn.textContent=texto||'Registrar material retirado';}}
+}
+async function recuperarMaterialEstoque(id){
+ const retirada=(SB_RETIRADOS||[]).find(r=>r.id===id);if(!retirada||retirada.status==='recuperado_estoque')return;
+ const m=materialById(retirada.materialId);if(!confirm(`Encaminhar ${retirada.quantidade} ${m?.unidade||''} de ${m?.nome||'material'} ao estoque logístico?`))return;
+ try{const {error}=await SB.rpc('recuperar_material_estoque',{p_retirada_id:id});if(error)throw error;await sbRecarregarDados();alert('Material recuperado e quantidade adicionada ao estoque logístico.');}
+ catch(e){sbShowError('Não foi possível encaminhar o material ao estoque',e);}
 }
 function rLogCadastroMateriais(){
  const b=el('lg-mat-cadastro-lista');if(!b)return;
@@ -2882,6 +2911,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAjuste=el('btn-lg-ajuste'); if(btnLgAjuste) btnLgAjuste.addEventListener('click',ajusteEstoqueLogistica); const selLgEst=el('lg-estoque-material'); if(selLgEst) selLgEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('lg-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
   const btnLgAddMaterial=el('btn-lg-add-material'); if(btnLgAddMaterial) btnLgAddMaterial.addEventListener('click',addMaterialLogistica);
+  el('btn-lg-retirada')?.addEventListener('click',registrarMaterialRetirado);
   document.querySelectorAll('.btn-historico-materiais').forEach(btn=>btn.addEventListener('click',alternarHistoricoMateriais));
   document.addEventListener('click',e=>{const btn=e.target.closest('.btn-arquivo-material');if(btn)arquivarMaterialIndividual(btn.dataset.id);});
   el('btn-limpar-entregues')?.addEventListener('click',limparMateriaisEntregues);
@@ -3042,6 +3072,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-tech-aceitar-material')) { aceitarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-correios')) { consultarCorreiosOficial(t.dataset.id); }
     if(t.classList.contains('btn-rm-mat')) { removerMaterial(t.dataset.id); }
+    if(t.classList.contains('btn-recuperar-material')) { recuperarMaterialEstoque(t.dataset.id); }
   });
 
   // Auto login
@@ -3209,6 +3240,8 @@ let SB_FOTOS_MAP = new Map();
 let EX_FOTOS_NOVAS = [];
 let SB_SOLICITANTES_CHAMADOS = [];
 let SB_CARREGANDO_SOLICITANTES = false;
+let SB_RETIRADOS = [];
+let SB_MOVIMENTOS = [];
 
 function sbUUID(v){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||'')); }
 function sbNum(v){
@@ -3276,7 +3309,7 @@ async function sbCarregarTodasEscolas(){
 async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
-  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR,retR,movR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     SB.from('chamados').select('*').order('criado_em',{ascending:true}),
     SB.from('execucoes').select('*'),
@@ -3287,9 +3320,11 @@ async function sbLoadAll(){
     sbCarregarTodasEscolas(),
     SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true}),
     SB.from('validacoes_encerramento').select('*'),
-    SB.from('exclusoes_chamados_portal').select('*')
+    SB.from('exclusoes_chamados_portal').select('*'),
+    SB.from('materiais_retirados').select('*').order('retirado_em',{ascending:false}),
+    SB.from('movimentacoes_estoque').select('*').order('criado_em',{ascending:false}).limit(60)
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR,retR,movR]) if(r.error) throw r.error;
   SB_ESCOLAS=escR.data||[];
   SB_FOTOS_MAP=new Map();
   (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
@@ -3338,6 +3373,8 @@ async function sbLoadAll(){
 
   D.mat=(mR.data||[]).map(m=>({id:m.id,nome:m.nome,unidade:m.unidade,estoque:Number(m.estoque||0),c:m.criado_em}));
   D.mr=(sR.data||[]).map(r=>({id:r.id,chamadoId:r.chamado_id,tecnico:sbUserById(r.tecnico_id),materialId:r.material_id,qtdSolicitada:Number(r.quantidade_solicitada||0),qtdSeparada:Number(r.quantidade_separada||0),qtdEntregue:Number(r.quantidade_entregue||0),status:r.status,obs:r.observacao||'',data:r.solicitado_em,direcionadoEm:r.direcionado_em,separadoEm:r.separado_em,entregueEm:r.entregue_em,responsavel:sbNameById(r.responsavel_id)}));
+  SB_RETIRADOS=(retR.data||[]).map(r=>({id:r.id,materialId:r.material_id,quantidade:Number(r.quantidade||0),sitePlanta:r.site_planta,protocoloOs:r.protocolo_os||'',condicao:r.condicao,observacao:r.observacao||'',status:r.status,retiradoPor:r.retirado_por,retiradoEm:r.retirado_em,recuperadoPor:r.recuperado_por,recuperadoEm:r.recuperado_em}));
+  SB_MOVIMENTOS=(movR.data||[]).map(m=>({id:m.id,materialId:m.material_id,tipo:m.tipo,quantidade:Number(m.quantidade||0),estoqueAnterior:m.estoque_anterior,estoqueNovo:m.estoque_novo,observacao:m.observacao||'',realizadoPor:m.realizado_por,criadoEm:m.criado_em}));
 
   SB_LOADED_CH=new Set(D.ch.map(x=>x.id)); SB_LOADED_MAT=new Set(D.mat.map(x=>x.id)); SB_LOADED_MR=new Set(D.mr.map(x=>x.id));
   lsSet('dd',D);
@@ -3603,7 +3640,7 @@ doLogin = async function(){
     const {data,error}=await SB.auth.signInWithPassword({email,password:senha}); if(error) throw error;
     const {data:p,error:pErr}=await SB.from('perfis').select('*').eq('id',data.user.id).single(); if(pErr) throw pErr;
     if(!p.ativo) throw new Error('Usuário desativado.');
-    const temLogistica=p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
+    const temLogistica=p.tipo==='admin'||p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
     if(loginType==='adm' && p.tipo!=='admin') throw new Error('Este usuário não possui perfil de administrador.');
     if(loginType==='log' && !temLogistica) throw new Error('Este usuário não possui acesso à área logística.');
     if(loginType==='tec' && p.tipo!=='tecnico') throw new Error('Este usuário não possui perfil de técnico.');
@@ -3815,7 +3852,7 @@ async function sbRestoreSession(){
     if(!session){ S=null; lsRemove('ss'); sbSetConnectionBadge('Aguardando login', true); return; }
     const {data:p,error}=await SB.from('perfis').select('*').eq('id',session.user.id).single(); if(error) throw error;
     SB_PROFILE=p; await sbLoadAll();
-    const temLogistica=p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
+    const temLogistica=p.tipo==='admin'||p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
     const portal=localStorage.getItem('dt_portal');
     if(portal==='log'&&temLogistica) S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
     else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
