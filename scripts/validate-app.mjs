@@ -65,7 +65,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.1\.0'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.2\.0'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
@@ -99,13 +99,10 @@ vm.runInContext(funcao('salvarQuantidadeEstoqueConfirmada'),ctx);
 const campoQtd={value:'40'},botaoEstoque={disabled:false,innerHTML:'Salvar',textContent:'Salvar'},materialEstoque={id:'mat-1',estoque:0};
 ctx.el=id=>id==='qtd'?campoQtd:id==='btn'?botaoEstoque:null;
 ctx.resolverMaterialEstoque=()=>{campoQtd.value='0';return materialEstoque;};
-ctx.SB={from:tabela=>{
- assert.equal(tabela,'materiais');
- return {update:campos=>{
-  assert.equal(campos.estoque,40);
-  const q={eq:(chave,valor)=>{assert.equal(chave,'id');assert.equal(valor,'mat-1');return q;},select:()=>q,single:async()=>({data:{id:'mat-1',estoque:40}})};
-  return q;
- }};
+ctx.SB={rpc:(nome,params)=>{
+ assert.equal(nome,'ajustar_estoque_logistico');
+ assert.equal(params.p_material_id,'mat-1');assert.equal(params.p_nova_quantidade,40);
+ return {single:async()=>({data:{id:'mat-1',estoque:40}})};
 }};
 let renderizacoesEstoque=0;
 for(const perfil of ['adm','log']){
