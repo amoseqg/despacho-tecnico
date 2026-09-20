@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.2.0',date:'2026-09-20',title:'Retirada, recuperação e auditoria de materiais',
+  changes:['Todos os administradores podem entrar na Área Logística com o mesmo login e as mesmas autorizações operacionais.','Materiais retirados da planta podem ser registrados com quantidade, local, protocolo, condição e observação.','Materiais recuperados podem ser encaminhados ao estoque logístico, com atualização automática da quantidade.','A área logística exibe as últimas alterações com usuário responsável, data, material e movimentação.','O cadastro de novos materiais e sua listagem foram ocultados da Área Logística.']
+ },{
   version:'2.1.0',date:'2026-09-17',title:'Exportação e pesquisa do estoque logístico',
   changes:['Administrador e Logística podem exportar todo o estoque em Excel.','A planilha contém material, unidade, quantidade e situação, com filtro no cabeçalho.','Os nomes dos materiais ficam ocultos na tela e aparecem somente durante a pesquisa no campo Material.']
  },{
