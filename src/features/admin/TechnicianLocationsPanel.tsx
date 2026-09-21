@@ -1,0 +1,6 @@
+'use client';
+
+import { useEffect,useState } from 'react';
+import { listarUltimasPosicoes,type PosicaoTecnico } from '@/src/features/chamados/tracking.service';
+
+export function TechnicianLocationsPanel(){const [posicoes,setPosicoes]=useState<PosicaoTecnico[]>([]);const [erro,setErro]=useState('');useEffect(()=>{let ativo=true;const carregar=()=>listarUltimasPosicoes().then(p=>{if(ativo)setPosicoes(p)}).catch(e=>{if(ativo)setErro(e instanceof Error?e.message:'Falha ao carregar localizações.')});void carregar();const t=setInterval(carregar,15000);return()=>{ativo=false;clearInterval(t)};},[]);return <section className="panel"><div className="panel-heading"><div><span className="eyebrow">Atendimentos ativos</span><h2>Rastreamento dos técnicos</h2></div></div>{erro&&<div className="error-box">{erro}</div>}{!posicoes.length&&<p>Nenhuma localização compartilhada em chamados ativos.</p>}<div className="report-grid">{posicoes.map(p=><article className="report-card" key={p.chamado_id}><strong>{p.chamado?.protocolo} — {p.chamado?.site_nome}</strong><span>Técnico: {p.chamado?.tecnico?.nome||'—'}</span><span>Atualizado: {new Date(p.registrado_em).toLocaleString('pt-BR')}</span><a className="button secondary" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${p.latitude},${p.longitude}`}>Abrir localização</a></article>)}</div></section>}
