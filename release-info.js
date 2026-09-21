@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.3.0',date:'2026-09-21',title:'Diagnóstico operacional para qualquer usuário e circuito',
+  changes:['Administrador Geral pode testar qualquer login, senha e circuito em sessão isolada.','A senha é apagada imediatamente e nunca é armazenada no histórico.','O diagnóstico valida autenticação, perfil ativo, tipo de acesso e existência do circuito antes da simulação completa.','Confirmações de criação, envio ao operador e encerramento deixaram de bloquear a interface.','O encerramento administrativo utiliza formulário seguro e não bloqueante com confirmação do servidor.']
+ },{
   version:'2.2.0',date:'2026-09-20',title:'Retirada, recuperação e auditoria de materiais',
   changes:['Todos os administradores podem entrar na Área Logística com o mesmo login e as mesmas autorizações operacionais.','Materiais retirados da planta podem ser registrados com quantidade, local, protocolo, condição e observação.','Materiais recuperados podem ser encaminhados ao estoque logístico, com atualização automática da quantidade.','A área logística exibe as últimas alterações com usuário responsável, data, material e movimentação.','O cadastro de novos materiais e sua listagem foram ocultados da Área Logística.']
  },{

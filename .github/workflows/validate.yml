@@ -17,6 +17,7 @@ jobs:
         with:
           node-version: 20
       - run: node scripts/validate-app.mjs
+      - run: node scripts/validate-diagnostico.mjs
       - run: node scripts/validate-vistorias.mjs
       - run: node scripts/validate-release.mjs
       - run: node scripts/validate-logistica-retirados.mjs

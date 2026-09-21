@@ -572,6 +572,8 @@ function doLogin() {
 function enterAdm() {
   hide('t0'); hide('t1'); hide('pt'); show('pa');
   el('an').textContent = S.n;
+  const labButton=el('nv')?.querySelector('[data-tab="lab"]');
+  if(labButton) labButton.classList.toggle('hidden',!adminGeral());
   admTab(el('nv').querySelector('[data-tab="db"]'), 'db');
   startLoop();
 }
@@ -596,6 +598,10 @@ function enterTec() {
 
 // ========== ABAS ==========
 function admTab(btn, a) {
+  if(a==='lab'&&!adminGeral()){
+    nfToast('O Diagnóstico operacional é exclusivo do Administrador Geral.','erro');
+    return;
+  }
   document.querySelectorAll('#nv button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
   ['db','tc','ch','at','rl','ml','ad','vi','ft','aq','pn','lab'].forEach(x => {
@@ -1178,7 +1184,7 @@ async function addCh() {
     el('c-status').style.color = 'var(--gr)';
     rCh();rDb();
     sbSetConnectionBadge('Chamado confirmado no Supabase',true);
-    alert('Chamado criado e confirmado no servidor!');
+    nfToast('Chamado criado e confirmado no servidor!','sucesso');
   }catch(err){
     sbShowError('O chamado não foi salvo. Os dados foram mantidos para nova tentativa',err);
     sbSetConnectionBadge('Falha ao salvar chamado',false);
@@ -1893,10 +1899,9 @@ async function encerrarChamadoAdmin(id){
   try{
     if(btn){btn.disabled=true;btn.textContent='Verificando acesso...';}
     const admin=await sbExigirSessaoAdmin();
-    const encerramento=prompt(`Informe obrigatoriamente o encerramento/solução do chamado ${c.pr}:`,c.ex?.relatorio||'');
+    const encerramento=await nfSolicitarEncerramento(c);
     if(encerramento===null)return;
     if(!encerramento.trim()){alert('Preencha a informação de encerramento antes de concluir o chamado.');return;}
-    if(!confirm(`Confirmar o encerramento do chamado ${c.pr}?`))return;
     if(btn)btn.textContent='Encerrando...';
     const agora=new Date().toISOString();
     const tecnicoId=sbIdByUser(c.te);
@@ -1906,7 +1911,7 @@ async function encerrarChamadoAdmin(id){
     const {data,error}=await SB.from('chamados').update({status:'concluida',concluido_em:agora,atualizado_em:agora}).eq('id',c.id).select('id,status,concluido_em').single();
     if(error)throw error;if(!data||data.status!=='concluida')throw new Error('O servidor não confirmou o encerramento.');
     if(tecnicoId){const {error:auditErr}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:tecnicoId,para_tecnico_id:tecnicoId,motivo:'Encerrado pelo administrador '+admin.nome,realizado_por:admin.id,criado_em:agora});if(auditErr)console.warn('Encerramento concluído; histórico adicional não gravado:',auditErr);}
-    c.ex={...(c.ex||{}),relatorio:encerramento.trim(),obs:'Encerrado administrativamente por '+admin.nome};c.st='concluida';c.cc=agora;c.tr.push({de:c.te,para:c.te,m:'Encerrado pelo administrador '+admin.nome,admin:admin.nome,d:agora});c._trLoadedCount=c.tr.length;lsSet('dd',D);rAt();rDb();rRl();sbSetConnectionBadge('Chamado encerrado pelo administrador',true);alert('Chamado encerrado com sucesso por '+admin.nome+'.');
+    c.ex={...(c.ex||{}),relatorio:encerramento.trim(),obs:'Encerrado administrativamente por '+admin.nome};c.st='concluida';c.cc=agora;c.tr.push({de:c.te,para:c.te,m:'Encerrado pelo administrador '+admin.nome,admin:admin.nome,d:agora});c._trLoadedCount=c.tr.length;lsSet('dd',D);rAt();rDb();rRl();sbSetConnectionBadge('Chamado encerrado pelo administrador',true);nfToast('Chamado encerrado com sucesso por '+admin.nome+'.','sucesso');
   }catch(err){sbShowError('Não foi possível encerrar o chamado',err);await sbRecarregarDados();}
   finally{if(btn&&document.body.contains(btn)){btn.disabled=false;btn.textContent=texto||'✅ Encerrar';}}
 }
@@ -2605,7 +2610,7 @@ async function cfEx() {
       if(btn){btn.disabled=true;btn.textContent='Enviando ao operador...';}
       const fotos=await sbEnviarFotos(c);c.ex.fotos=[...(anterior.ex?.fotos||[]),...fotos];
       await sbEnviarParaValidacaoOperador(c);await limparRascunhoExecucao(c.id);lsSet('dd',D);clsEx();rTat();
-      alert('Informações de encerramento enviadas ao operador. Aguarde a senha e a validação para encerrar o chamado.');
+      nfToast('Informações enviadas ao operador. Aguarde a senha e a validação.','sucesso');
     }catch(err){c.ex=anterior.ex;lsSet('dd',D);sbShowError('Não foi possível enviar o encerramento ao operador',err);}
     finally{if(btn){btn.disabled=false;btn.textContent=textoBtn||'📨 Enviar ao operador';}}
     return;
@@ -2628,7 +2633,7 @@ async function cfEx() {
     clsEx();
     rTat(); rTco(); rTdb();
     pararRastreamentoTecnico(c.id);
-    alert('Chamado encerrado e sincronizado com o administrador!');
+    nfToast('Chamado encerrado e sincronizado com o administrador!','sucesso');
   }catch(err){
     c.ex=anterior.ex;c.st=anterior.st;c.cc=anterior.cc;c.ap=anterior.ap;c.ajuste=anterior.ajuste;
     lsSet('dd',D);
@@ -3258,7 +3263,18 @@ function sbIso(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null
 function sbIdByUser(u){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x.u===u); return p?._id||null; }
 function sbUserById(id){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x._id===id); return p?.u||''; }
 function sbNameById(id){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x._id===id); return p?.n||''; }
-function sbShowError(prefix, err){ console.error(prefix, err); alert(prefix + (err?.message ? ': '+err.message : '')); }
+function nfToast(message,tipo='info'){
+  let area=document.getElementById('nf-toast-area');
+  if(!area){area=document.createElement('div');area.id='nf-toast-area';area.setAttribute('aria-live','polite');area.style.cssText='position:fixed;right:18px;bottom:82px;z-index:100000;display:grid;gap:8px;width:min(390px,calc(100vw - 32px))';document.body.append(area);}
+  const item=document.createElement('div');item.style.cssText=`padding:12px 14px;border-radius:10px;background:${tipo==='erro'?'#991b1b':tipo==='sucesso'?'#166534':'#16324f'};color:#fff;box-shadow:0 10px 30px #0003;font:600 14px/1.4 system-ui`;item.textContent=String(message||'');area.append(item);setTimeout(()=>item.remove(),6500);
+}
+function nfSolicitarEncerramento(c){
+  return new Promise(resolve=>{
+    const dialog=document.createElement('dialog');dialog.style.cssText='width:min(620px,calc(100% - 28px));border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';dialog.innerHTML=`<form method="dialog" style="padding:20px;font-family:system-ui"><h3 style="margin:0 0 8px;color:#16324f">Encerrar chamado ${esc(c.pr)}</h3><p style="font-size:14px;color:#526273">Informe a solução aplicada. O encerramento será gravado e confirmado pelo servidor.</p><textarea id="nf-encerramento-admin" class="input" style="min-height:150px;width:100%">${esc(c.ex?.relatorio||'')}</textarea><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button value="cancel" class="btn btn-s">Cancelar</button><button value="ok" class="btn btn-p">Confirmar encerramento</button></div></form>`;document.body.append(dialog);
+    dialog.addEventListener('close',()=>{const value=dialog.returnValue==='ok'?dialog.querySelector('#nf-encerramento-admin').value:null;dialog.remove();resolve(value);},{once:true});dialog.showModal();
+  });
+}
+function sbShowError(prefix, err){ console.error(prefix, err); nfToast(prefix + (err?.message ? ': '+err.message : ''),'erro'); }
 
 async function sbExigirSessaoAdmin(){
   const {data:{user},error:userErr}=await SB.auth.getUser();
@@ -3927,6 +3943,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   const q=id=>document.getElementById(id);
   const safe=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const withTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(`${label} excedeu ${Math.round(ms/1000)} segundos.`)),ms))]);
+  const diagnosticClient=()=>window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},global:{headers:{'X-Client-Info':'nexofield-diagnostico'}}});
+  function ensureDiagnosticForm(){
+    const details=q('v-lab')?.querySelector('details');if(!details||details.dataset.generico==='1')return;
+    details.dataset.generico='1';details.innerHTML=`<summary style="cursor:pointer;font-size:.72rem;font-weight:700;color:var(--p)">🔐 Diagnóstico de qualquer usuário e circuito</summary><div class="grid-3" style="gap:8px;margin-top:9px"><div class="form-group"><label class="label">Tipo de acesso esperado</label><select id="lab-ind-tipo" class="select"><option value="auto">Detectar automaticamente</option><option value="admin">Administrador</option><option value="tecnico">Técnico</option><option value="logistica">Logística</option><option value="solicitante">Solicitante externo</option></select></div><div class="form-group"><label class="label">E-mail do usuário</label><input id="lab-ind-login" type="email" class="input" autocomplete="off" placeholder="usuario@empresa.com"></div><div class="form-group"><label class="label">Senha</label><input id="lab-ind-senha" type="password" class="input" autocomplete="new-password" placeholder="Usada somente neste teste"></div><div class="form-group"><label class="label">Circuito de referência</label><input id="lab-ind-circuito" class="input" autocomplete="off" placeholder="Ex.: RCE 5175274"></div></div><button type="button" class="btn btn-s" id="lab-iniciar-individual">▶ Diagnosticar usuário e circuito</button><div style="font-size:.62rem;color:var(--gr);margin-top:7px">A autenticação ocorre em sessão isolada. A senha é apagada imediatamente e nunca entra no histórico.</div><div id="lab-ind-resultado" class="info hidden" style="margin-top:9px"></div>`;
+  }
   function technicians(){const list=Array.isArray(window.D?.tc)?D.tc:[],active=list.filter(t=>t&&t.n&&t.ativo!==false);return(active.length?active:[{n:'Técnico de teste'}]).map((t,i)=>({display:t.n,synthetic:`Técnico Simulado ${String(i+1).padStart(2,'0')}`,user:`teste.tecnico${String(i+1).padStart(2,'0')}`}));}
   function setStats(total,steps,ok,fail){q('lab-total').textContent=total;q('lab-etapas').textContent=steps;q('lab-aprovadas').textContent=ok;q('lab-falhas').textContent=fail;}
   function card(t,i){const rows=Object.entries(LABELS).map(([key,label],n)=>`<div id="lab-row-${i}-${key}" style="display:grid;grid-template-columns:20px 1fr auto;gap:6px;align-items:center;padding:5px 0;border-bottom:1px solid #eef2f7;font-size:.64rem"><span id="lab-icon-${i}-${key}">○</span><span>${n+1}. ${safe(label)}</span><b id="lab-state-${i}-${key}" style="color:var(--gr);font-size:.58rem">Aguardando</b></div>`).join('');return `<div class="card" id="lab-card-${i}" style="border-top:3px solid #94a3b8"><div style="display:flex;justify-content:space-between;gap:8px"><b style="font-size:.76rem">${safe(t.display)}</b><span id="lab-badge-${i}" class="badge">Aguardando</span></div><div style="font-size:.62rem;color:var(--gr);margin-top:4px">Usuário isolado: ${safe(t.user)} · senha sintética protegida</div><div style="height:7px;background:#e2e8f0;border-radius:8px;overflow:hidden;margin:10px 0"><div id="lab-bar-${i}" style="height:100%;width:0;background:var(--p);transition:width .2s"></div></div><div id="lab-step-${i}" style="font-size:.68rem;color:var(--p);font-weight:700;margin-bottom:6px">Preparando protocolo e SDM fictícios…</div><div id="lab-screen-${i}" style="background:#f8fafc;border:1px solid #dbe4ee;border-radius:9px;padding:9px;margin-bottom:8px;min-height:92px"></div><div style="max-height:330px;overflow:auto">${rows}</div><div id="lab-id-${i}" style="font-size:.6rem;color:var(--gr);margin-top:8px"></div></div>`;}
@@ -3947,8 +3969,32 @@ document.addEventListener('DOMContentLoaded',()=>{
       saveState(techs,perTech,checks);showErrors(checks);status.textContent=`Execução concluída: ${approved} etapas aprovadas${failed?` e ${failed} falha(s) sinalizada(s)`:' sem falhas'}. O checklist foi preservado.`;
     }catch(err){checks.push({message:err.message,suggestion:'Verificar a conexão com o banco isolado e a função run_nexofield_test.'});showErrors(checks);setStats(techs.length,0,0,checks.length);status.textContent='A execução foi interrompida e o diagnóstico foi registrado na tela.';console.error('NexoField Lab:',err);}finally{running=false;btn.disabled=false;btn.textContent='▶ Iniciar novo teste';}
   }
-  function startIndividual(){const select=q('lab-ind-tecnico'),login=q('lab-ind-login'),password=q('lab-ind-senha');if(!select||!login||!password)return;const user=login.value.trim(),pass=password.value;if(!user||pass.length<6){alert('Informe o login de teste e uma senha de teste com pelo menos 6 caracteres.');return;}const option=select.options[select.selectedIndex],display=option?.textContent||'Técnico selecionado';overrideTechs=[{display,synthetic:'Técnico Simulado Individual',user}];password.value='';start();}
-  function render(){q('lab-iniciar').onclick=start;const techs=technicians(),select=q('lab-ind-tecnico');if(select){select.innerHTML=techs.map((t,i)=>`<option value="${i}">${safe(t.display)}</option>`).join('');select.onchange=()=>{const t=techs[Number(select.value)]||techs[0];q('lab-ind-login').value=t?.user||'';};if(!q('lab-ind-login').value)q('lab-ind-login').value=techs[0]?.user||'';}if(q('lab-iniciar-individual'))q('lab-iniciar-individual').onclick=startIndividual;if(restore())return;q('lab-cards').innerHTML=techs.map(card).join('');techs.forEach((t,i)=>showScreen(i,t,'login',{}));setStats(techs.length,0,0,0);}
+  async function startIndividual(){
+    if(!adminGeral()){nfToast('Somente o Administrador Geral pode executar diagnósticos de credenciais.','erro');return;}
+    const login=q('lab-ind-login'),password=q('lab-ind-senha'),circuitInput=q('lab-ind-circuito'),tipo=q('lab-ind-tipo'),resultado=q('lab-ind-resultado'),button=q('lab-iniciar-individual');
+    const user=login?.value.trim().toLowerCase(),pass=password?.value||'',circuit=String(circuitInput?.value||'').trim().toUpperCase();
+    if(!user||!user.includes('@')||pass.length<6||!circuit){nfToast('Informe e-mail, senha e circuito para executar o diagnóstico.','erro');return;}
+    const client=diagnosticClient();button.disabled=true;button.textContent='⏳ Diagnosticando...';resultado.classList.remove('hidden');resultado.textContent='Validando autenticação em sessão isolada...';
+    const checks=[];let display=user,detected='';
+    try{
+      const auth=await withTimeout(client.auth.signInWithPassword({email:user,password:pass}),12000,'Autenticação');password.value='';if(auth.error)throw auth.error;checks.push({step:'login',status:'passed',message:'Credenciais aceitas'});
+      const uid=auth.data.user?.id;let profile=null;
+      const perfilResp=await withTimeout(client.from('perfis').select('id,nome,usuario,tipo,admin_geral,ativo').eq('id',uid).maybeSingle(),10000,'Consulta do perfil');
+      if(!perfilResp.error&&perfilResp.data){profile=perfilResp.data;detected=profile.tipo;display=profile.nome||user;if(!profile.ativo)throw new Error('O perfil existe, mas está desativado.');}
+      if(!profile){const ext=await client.from('solicitantes_chamados').select('nome,ativo').eq('user_id',uid).maybeSingle();if(!ext.error&&ext.data){profile=ext.data;detected='solicitante';display=ext.data.nome||user;if(!ext.data.ativo)throw new Error('O solicitante existe, mas está desativado.');}}
+      if(!profile)throw new Error('Credenciais válidas, porém nenhum perfil operacional foi encontrado.');
+      if(tipo.value!=='auto'&&tipo.value!==detected&&!(tipo.value==='logistica'&&detected==='admin'))throw new Error(`O login pertence ao perfil ${detected}, não ao acesso ${tipo.value}.`);
+      checks.push({step:'perfil',status:'passed',message:`Perfil ${detected} ativo`});
+      let site=null;const siteResp=await client.from('sites').select('circuito,site,cidade,ativo').ilike('circuito',circuit).maybeSingle();if(!siteResp.error)site=siteResp.data;
+      if(!site&&typeof SITES_PEII!=='undefined'&&Array.isArray(SITES_PEII)){const row=SITES_PEII.find(x=>String(x?.[0]||'').trim().toUpperCase()===circuit);if(row)site={circuito:row[0],site:row[1],cidade:row[2],ativo:true};}
+      if(!site)throw new Error(`Circuito ${circuit} não encontrado na base.`);checks.push({step:'circuito',status:'passed',message:`${site.circuito} — ${site.site}`});
+      const history={savedAt:new Date().toISOString(),user,profile:detected,circuit,checks};localStorage.setItem('nexofield_diagnostico_last_v1',JSON.stringify(history));
+      resultado.innerHTML=`<b>✓ Autenticação e circuito aprovados</b><br>Usuário: ${safe(display)} · Perfil: ${safe(detected)}<br>Circuito: ${safe(site.circuito)} — ${safe(site.site)}<br><span style="color:var(--gr)">Iniciando o fluxo completo no banco isolado...</span>`;
+      await client.auth.signOut().catch(()=>{});overrideTechs=[{display,synthetic:`Diagnóstico ${detected} · ${circuit}`,user}];await start();
+    }catch(err){password.value='';checks.push({step:'diagnostico',status:'failed',message:String(err?.message||err)});resultado.innerHTML=`<b style="color:var(--r)">Falha localizada</b><br>${safe(err?.message||err)}<br><span style="color:var(--gr)">A senha não foi armazenada.</span>`;localStorage.setItem('nexofield_diagnostico_last_v1',JSON.stringify({savedAt:new Date().toISOString(),user,circuit,checks}));nfToast('Diagnóstico interrompido: '+String(err?.message||err),'erro');await client.auth.signOut().catch(()=>{});
+    }finally{password.value='';button.disabled=false;button.textContent='▶ Diagnosticar usuário e circuito';}
+  }
+  function render(){if(!adminGeral())return;ensureDiagnosticForm();q('lab-iniciar').onclick=start;const techs=technicians();if(q('lab-iniciar-individual'))q('lab-iniciar-individual').onclick=startIndividual;if(restore())return;q('lab-cards').innerHTML=techs.map(card).join('');techs.forEach((t,i)=>showScreen(i,t,'login',{}));setStats(techs.length,0,0,0);}
   function techRows(){return Object.entries(LABELS).map(([key,label],n)=>`<div id="tlab-row-${key}" style="display:grid;grid-template-columns:20px 1fr auto;gap:7px;padding:7px;border-bottom:1px solid #e5e7eb;font-size:.7rem"><span id="tlab-icon-${key}">○</span><span>${n+1}. ${safe(label)}</span><b id="tlab-state-${key}" style="color:var(--gr)">Aguardando</b></div>`).join('');}
   function techSetRow(key,running,ok=true){const icon=q('tlab-icon-'+key),state=q('tlab-state-'+key),row=q('tlab-row-'+key);if(!icon||!state)return;icon.textContent=running?'●':(ok?'✓':'✕');state.textContent=running?'Executando':(ok?'Aprovada':'Falhou');const color=running?'#d97706':(ok?'#16a34a':'#dc2626');icon.style.color=state.style.color=color;row.style.background=running?'#fffbeb':(ok?'#f0fdf4':'#fef2f2');}
   async function startTech(){if(running)return;const status=q('tlab-status'),button=q('tlab-iniciar'),session=typeof S!=='undefined'?S:null,t={display:session?.n||'Técnico autenticado',user:session?.u||'sessão autenticada',synthetic:'Técnico Autenticado de Teste'};running=true;button.disabled=true;button.textContent='⏳ Executando…';q('tlab-card').innerHTML=`<div class="card" style="border-top:3px solid var(--p)"><div style="display:flex;justify-content:space-between"><b>${safe(t.display)}</b><span class="badge">Sessão validada</span></div><div id="tlab-screen" style="background:#f8fafc;border:1px solid #dbe4ee;border-radius:9px;padding:10px;margin:10px 0"></div><div>${techRows()}</div><div id="tlab-id" style="font-size:.65rem;color:var(--gr);margin-top:8px"></div></div>`;status.textContent='Executando o fluxo isolado com a sessão autenticada…';try{const result=await request([t.synthetic]),steps=result.steps.length?result.steps:Object.keys(LABELS).map(step=>({step,status:'passed'}));for(const step of steps){const key=step.step||step.etapa,ok=String(step.status||'passed').toLowerCase()!=='failed';q('tlab-screen').innerHTML=screenView(t,key,step);techSetRow(key,true);await wait(700);techSetRow(key,false,ok);}const first=steps[0]||{};q('tlab-id').textContent=`${first.protocol||'TEST-gerado'} · ${first.sdm||'TEST-SDM-gerado'}`;status.textContent='Teste autenticado concluído. O checklist permanece nesta tela.';try{localStorage.setItem('nexofield_tlab_last_v1',JSON.stringify({savedAt:new Date().toISOString(),display:t.display,user:t.user,steps}));}catch(e){}}catch(err){status.textContent='Falha no teste: '+err.message;}finally{running=false;button.disabled=false;button.textContent='▶ Iniciar meu teste novamente';}}
@@ -3960,7 +4006,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 </script>
 <script src="/vistorias.js?v=1.4.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.0.5"></script>
+<script src="/release-info.js?v=2.3.0"></script>
 <script src="/pendencias.js?v=2.0.3"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=1"></script>\n<script src="/health-monitor.js?v=1.0.0"></script>
