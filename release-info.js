@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.3.2',date:'2026-09-21',title:'Acesso administrativo ao Portal de Abertura',
+  changes:['Administrador Geral e demais administradores ativos podem entrar no Portal de Abertura com o login habitual do NexoField.','A autorização de abertura é criada ou reativada automaticamente para o administrador autenticado.','Os acessos de solicitantes externos continuam funcionando normalmente.']
+ },{
   version:'2.3.1',date:'2026-09-21',title:'Cadastro de material restaurado na Logística',
   changes:['A Área Logística voltou a exibir a opção Cadastrar novo material em um painel recolhível.','O cadastro informa modelo e unidade e confirma a gravação no Supabase.','A relação completa e os nomes dos materiais continuam ocultos, aparecendo somente durante a pesquisa.']
  },{

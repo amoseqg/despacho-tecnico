@@ -33,8 +33,18 @@
   async function validarAcesso(){
     const {data:{user},error:userError}=await sb.auth.getUser();
     if(userError||!user){mostrarLogin();return false;}
-    const {data,error}=await sb.from('solicitantes_chamados').select('id,user_id,nome,email,operadora,ativo').eq('user_id',user.id).maybeSingle();
+    let {data,error}=await sb.from('solicitantes_chamados').select('id,user_id,nome,email,operadora,ativo').eq('user_id',user.id).maybeSingle();
     if(error)throw error;
+    if(!data?.ativo){
+      const {data:perfil,error:perfilError}=await sb.from('perfis').select('id,nome,email,tipo,ativo').eq('id',user.id).maybeSingle();
+      if(perfilError)throw perfilError;
+      if(perfil?.ativo&&perfil.tipo==='admin'){
+        const autorizacao={user_id:user.id,nome:texto(perfil.nome)||texto(user.email),email:texto(perfil.email||user.email).toLowerCase(),operadora:'metodo',ativo:true,criado_por:user.id,atualizado_em:new Date().toISOString()};
+        const {data:registro,error:autorizacaoError}=await sb.from('solicitantes_chamados').upsert(autorizacao,{onConflict:'user_id'}).select('id,user_id,nome,email,operadora,ativo').single();
+        if(autorizacaoError)throw autorizacaoError;
+        data=registro;
+      }
+    }
     if(!data?.ativo){await sb.auth.signOut();mostrarLogin('Este e-mail não está autorizado para abrir chamados. Procure um administrador do NexoField.');return false;}
     solicitante=data;mostrarPortal();await Promise.all([carregarSites(),carregarChamados()]);return true;
   }

@@ -20,6 +20,9 @@ assert.match(html,/id="form-nova-senha"/);
 assert.match(html,/id="btn-novo-circuito"/);
 assert.match(html,/id="btn-salvar-circuito"/);
 assert.match(js,/from\('solicitantes_chamados'\)/);
+assert.match(js,/from\('perfis'\)\.select\('id,nome,email,tipo,ativo'\)/);
+assert.match(js,/perfil\?\.ativo&&perfil\.tipo==='admin'/);
+assert.match(js,/upsert\(autorizacao,\{onConflict:'user_id'\}\)/);
 assert.match(js,/from\('chamados'\)\.insert/);
 assert.match(js,/solicitante_id:solicitante\.user_id/);
 assert.match(js,/select\('id,protocolo,status,criado_em,vencimento_em'\)/);
@@ -71,4 +74,4 @@ assert.match(sql,/pedido_cliente.*local_fechado.*feriado.*fortes_chuvas.*falta_e
 assert.match(sql,/cron\.schedule/);
 assert.match(css,/@media\(max-width:600px\)/);
 
-console.log('Portal validado: acesso separado, circuito automático, protocolo, vencimento, RLS e fila administrativa.');
+console.log('Portal validado: solicitantes e administradores ativos, circuito automático, protocolo, vencimento, RLS e fila administrativa.');
