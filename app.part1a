@@ -939,6 +939,17 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div id="lg-estoque-lista"></div>
     </div>
     <div class="card" style="margin-top:12px">
+      <details id="lg-cadastro-material">
+        <summary style="font-size:.9rem;color:var(--p);font-weight:700;cursor:pointer;padding:8px 0">➕ Cadastrar novo material</summary>
+        <div class="info">Cadastre um item novo no estoque. A relação completa de materiais continuará oculta e disponível somente pela pesquisa.</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="label">Modelo / Material</label><input id="lg-mat-nome" class="input" placeholder="Ex.: FortiAP, cabo UTP..." autocomplete="off"></div>
+          <div class="form-group"><label class="label">Unidade</label><select id="lg-mat-un" class="select"><option value="UN">UN</option><option value="M">M</option><option value="KIT">KIT</option><option value="CX">CX</option><option value="OUTRO">OUTRO</option></select></div>
+          <div class="form-group" style="display:flex;align-items:flex-end"><button type="button" class="btn btn-g" id="btn-lg-add-material" style="width:100%">➕ Cadastrar Material</button></div>
+        </div>
+      </details>
+    </div>
+    <div class="card" style="margin-top:12px">
       <details id="lg-retirados" open>
         <summary style="font-size:.9rem;color:var(--p);font-weight:700;cursor:pointer;padding:8px 0">♻️ Materiais retirados da planta</summary>
         <div class="info">Registre equipamentos retirados dos locais atendidos. Quando o item estiver recuperado, encaminhe-o ao estoque logístico para somar a quantidade disponível.</div>

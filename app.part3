@@ -906,6 +906,7 @@ function rLogCadastroMateriais(){
 }
 async function addMaterialLogistica(){
  const nome=el('lg-mat-nome')?.value.trim(),un=el('lg-mat-un')?.value||'UN',btn=el('btn-lg-add-material');
+ if(!['adm','log'].includes(S?.t)){alert('Somente Administradores e usuários autorizados da Logística podem cadastrar materiais.');return;}
  if(!nome){alert('Informe o material');return;}
  if(D.mat.some(m=>m.nome.toLowerCase()===nome.toLowerCase())){alert('Material já cadastrado');return;}
  const texto=btn?.innerHTML;

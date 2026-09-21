@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.3.1',date:'2026-09-21',title:'Cadastro de material restaurado na Logística',
+  changes:['A Área Logística voltou a exibir a opção Cadastrar novo material em um painel recolhível.','O cadastro informa modelo e unidade e confirma a gravação no Supabase.','A relação completa e os nomes dos materiais continuam ocultos, aparecendo somente durante a pesquisa.']
+ },{
   version:'2.3.0',date:'2026-09-21',title:'Diagnóstico operacional para qualquer usuário e circuito',
   changes:['Administrador Geral pode testar qualquer login, senha e circuito em sessão isolada.','A senha é apagada imediatamente e nunca é armazenada no histórico.','O diagnóstico valida autenticação, perfil ativo, tipo de acesso e existência do circuito antes da simulação completa.','Confirmações de criação, envio ao operador e encerramento deixaram de bloquear a interface.','O encerramento administrativo utiliza formulário seguro e não bloqueante com confirmação do servidor.']
  },{
