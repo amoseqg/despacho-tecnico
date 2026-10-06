@@ -725,11 +725,11 @@ function materialOcultoDaLista(r){return !!logMeta(r).ocultoDaListaEm||materialE
 function materialVisivelNaLista(r){return mostrarHistoricoMateriais?materialOcultoDaLista(r):!materialOcultoDaLista(r);}
 function botaoArquivoMaterial(r){
  const oculto=materialOcultoDaLista(r);
- return `<button type="button" class="btn ${oculto?'btn-y':'btn-r'} btn-arquivo-material" data-id="${escM(r.id)}">${oculto?'Restaurar na lista':'Apagar da lista'}</button>`;
+ return `<button type="button" class="btn ${oculto?'btn-y':'btn-r'} btn-arquivo-material" data-id="${escM(r.id)}">${oculto?'Restaurar na lista':'Excluir da lista — manter histórico'}</button>${oculto?' <button type="button" class="btn btn-r" onclick="alternarHistoricoMateriais()">Ocultar histórico</button><div class="os-r">Item excluído da lista. Histórico salvo.</div>':''}`;
 }
 function alternarHistoricoMateriais(){
  mostrarHistoricoMateriais=!mostrarHistoricoMateriais;
- document.querySelectorAll('.btn-historico-materiais').forEach(b=>{b.textContent=mostrarHistoricoMateriais?'Voltar às solicitações':'Ver histórico de itens apagados';b.setAttribute('aria-pressed',String(mostrarHistoricoMateriais));});
+ document.querySelectorAll('.btn-historico-materiais').forEach(b=>{b.textContent=mostrarHistoricoMateriais?'Ocultar histórico':'Ver histórico de itens apagados';b.setAttribute('aria-pressed',String(mostrarHistoricoMateriais));});
  rMl();rLog();
 }
 async function arquivarMaterialIndividual(id){
@@ -901,16 +901,16 @@ function rastreioTramite(r){
 }
 function rRastreioMateriais(targetId){
  const box=el(targetId);if(!box)return;
- const list=D.mr.filter(r=>materialInterior(r)&&r.status!=='cancelado').slice().reverse();
+ const list=D.mr.filter(materialVisivelNaLista).filter(r=>materialInterior(r)&&r.status!=='cancelado').slice().reverse();
  box.innerHTML=list.length?list.map(r=>{
   const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),meta=logMeta(r),st=logStatus(r),tec=tecnicoMaterial(r),destino=enderecoEntregaTec(tec);
-  const podeRastrear=['separado'].includes(r.status);
+  const podeRastrear=!materialOcultoDaLista(r)&&['separado'].includes(r.status);
   return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSeparada||r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
    <div class="os-r"><b>Protocolo:</b> ${escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'))} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
    <div class="os-r"><b>Localidade:</b> ${tecnicoMaterial(r)?.r==='noronha'?'Fernando de Noronha':'Interior'}</div>
    <div class="os-r"><b>Endereço de entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Não cadastrado')}</div>
    ${destino.contato?`<div class="os-r"><b>Contato para entrega:</b> ${escM(destino.contato)}</div>`:''}
-   ${rastreioTramite(r)}
+   ${rastreioTramite(r)}${['adm','log'].includes(S?.t)?`<div style="margin:8px 0">${botaoArquivoMaterial(r)}</div>`:''}
    <div class="os-r"><b>Código de rastreamento:</b> ${escM(meta.rastreamento||'Ainda não informado')}</div>
    <div class="os-r"><b>Previsão de entrega:</b> ${meta.prazo?escM(new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR')):'Ainda não informada'}</div>
    ${meta.rastreamento?`<div style="margin-top:8px"><button class="btn btn-s btn-correios" data-id="${r.id}">🔎 Consultar no site oficial dos Correios</button></div>`:''}
