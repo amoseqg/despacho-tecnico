@@ -913,6 +913,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <summary style="font-size:.9rem;color:var(--p);font-weight:700;cursor:pointer;padding:8px 0">🚚 Trâmite dos materiais</summary>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">
           <button type="button" class="btn btn-p btn-exp-materiais-liberados">📥 Exportar demandas com material liberado</button><button type="button" class="btn btn-y btn-historico-materiais" aria-pressed="false">Ver histórico de itens apagados</button>
+          <button type="button" class="btn btn-g" onclick="abrirMaterialLiberadoManual()">➕ Inserir material liberado</button>
           <button type="button" class="btn btn-y" id="btn-limpar-entregues">🧹 Limpar itens entregues</button>
         </div>
         <div class="info">Capital: separação → aguardando aceite → entregue. Interior/Noronha: separação → em trânsito com rastreio e previsão → aceite do técnico → entregue. A limpeza remove os entregues desta lista e mantém o histórico na exportação.</div>
