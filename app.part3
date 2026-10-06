@@ -639,6 +639,60 @@ function tecTab(btn, a) {
 }
 
 // ========== MATERIAIS / LOGÍSTICA ==========
+
+function abrirMaterialLiberadoManual(){
+ if(!SB_PROFILE||!['adm','log'].includes(S?.t))return;
+ let dlg=el('material-liberado-manual');
+ if(!dlg){
+  dlg=document.createElement('dialog');dlg.id='material-liberado-manual';
+  dlg.style.cssText='width:min(720px,94vw);max-height:90vh;overflow:auto;border:1px solid var(--b);border-radius:14px;padding:24px;background:var(--bg,#fff);color:var(--tx,#172033)';
+  dlg.innerHTML=`<form id="form-material-liberado"><h3>Inserir material liberado</h3><div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:18px 0">
+   <label>Material<select name="material" required></select></label>
+   <label>Quantidade solicitada<input name="solicitada" type="number" min="0.001" step="any" required></label>
+   <label>Quantidade liberada<input name="liberada" type="number" min="0.001" step="any" required></label>
+   <label>Técnico<select name="tecnico" required></select></label>
+   <label>Região<select name="regiao" required><option value="capital">Capital</option><option value="interior">Interior</option></select></label>
+   <label>Protocolo<input name="protocolo" required></label>
+   <label>SDM<input name="sdm"></label>
+   <label>Site / Cliente<input name="site" required></label>
+   <label>Status<select name="status"><option value="separado">Não entregue</option><option value="entregue">Entregue</option></select></label>
+   <label>Solicitado em<input name="solicitado" type="datetime-local" required></label>
+   <label>Entregue em<input name="entregue" type="datetime-local" disabled></label>
+   <label>Responsável logística<input name="responsavel" required></label>
+  </div><p role="alert" id="manual-material-erro" style="color:#b91c1c"></p><div style="display:flex;gap:10px;justify-content:flex-end"><button type="button" class="btn btn-y" id="manual-material-cancelar">Cancelar</button><button type="submit" class="btn btn-p">Salvar material liberado</button></div></form>`;
+  document.body.appendChild(dlg);
+  const form=dlg.querySelector('form');
+  dlg.querySelector('#manual-material-cancelar').onclick=()=>dlg.close();
+  form.elements.status.onchange=()=>{const entregue=form.elements.status.value==='entregue';form.elements.entregue.disabled=!entregue;form.elements.entregue.required=entregue;if(!entregue)form.elements.entregue.value='';};
+  form.onsubmit=salvarMaterialLiberadoManual;
+ }
+ const f=dlg.querySelector('form');f.reset();
+ f.elements.material.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${escM(m.id)}">${escM(m.nome)}</option>`).join('');
+ f.elements.tecnico.innerHTML='<option value="">Selecione...</option>'+D.tc.map(t=>`<option value="${escM(t.u)}">${escM(t.n)}</option>`).join('');
+ f.elements.responsavel.value=S.n||sbNameById(SB_PROFILE.id)||'';
+ const now=new Date();f.elements.solicitado.value=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
+ f.elements.status.onchange();el('manual-material-erro').textContent='';dlg.showModal();
+}
+async function salvarMaterialLiberadoManual(event){
+ event.preventDefault();const f=event.target,btn=f.querySelector('[type="submit"]'),erro=el('manual-material-erro');
+ if(btn.disabled||!f.reportValidity())return;
+ if(!SB_PROFILE||!['adm','log'].includes(S?.t)){erro.textContent='Acesse como administrador ou logística.';return;}
+ const v=n=>f.elements[n].value.trim(),q=Number(v('solicitada')),lib=Number(v('liberada'));
+ const solicitado=new Date(v('solicitado')),entregue=v('status')==='entregue'?new Date(v('entregue')):null;
+ if(!Number.isFinite(q)||!Number.isFinite(lib)||q<=0||lib<=0||lib>q){erro.textContent='A quantidade liberada deve ser maior que zero e não pode exceder a solicitada.';return;}
+ if(!Number.isFinite(solicitado.getTime())||(entregue&&(!Number.isFinite(entregue.getTime())||entregue<solicitado))){erro.textContent='Confira as datas. A entrega não pode ocorrer antes da solicitação.';return;}
+ const tec=sbIdByUser(v('tecnico')),mat=materialById(v('material'));if(!tec||!mat){erro.textContent='Selecione um material e um técnico cadastrados.';return;}
+ const chamado=D.ch.find(c=>String(c.pr)===v('protocolo'));
+ const meta={manual:true,etapa:entregue?'entregue':'aguardando_aceite',protocolo:v('protocolo'),sdm:v('sdm'),site:v('site'),regiao:v('regiao'),responsavelManual:v('responsavel'),registradoPor:SB_PROFILE.id,registradoEm:new Date().toISOString()};
+ btn.disabled=true;erro.textContent='';
+ try{
+  const {data,error}=await SB.from('solicitacoes_material').insert({chamado_id:chamado?.id||null,tecnico_id:tec,material_id:mat.id,quantidade_solicitada:q,quantidade_separada:lib,quantidade_entregue:entregue?lib:0,status:v('status'),observacao:logObs({},meta),solicitado_em:solicitado.toISOString(),entregue_em:entregue?.toISOString()||null,responsavel_id:SB_PROFILE.id}).select('id').single();
+  if(error)throw error;if(!data?.id)throw new Error('O servidor não confirmou o cadastro.');
+  el('material-liberado-manual').close();await sbRecarregarDados();alert('Material liberado cadastrado com sucesso.');
+ }catch(e){erro.textContent='Não foi possível salvar: '+(e.message||'Confira sua conexão e tente novamente.');}
+ finally{btn.disabled=false;}
+}
+
 function escM(v){ return esc(v); }
 function materialById(id){ return D.mat.find(m=>m.id===id); }
 const LOG_TAG='[[LOGISTICA]]';
@@ -650,9 +704,10 @@ function logMeta(r){
 function logObsBase(r){const s=String(r?.obs||''),i=s.lastIndexOf(LOG_TAG);return (i<0?s:s.slice(0,i)).trim();}
 function logObs(r,meta){const base=logObsBase(r);return (base?base+'\n':'')+LOG_TAG+JSON.stringify(meta);}
 function tecnicoMaterial(r){return D.tc.find(t=>t.u===r.tecnico);}
-function materialInterior(r){const t=tecnicoMaterial(r);return t && (t.r==='interior'||t.r==='noronha');}
+function materialInterior(r){const meta=logMeta(r);if(meta.manual)return meta.regiao==='interior';const t=tecnicoMaterial(r);return t && (t.r==='interior'||t.r==='noronha');}
 function logStatus(r){
   const m=logMeta(r);
+  if(m.manual)return r.status==='entregue'?['b-concluida','Entregue']:['b-pendente','Não entregue'];
   if(r.status==='entregue')return ['b-concluida','Entregue'];
   if(m.etapa==='em_transito')return ['b-andamento','Em trânsito'];
   if(m.etapa==='aguardando_aceite')return ['b-pendente','Aguardando aceite'];
@@ -660,7 +715,7 @@ function logStatus(r){
 }
 function logDetalhes(r){
   const m=logMeta(r),base=logObsBase(r);
-  return `${base?`<div class="os-r"><b>Observação:</b> ${escM(base)}</div>`:''}
+  return `${m.manual?`<div class="os-r"><b>SDM:</b> ${escM(m.sdm||'—')} &nbsp; <b>Site / Cliente:</b> ${escM(m.site)}</div><div class="os-r"><b>Solicitado em:</b> ${rastreioData(r.data)} &nbsp; <b>Entregue em:</b> ${rastreioData(r.entregueEm)}</div><div class="os-r"><b>Quantidade liberada:</b> ${r.qtdSeparada||0} &nbsp; <b>Responsável logística:</b> ${escM(m.responsavelManual)}</div>`:''}${base?`<div class="os-r"><b>Observação:</b> ${escM(base)}</div>`:''}
     ${m.rastreamento?`<div class="os-r"><b>Código de rastreamento:</b> ${escM(m.rastreamento)}</div>`:''}
     ${m.prazo?`<div class="os-r"><b>Previsão de entrega:</b> ${escM(new Date(m.prazo+'T12:00:00').toLocaleDateString('pt-BR'))}</div>`:''}`;
 }
@@ -709,7 +764,7 @@ function rMl(){
   box.innerHTML=list.length?list.map(r=>{
     const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r);
     return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
-      <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
+      <div class="os-r"><b>Protocolo:</b> ${escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'))} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
       <div class="os-r"><b>Destino:</b> ${materialInterior(r)?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Separado:</b> ${r.qtdSeparada||0} &nbsp; <b>Entregue:</b> ${r.qtdEntregue||0}</div>
       ${logDetalhes(r)}
       ${r.responsavel?`<div class="os-r"><b>Responsável logística:</b> ${escM(r.responsavel)}</div>`:''}
@@ -851,7 +906,7 @@ function rRastreioMateriais(targetId){
   const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),meta=logMeta(r),st=logStatus(r),tec=tecnicoMaterial(r),destino=enderecoEntregaTec(tec);
   const podeRastrear=['separado'].includes(r.status);
   return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSeparada||r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
-   <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
+   <div class="os-r"><b>Protocolo:</b> ${escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'))} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
    <div class="os-r"><b>Localidade:</b> ${tecnicoMaterial(r)?.r==='noronha'?'Fernando de Noronha':'Interior'}</div>
    <div class="os-r"><b>Endereço de entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Não cadastrado')}</div>
    ${destino.contato?`<div class="os-r"><b>Contato para entrega:</b> ${escM(destino.contato)}</div>`:''}
@@ -958,16 +1013,16 @@ function exportarMateriaisLiberados(){
      'Quantidade solicitada':r.qtdSolicitada||0,
      'Quantidade liberada':r.qtdEntregue||r.qtdSeparada||0,
      'Técnico':nt(r.tecnico)||r.tecnico||'',
-     'Região':nomeRegiao(tec?.r||c?.re||'').replace(/^[^ ]+ /,''),
-     'Protocolo':c?.pr||r.protocolo||'',
-     'SDM':c?.sdm||'',
-     'Site / Cliente':c?.si||'',
+     'Região':meta.manual?(meta.regiao==='interior'?'Interior':'Capital'):nomeRegiao(tec?.r||c?.re||'').replace(/^[^ ]+ /,''),
+     'Protocolo':meta.manual?meta.protocolo:(c?.pr||r.protocolo||''),
+     'SDM':meta.manual?meta.sdm:(c?.sdm||''),
+     'Site / Cliente':meta.manual?meta.site:(c?.si||''),
      'Status':st[1],
      'Solicitado em':rastreioData(r.data),
      'Separado em':rastreioData(r.separadoEm),
      'Liberado / enviado em':rastreioData(meta.transitoEm||r.separadoEm),
      'Entregue em':rastreioData(r.entregueEm),
-     'Responsável logística':r.responsavel||'',
+     'Responsável logística':meta.responsavelManual||r.responsavel||'',
      'Código de rastreamento':meta.rastreamento||'',
      'Previsão de entrega':meta.prazo?new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR'):'',
      'Observação':logObsBase(r)
@@ -1018,7 +1073,7 @@ function rLog(){
    else if(r.status==='separado'&&meta.etapa==='separado')acao=interior?`<button class="btn btn-p btn-log-enviar" data-id="${r.id}">🚚 Informar envio e rastreio</button>`:`<button class="btn btn-p btn-log-liberar" data-id="${r.id}">🤝 Liberar para aceite</button>`;
    return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--b)">
-      <div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo||'—')} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
+      <div class="os-r"><b>Protocolo:</b> ${escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'))} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
       <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
       ${interior?`<div class="os-r"><b>Entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Endereço não cadastrado')}${destino.contato?' — Contato: '+escM(destino.contato):''}</div>`:''}
       ${logDetalhes(r)}<div style="margin-top:8px">${materialOcultoDaLista(r)?'':acao} ${botaoArquivoMaterial(r)}</div>
