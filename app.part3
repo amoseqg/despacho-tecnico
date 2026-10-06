@@ -669,7 +669,7 @@ function abrirMaterialLiberadoManual(){
  const f=dlg.querySelector('form');f.reset();
  f.elements.material.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${escM(m.id)}">${escM(m.nome)}</option>`).join('');
  f.elements.tecnico.innerHTML='<option value="">Selecione...</option>'+D.tc.map(t=>`<option value="${escM(t.u)}">${escM(t.n)}</option>`).join('');
- f.elements.responsavel.value=S.n||sbNameById(SB_PROFILE.id)||'';
+ f.elements.responsavel.value='';
  const now=new Date();f.elements.solicitado.value=new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,16);
  f.elements.status.onchange();el('manual-material-erro').textContent='';dlg.showModal();
 }
