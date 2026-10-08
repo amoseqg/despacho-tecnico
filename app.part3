@@ -1479,9 +1479,9 @@ function inicioIndicadoresPainel(){
 function dadosIndicadoresTecnicos(){
   const inicioPainel=inicioIndicadoresPainel();
   const perdas=[];
-  D.ch.forEach(c=>{if(c.st!=='concluida'||!c.am||!c.cc)return;const inicio=new Date(c.am).getTime(),fim=new Date(c.cc).getTime();if(Number.isFinite(inicio)&&Number.isFinite(fim)&&fim>=inicioPainel&&fim-inicio>LIMITE_PRAZO_MS)perdas.push({chamado:c,duracao:fim-inicio});});
+  D.ch.forEach(c=>{if(!chamadoVisivel(c)||c.st!=='concluida'||!c.am||!c.cc)return;const inicio=new Date(c.am).getTime(),fim=new Date(c.cc).getTime();if(Number.isFinite(inicio)&&Number.isFinite(fim)&&fim>=inicioPainel&&fim-inicio>LIMITE_PRAZO_MS)perdas.push({chamado:c,duracao:fim-inicio});});
   const reincidencias=[];
-  D.ch.forEach(c=>{if(dataChamadoMs(c)<inicioPainel)return;const anterior=historicoAnteriorCircuito(c);if(anterior)reincidencias.push({chamado:c,anterior:anterior.chamado,intervalo:dataChamadoMs(c)-anterior.data});});
+  D.ch.forEach(c=>{if(!chamadoVisivel(c)||dataChamadoMs(c)<inicioPainel)return;const anterior=historicoAnteriorCircuito(c);if(anterior)reincidencias.push({chamado:c,anterior:anterior.chamado,intervalo:dataChamadoMs(c)-anterior.data});});
   return {perdas,reincidencias};
 }
 
@@ -1575,11 +1575,11 @@ function chamadosDoCardDashboard(tipo){
   if(tipo==='historico')return D.ch.slice();
   if(['pendente','andamento','recusado'].includes(tipo))return lista.filter(c=>c.st===tipo);
   if(tipo==='concluida')return lista.filter(c=>c.st==='concluida'&&(ciclo===null||new Date(c.cc||c.dtexec||c.cr).getTime()>=ciclo));
-  if(tipo==='dentro-prazo'||tipo==='perda-prazo')return D.ch.filter(c=>{
+  if(tipo==='dentro-prazo'||tipo==='perda-prazo')return lista.filter(c=>{
     const v=avaliacaoPrazoDashboard(c);if(!v||v.fim<inicio)return false;
     return tipo==='dentro-prazo'?c.st==='concluida'&&v.duracao<=LIMITE_PRAZO_MS:v.duracao>LIMITE_PRAZO_MS;
   });
-  if(tipo==='reincidencia')return dadosIndicadoresTecnicos().reincidencias.map(x=>x.chamado);
+  if(tipo==='reincidencia')return dadosIndicadoresTecnicos().reincidencias.map(x=>x.chamado).filter(chamadoVisivel);
   return [];
 }
 function historicoTransferenciasHtml(c){
@@ -1592,7 +1592,7 @@ function abrirCardDashboard(tipo){
   const titulos={historico:'Histórico completo de chamados',pendente:'Pendentes',andamento:'Em andamento',concluida:'Concluídos',recusado:'Recusados','dentro-prazo':'Concluídos dentro do prazo','perda-prazo':'Chamados com perda de prazo',reincidencia:'Chamados reincidentes'};
   box.dataset.tipo=tipo;box.classList.remove('hidden');el('db-detalhes-titulo').textContent='📋 '+(titulos[tipo]||'Chamados');periodo?.classList.toggle('hidden',tipo!=='concluida');
   const itens=chamadosDoCardDashboard(tipo).slice().sort((a,b)=>new Date(b.cc||b.cr||0)-new Date(a.cc||a.cr||0));
-  lista.innerHTML=itens.map(c=>{const status={aberto:'Aberto',pendente:'Pendente',andamento:'Andamento',concluida:'Concluído',recusado:'Recusado'}[c.st]||c.st;return `<div class="os"><div class="os-h"><span class="os-id">${esc(c.pr||'Sem protocolo')}</span><span class="badge b-${c.st==='concluida'?'concluida':c.st==='andamento'?'andamento':c.st==='recusado'?'recusado':'pendente'}">${esc(status)}</span></div><div class="os-r"><b>Site:</b> ${esc(c.si||'—')}</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||'—')}</div><div class="os-r"><b>Técnico:</b> ${esc(c.te?nt(c.te):'—')}</div>${c.cc?`<div class="os-r"><b>Encerrado em:</b> ${new Date(c.cc).toLocaleString('pt-BR')}</div>`:''}${c.ex?.relatorio?`<div class="os-r"><b>Relatório:</b> ${esc(c.ex.relatorio)}</div>`:''}${historicoTransferenciasHtml(c)}${botaoArquivoChamado(c)}</div>`;}).join('')||'<div class="empty">Nenhum chamado encontrado neste card.</div>';
+  lista.innerHTML=itens.map(c=>{const status={aberto:'Aberto',pendente:'Pendente',andamento:'Andamento',concluida:'Concluído',recusado:'Recusado'}[c.st]||c.st;return `<div class="os"><div class="os-h"><span class="os-id">${esc(c.pr||'Sem protocolo')}</span><span class="badge b-${c.st==='concluida'?'concluida':c.st==='andamento'?'andamento':c.st==='recusado'?'recusado':'pendente'}">${esc(status)}</span></div><div class="os-r"><b>Site:</b> ${esc(c.si||'—')}</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||'—')}</div><div class="os-r"><b>Técnico:</b> ${esc(c.te?nt(c.te):'—')}</div>${c.cc?`<div class="os-r"><b>Encerrado em:</b> ${new Date(c.cc).toLocaleString('pt-BR')}</div>`:''}${c.ex?.relatorio?`<div class="os-r"><b>Relatório:</b> ${esc(c.ex.relatorio)}</div>`:''}${historicoTransferenciasHtml(c)}${chamadoVisivel(c)?botaoArquivoChamado(c):'<div class="info">Arquivado — preservado no histórico.</div>'}</div>`;}).join('')||'<div class="empty">Nenhum chamado encontrado neste card.</div>';
   let dialog=el('db-janela-chamados');
   if(!dialog){
     dialog=document.createElement('dialog');dialog.id='db-janela-chamados';
