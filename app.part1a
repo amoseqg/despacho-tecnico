@@ -1024,7 +1024,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <div class="modal-bd">
       <div class="info" id="pl-in"></div>
       <div style="overflow-x:auto"><table class="pl-table" id="pl-tb">
-        <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Data</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th></tr></thead>
+        <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Data</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th><th id="pl-acoes-cab" class="hidden">Ações do seu perfil</th></tr></thead>
         <tbody id="pl-tb-body"></tbody>
       </table></div>
       <div class="pl-ft" style="margin-top:12px">

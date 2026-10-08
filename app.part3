@@ -1737,9 +1737,9 @@ function rRl(dt1, dt2, forcarExibicao) {
 
   container.innerHTML = '<div class="grid-2">' + tecnicos.map(u => {
     const t = porTec[u];
-    const pendentes = t.chamados.filter(c => !c.ap || c.ap.status === 'pendente').length;
-    const aprovados = t.chamados.filter(c => c.ap && c.ap.status === 'aprovado').length;
-    const rejeitados = t.chamados.filter(c => c.ap && c.ap.status === 'rejeitado').length;
+    const pendentes = t.chamados.filter(c => !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente')).length;
+    const aprovados = t.chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
+    const rejeitados = t.chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'rejeitado').length;
 
     let statusGeral = 'pendente';
     if (pendentes === 0 && aprovados > 0 && rejeitados === 0) statusGeral = 'aprovado';
@@ -1755,8 +1755,8 @@ function rRl(dt1, dt2, forcarExibicao) {
 
     let totalVal = 0;
     t.chamados.forEach(c => {
-      if (c.ex && c.ex.total) {
-        const v = parseFloat(c.ex.total.replace('R$ ', '').replace('.', '').replace(',', '.'));
+      if (c.ex && c.ex.total && !c.ex.pagamentoExcluido) {
+        const v = numeroExcel(c.ex.total);
         if (!isNaN(v)) totalVal += v;
       }
     });
@@ -1769,7 +1769,7 @@ function rRl(dt1, dt2, forcarExibicao) {
       <h3>${t.nome}</h3>
       <div class="reg">${regBadge}</div>
       <div class="tot">${totalStr}</div>
-      <div class="qtd"><b>${t.chamados.length}</b> serviço(s) — ${badgeGeral}</div>
+      <div class="qtd"><b>${t.chamados.filter(c=>!c.ex?.pagamentoExcluido).length}</b> serviço(s) — ${badgeGeral}${t.chamados.some(c=>c.ex?.pagamentoExcluido)?'<br>Há valores excluídos no histórico':''}</div>
     </div>`;
   }).join('') + '</div>';
 }
@@ -1795,6 +1795,51 @@ function exportarRelatorioQualidade(tipo){
   if(!rows.length){alert('Não há dados para este relatório.');return;}
   const ws=XLSX.utils.json_to_sheet(rows);ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+3,16),45)}));
   const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,tipo==='perdas'?'Perda de Prazo':'Reincidências 30 dias');XLSX.writeFile(wb,nome);
+}
+
+// Operações financeiras exclusivas do titular, confirmadas pelo banco.
+function podeGerirValoresParceiros(){
+ return S?.t==='adm' && SB_PROFILE?.tipo==='admin' && SB_PROFILE?.ativo===true && SB_PROFILE.id==='391d92ed-3a0d-42f7-9e5f-e3f5172b3e1b';
+}
+function validarValorParceiro(texto){
+ const s=String(texto??'').trim().replace(/^R\$\s*/, '').replace(/\s/g,'');
+ if(!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(s))return null;
+ const v=Number(s.replace(/\./g,'').replace(',','.'));
+ return Number.isFinite(v)&&v>=0&&v<=999999999999.99?v:null;
+}
+async function abrirAjusteValorParceiro(id,acao){
+ if(!podeGerirValoresParceiros())return;
+ const c=D.ch.find(x=>x.id===id);
+ if(!c?.ex||c.st!=='concluida')return;
+ const titulo={corrigir:'Corrigir valor',excluir:'Excluir valor',restaurar:'Restaurar valor',historico:'Histórico de valores'}[acao];
+ if(!titulo)return;
+ const dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(600px,calc(100% - 28px));max-height:85vh;overflow:auto;border:0;border-radius:16px;padding:24px;box-shadow:0 24px 70px #0005;font-family:system-ui';
+ dialog.innerHTML=`<form><h3 style="margin-top:0">${titulo}</h3><p><b>Protocolo:</b> ${esc(c.pr)}<br><b>Parceiro:</b> ${esc(nt(c.te))}<br><b>Valor atual:</b> ${esc(c.ex.total)}</p>${acao==='historico'?'<div class="historico">Carregando histórico...</div>':`<p>${acao==='excluir'?'O valor será retirado dos totais e dos relatórios de pagamento. O chamado e o histórico serão preservados.':acao==='restaurar'?'O lançamento voltará aos totais e aos relatórios de pagamento.':'O valor total será substituído pelo valor correto, mantendo a aprovação existente.'}</p>${acao==='corrigir'?`<label style="display:block;margin-bottom:16px">Valor total correto (R$)<input name="valor" class="input" inputmode="decimal" required value="${esc(numeroExcel(c.ex.total).toFixed(2).replace('.',','))}" style="display:block;width:100%;margin-top:6px"></label>`:''}<label style="display:block">Motivo<textarea name="motivo" class="input" required minlength="3" maxlength="2000" style="display:block;width:100%;margin-top:6px;min-height:90px"></textarea></label>`}<p class="erro" role="alert" style="color:#b91c1c"></p><div style="display:flex;justify-content:flex-end;gap:10px;margin-top:18px"><button type="button" class="btn btn-s fechar">${acao==='historico'?'Fechar':'Cancelar'}</button>${acao==='historico'?'':'<button type="submit" class="btn btn-p salvar">Confirmar</button>'}</div></form>`;
+ document.body.append(dialog);dialog.querySelector('.fechar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+ if(acao==='historico'){
+  try{
+   const {data,error}=await SB.from('historico_valores_parceiros').select('acao,motivo,criado_em,anterior,novo').eq('chamado_id',id).order('criado_em',{ascending:false});if(error)throw error;
+   dialog.querySelector('.historico').innerHTML=(data||[]).map(h=>`<div style="border-top:1px solid #ddd;padding:12px 0"><b>${esc(h.acao)}</b> — ${esc(new Date(h.criado_em).toLocaleString('pt-BR'))}<br>${esc(Number(h.anterior.valor||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))} → ${esc(Number(h.novo.valor||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}))}${h.novo.excluido?' (excluído dos pagamentos)':''}<br>${esc(h.motivo)}</div>`).join('')||'Nenhum ajuste registrado.';
+  }catch(e){dialog.querySelector('.erro').textContent=e.message;dialog.querySelector('.historico').textContent='Não foi possível carregar o histórico.';}
+  return;
+ }
+ const revisao=c.ex.pagamentoRevisao||0;
+ dialog.querySelector('form').onsubmit=async e=>{
+  e.preventDefault();const btn=dialog.querySelector('.salvar');if(btn.disabled)return;
+  const motivo=dialog.querySelector('[name=motivo]').value.trim(),valor=acao==='corrigir'?validarValorParceiro(dialog.querySelector('[name=valor]').value):null;
+  const erro=dialog.querySelector('.erro');
+  if(motivo.length<3||(acao==='corrigir'&&valor===null)){erro.textContent='Informe o motivo e um valor válido, como 130,00.';return;}
+  btn.disabled=true;btn.textContent='Salvando...';
+  try{
+   if(!podeGerirValoresParceiros())throw new Error('Acesso exclusivo do seu perfil.');
+   const {data,error}=await SB.rpc('ajustar_valor_parceiro',{p_chamado_id:id,p_acao:acao,p_valor:valor,p_motivo:motivo,p_revisao:revisao}).single();if(error)throw error;
+   if(data?.chamado_id!==id || data.pagamento_revisao!==revisao+1 || (acao==='corrigir'&&Number(data.pagamento_valor_corrigido)!==valor) || (acao==='excluir'&&!data.pagamento_excluido) || (acao==='restaurar'&&data.pagamento_excluido))throw new Error('O servidor não confirmou o ajuste. Atualize a tela.');
+   Object.assign(c.ex,{pagamentoExcluido:data.pagamento_excluido,pagamentoRevisao:data.pagamento_revisao,pagamentoMotivo:data.pagamento_motivo,valorCorrigido:data.pagamento_valor_corrigido,valorOriginal:data.valor_total,total:'R$ '+Number(data.pagamento_valor_corrigido??data.valor_total??0).toFixed(2).replace('.',',')});
+   lsSet('dd',D);const dt1=RL_DT1_ATUAL,dt2=RL_DT2_ATUAL;rRl(dt1,dt2);opPl(c.te);dialog.close();nfToast('Ajuste confirmado. Totais e relatórios de pagamento atualizados.','sucesso');
+  }catch(err){erro.textContent=err.message||'Não foi possível salvar.';}
+  finally{btn.disabled=false;btn.textContent='Confirmar';}
+ };
 }
 
 let PLU = null;
@@ -1824,7 +1869,7 @@ function opPl(u) {
     const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '—';
     const atvNome = ex.atv ? ex.atv.split('|')[0] : '—';
     const ap = c.ap || { status: 'pendente' };
-    const apBadge = {
+    const apBadge = ex.pagamentoExcluido ? '<span class="badge b-rejeitado">Valor excluído</span>' : {
       pendente: '<span class="badge b-pag-pendente">Pendente</span>',
       aprovado: '<span class="badge b-aprovado">Aprovado</span>',
       rejeitado: '<span class="badge b-rejeitado">Rejeitado</span>'
@@ -1845,19 +1890,20 @@ function opPl(u) {
       if (ex.can) parts.push(ex.can);
       qtd = parts.join(' / ');
     }
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td>${valorInfo(ex.relatorio || ex.obs)}</td><td>${apBadge}</td></tr>`;
+    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td>${valorInfo(ex.relatorio || ex.obs)}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${podeGerirValoresParceiros()?`<td><div style="display:flex;gap:6px;flex-wrap:wrap">${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button></div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
   el('pl-tb-body').innerHTML = rows;
+  el('pl-acoes-cab').classList.toggle('hidden',!podeGerirValoresParceiros());
 
-  const pendentes = chamados.filter(c => !c.ap || c.ap.status === 'pendente').length;
-  const aprovados = chamados.filter(c => c.ap && c.ap.status === 'aprovado').length;
-  const rejeitados = chamados.filter(c => c.ap && c.ap.status === 'rejeitado').length;
+  const pendentes = chamados.filter(c => !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente')).length;
+  const aprovados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
+  const rejeitados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'rejeitado').length;
 
   let totalVal = 0;
   chamados.forEach(c => {
-    if (c.ex && c.ex.total) {
-      const v = parseFloat(c.ex.total.replace('R$ ', '').replace('.', '').replace(',', '.'));
+    if (c.ex && c.ex.total && !c.ex.pagamentoExcluido) {
+      const v = numeroExcel(c.ex.total);
       if (!isNaN(v)) totalVal += v;
     }
   });
@@ -1873,7 +1919,7 @@ function opPl(u) {
 
   const expAp = el('btn-exp-serv-xlsx');
   if (expAp) {
-    const aprovados = chamados.filter(c => c.ap && c.ap.status === 'aprovado').length;
+    const aprovados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
     expAp.classList.toggle('hidden', !adminGeral() || aprovados === 0);
   }
   el('m-pl').classList.add('a');
@@ -1901,7 +1947,7 @@ async function cfAp() {
   // quando há itens aprovados. A confirmação deve seguir a mesma regra visual,
   // permitindo corrigir a decisão anterior sem deixar o modal travado.
   const alvos=D.ch.filter(c=>{
-    if(c.te!==PLU || c.st!=='concluida') return false;
+    if(c.te!==PLU || c.st!=='concluida' || c.ex?.pagamentoExcluido) return false;
     const status=c.ap?.status||'pendente';
     return APT==='aprovado' ? status!=='aprovado' : status!=='rejeitado';
   });
@@ -2180,7 +2226,7 @@ function reabrirAjuste(id) {
 function rTar(dt1, dt2) {
   const tb = el('tb-ar-body');
   if(!tb) return;
-  let list = D.ch.filter(c => c.te === S.u && c.st === 'concluida');
+  let list = D.ch.filter(c => c.te === S.u && c.st === 'concluida' && !c.ex?.pagamentoExcluido);
   if (dt1) {
     const d1 = new Date(dt1 + 'T00:00:00');
     list = list.filter(c => c.dtexec && new Date(c.dtexec) >= d1);
@@ -2756,7 +2802,7 @@ function valorExcel(v) {
 }
 
 function atividadesDoTecnicoAtual(dt1, dt2) {
-  let list = D.ch.filter(c => c.te === S.u && c.st === 'concluida');
+  let list = D.ch.filter(c => c.te === S.u && c.st === 'concluida' && !c.ex?.pagamentoExcluido);
   if (dt1) {
     const d1 = new Date(dt1 + 'T00:00:00');
     list = list.filter(c => c.dtexec && new Date(c.dtexec) >= d1);
@@ -2795,7 +2841,7 @@ function linhaPagamento(c) {
   const materiais = [ex.utp && 'UTP ' + ex.utp + 'm', ex.cci && 'CCI ' + ex.cci + 'm', ex.can && 'Canaleta ' + ex.can + 'm'].filter(Boolean);
   const quantidades = [ex.utp, ex.cci, ex.can].filter(Boolean);
   const status = c.ap && c.ap.status ? c.ap.status.toUpperCase() : 'PENDENTE';
-  const observacao = [ex.relatorio || ex.obs, 'PAGAMENTO: ' + status].filter(Boolean).join(' | ');
+  const observacao = [ex.relatorio || ex.obs, ex.valorCorrigido!=null?'VALOR CORRIGIDO: '+(ex.pagamentoMotivo||''):null, 'PAGAMENTO: ' + status].filter(Boolean).join(' | ');
   return [
     valorExcel(c.pr), valorExcel(c.si), valorExcel(ex.co), valorExcel(ex.cd), valorExcel(ex.cr),
     c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '',
@@ -2823,7 +2869,7 @@ function criarAbaPagamento(nome, list) {
 }
 
 function chamadosPagamentoPeriodo(dt1, dt2) {
-  let list = D.ch.filter(c => c.st === 'concluida');
+  let list = D.ch.filter(c => c.st === 'concluida' && !c.ex?.pagamentoExcluido);
   if (dt1) { const d1 = new Date(dt1 + 'T00:00:00'); list = list.filter(c => c.dtexec && new Date(c.dtexec) >= d1); }
   if (dt2) { const d2 = new Date(dt2 + 'T23:59:59'); list = list.filter(c => c.dtexec && new Date(c.dtexec) <= d2); }
   return list;
@@ -2891,7 +2937,7 @@ function exportarServicoAprovadoExcel() {
   // Somente serviços concluídos e efetivamente aprovados pelo administrador.
   const list = D.ch.filter(c =>
     c.te === PLU &&
-    c.st === 'concluida' &&
+    c.st === 'concluida' && !c.ex?.pagamentoExcluido &&
     c.ap &&
     c.ap.status === 'aprovado'
   );
@@ -2912,7 +2958,7 @@ function exportarServicoAprovadoExcel() {
 // ========== EXPORTAR CSV ==========
 function expCSV() {
   let csv = 'O.S;SITE;ORIGEM;DESTINO;RETORNO;DATA;ATIVIDADE;MISCELANEA;QTD;KM TOTAL;VALOR KM;VALOR MATERIAL;TOTAL MATERIAL;VALOR ATIVIDADE;VALOR TOTAL;OBSERVACAO\n';
-  D.ch.filter(c => c.st === 'concluida').forEach(c => {
+  D.ch.filter(c => c.st === 'concluida' && !c.ex?.pagamentoExcluido).forEach(c => {
     const ex = c.ex || {};
     const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '';
     const atvNome = ex.atv ? ex.atv.split('|')[0] : '';
@@ -3163,7 +3209,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
@@ -3493,7 +3540,7 @@ async function sbLoadAll(){
       exclusaoPortal:exclusaoPortal?{nome:exclusaoPortal.excluido_por_nome,email:exclusaoPortal.excluido_por_email,data:exclusaoPortal.excluido_em,statusAnterior:exclusaoPortal.status_anterior}:null
     };
     legacy._trLoadedCount=legacy.tr.length;
-    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',total:'R$ '+Number(ex.valor_total||0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
+    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
     return legacy;
   });

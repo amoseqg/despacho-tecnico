@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.4.0',date:'2026-10-08',title:'Ajustes de valores dos parceiros',
+  changes:['Perfil de Amós pode excluir e corrigir valores, inclusive aprovados.','Valores excluídos saem dos totais e relatórios de pagamento, preservando o chamado e o histórico.','Ações financeiras protegidas no banco e registradas com motivo, valor anterior e data.']
+ },{
   version:'2.3.2',date:'2026-09-21',title:'Acesso administrativo ao Portal de Abertura',
   changes:['Administrador Geral e demais administradores ativos podem entrar no Portal de Abertura com o login habitual do NexoField.','A autorização de abertura é criada ou reativada automaticamente para o administrador autenticado.','Os acessos de solicitantes externos continuam funcionando normalmente.']
  },{
