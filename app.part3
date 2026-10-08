@@ -1524,7 +1524,7 @@ function rCh() {
   const elDi = el('l-di');
   const elRe = el('l-re');
   if(elAb) elAb.innerHTML = ab.length ? ab.map(c => {
-    const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : 'Não definida';
+    const dtexec = c.dtexec ? formatarDataBrasil(c.dtexec) : 'Não definida';
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aberto</span></div>
     ${dadosSite(c)}
     ${dadosAberturaPortal(c)}
@@ -1540,7 +1540,7 @@ function rCh() {
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
   if(elRe) elRe.innerHTML = re.length ? re.map(c => {
-    const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : 'Não definida';
+    const dtexec = c.dtexec ? formatarDataBrasil(c.dtexec) : 'Não definida';
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-recusado">Recusado</span></div>
     <div class="os-r"><b>Site:</b> ${c.si}</div>
     <div class="os-r"><b>Técnico:</b> ${nt(c.te)}</div>
@@ -1570,6 +1570,20 @@ function rDb() {
 }
 
 function dataEncerramentoChamado(c){return c.cc||c.dtexec||'';}
+function dataBrasilISO(valor){
+  if(!valor)return '';
+  const texto=String(valor);
+  if(/^\d{4}-\d{2}-\d{2}$/.test(texto))return texto;
+  const d=new Date(texto);if(Number.isNaN(d.getTime()))return '';
+  const partes=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+  const campo=tipo=>partes.find(p=>p.type===tipo)?.value;
+  return `${campo('year')}-${campo('month')}-${campo('day')}`;
+}
+function formatarDataBrasil(valor){const iso=dataBrasilISO(valor);return iso?iso.split('-').reverse().join('/'):'—';}
+function datasPagamentoHtml(c){
+ const encerramento=formatarDataBrasil(dataEncerramentoChamado(c));
+ return encerramento+(c.ap?.status==='aprovado'&&c.ap.data?`<br><small>Aprovado: ${formatarDataBrasil(c.ap.data)}</small>`:'');
+}
 function chamadosDoCardDashboard(tipo){
   const lista=D.ch.filter(chamadoVisivel),ciclo=inicioCicloDashboard(),inicio=inicioIndicadoresPainel();
   if(tipo==='historico')return D.ch.slice();
@@ -1712,12 +1726,10 @@ function rRl(dt1, dt2, forcarExibicao) {
 
   let chamados = D.ch.filter(c => c.st === 'concluida');
   if (dt1) {
-    const d1 = new Date(dt1 + 'T00:00:00');
-    chamados = chamados.filter(c => c.dtexec && new Date(c.dtexec) >= d1);
+    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= dt1 && !!dataEncerramentoChamado(c));
   }
   if (dt2) {
-    const d2 = new Date(dt2 + 'T23:59:59');
-    chamados = chamados.filter(c => c.dtexec && new Date(c.dtexec) <= d2);
+    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c));
   }
 
   const porTec = {};
@@ -1852,12 +1864,10 @@ function opPl(u) {
 
   let chamados = D.ch.filter(c => c.te === u && c.st === 'concluida');
   if (RL_DT1_ATUAL) {
-    const d1 = new Date(RL_DT1_ATUAL + 'T00:00:00');
-    chamados = chamados.filter(c => c.dtexec && new Date(c.dtexec) >= d1);
+    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= RL_DT1_ATUAL && !!dataEncerramentoChamado(c));
   }
   if (RL_DT2_ATUAL) {
-    const d2 = new Date(RL_DT2_ATUAL + 'T23:59:59');
-    chamados = chamados.filter(c => c.dtexec && new Date(c.dtexec) <= d2);
+    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= RL_DT2_ATUAL && !!dataEncerramentoChamado(c));
   }
   if (chamados.length === 0) return;
 
@@ -1866,7 +1876,7 @@ function opPl(u) {
 
   const rows = chamados.map(c => {
     const ex = c.ex || {};
-    const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '—';
+    const dtexec = datasPagamentoHtml(c);
     const atvNome = ex.atv ? ex.atv.split('|')[0] : '—';
     const ap = c.ap || { status: 'pendente' };
     const apBadge = ex.pagamentoExcluido ? '<span class="badge b-rejeitado">Valor excluído</span>' : {
@@ -2087,7 +2097,7 @@ async function encerrarChamadoAdmin(id){
     const {data,error}=await SB.from('chamados').update({status:'concluida',concluido_em:agora,atualizado_em:agora}).eq('id',c.id).select('id,status,concluido_em').single();
     if(error)throw error;if(!data||data.status!=='concluida')throw new Error('O servidor não confirmou o encerramento.');
     if(tecnicoId){const {error:auditErr}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:tecnicoId,para_tecnico_id:tecnicoId,motivo:'Encerrado pelo administrador '+admin.nome,realizado_por:admin.id,criado_em:agora});if(auditErr)console.warn('Encerramento concluído; histórico adicional não gravado:',auditErr);}
-    c.ex={...(c.ex||{}),relatorio:encerramento.trim(),obs:'Encerrado administrativamente por '+admin.nome};c.st='concluida';c.cc=agora;c.tr.push({de:c.te,para:c.te,m:'Encerrado pelo administrador '+admin.nome,admin:admin.nome,d:agora});c._trLoadedCount=c.tr.length;lsSet('dd',D);rAt();rDb();rRl();sbSetConnectionBadge('Chamado encerrado pelo administrador',true);nfToast('Chamado encerrado com sucesso por '+admin.nome+'.','sucesso');
+    c.ex={...(c.ex||{}),relatorio:encerramento.trim(),obs:'Encerrado administrativamente por '+admin.nome};c.st='concluida';c.cc=data.concluido_em;c.tr.push({de:c.te,para:c.te,m:'Encerrado pelo administrador '+admin.nome,admin:admin.nome,d:agora});c._trLoadedCount=c.tr.length;lsSet('dd',D);rAt();rDb();rRl();sbSetConnectionBadge('Chamado encerrado pelo administrador',true);nfToast('Chamado encerrado com sucesso por '+admin.nome+'.','sucesso');
   }catch(err){sbShowError('Não foi possível encerrar o chamado',err);await sbRecarregarDados();}
   finally{if(btn&&document.body.contains(btn)){btn.disabled=false;btn.textContent=texto||'✅ Encerrar';}}
 }
@@ -2228,12 +2238,10 @@ function rTar(dt1, dt2) {
   if(!tb) return;
   let list = D.ch.filter(c => c.te === S.u && c.st === 'concluida' && !c.ex?.pagamentoExcluido);
   if (dt1) {
-    const d1 = new Date(dt1 + 'T00:00:00');
-    list = list.filter(c => c.dtexec && new Date(c.dtexec) >= d1);
+    list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= dt1 && !!dataEncerramentoChamado(c));
   }
   if (dt2) {
-    const d2 = new Date(dt2 + 'T23:59:59');
-    list = list.filter(c => c.dtexec && new Date(c.dtexec) <= d2);
+    list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c));
   }
   if (list.length === 0) {
     tb.innerHTML = '<tr><td colspan="17" class="empty">Nenhuma atividade realizada no período</td></tr>';
@@ -2242,7 +2250,7 @@ function rTar(dt1, dt2) {
   let totalGeral = 0;
   const rows = list.map(c => {
     const ex = c.ex || {};
-    const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '—';
+    const dtexec = datasPagamentoHtml(c);
     const atvNome = ex.atv ? ex.atv.split('|')[0] : '—';
     const ap = c.ap || { status: 'pendente' };
     const apBadge = {
@@ -2328,13 +2336,21 @@ function calcDist() {
   const k2 = buscarDist(d, r);
   if (k1 === null || k2 === null) { alert('Distância não cadastrada entre essas cidades!'); return; }
   const total = k1 + k2;
-  const exc = total > 40 ? total - 40 : 0;
+  const exc = el('ex-cobrar-km').checked && total > 40 ? total - 40 : 0;
   el('ex-km').value = total.toFixed(1);
   el('ex-vkm').value = 'R$ ' + exc.toFixed(2).replace('.', ',');
   const info = el('ex-dist-info');
   info.innerHTML = `${esc(oExibido)} → ${esc(dExibido)}: <b>${k1} km</b><br>${esc(dExibido)} → ${esc(rExibido)}: <b>${k2} km</b><br><strong>TOTAL: ${total} km</strong> (excedente: ${exc} km)`;
   info.classList.remove('hidden');
   calcTotal();
+  salvarRascunhoExecucao();
+}
+
+function atualizarCobrancaKm(){
+ const km=numeroExcel(el('ex-km').value);
+ const valor=el('ex-cobrar-km').checked?Math.max(0,km-40):0;
+ el('ex-vkm').value='R$ '+valor.toFixed(2).replace('.',',');
+ calcTotal();agendarRascunhoExecucao();
 }
 
 function calcAtv() {
@@ -2364,7 +2380,7 @@ function calcMat() {
 
 function calcTotal() {
   const vkmTxt = (el('ex-vkm').value || '').replace('R$ ', '').replace(',', '.');
-  const vkm = parseFloat(vkmTxt) || 0;
+  const vkm = el('ex-cobrar-km')?.checked ? numeroExcel(el('ex-vkm').value) : 0;
   const vatv = parseFloat(el('ex-vatv').value) || 0;
   const tmatTxt = (el('ex-tmat').value || '').replace('R$ ', '').replace(',', '.');
   const tmat = parseFloat(tmatTxt) || 0;
@@ -2603,6 +2619,7 @@ async function apagarFotosRascunho(id){
 function dadosRascunhoExecucao(){
   const ids=['ex-co','ex-cd','ex-cr','ex-km','ex-vkm','ex-atv','ex-vatv','ex-avulso','ex-utp','ex-cci','ex-can','ex-tmat','ex-causa','ex-solucao','ex-validacao','ex-senha','ex-relatorio','ex-obs','ex-total'];
   const campos={};for(const id of ids){const campo=el(id);campos[id]=id==='ex-total'?campo?.textContent||'':campo?.value||'';}
+  campos['ex-cobrar-km']=!!el('ex-cobrar-km')?.checked;
   campos['ex-esc-d']=el('ex-esc-d')?.value||'';campos.escd=el('ex-esc-d')?.dataset.id||'';return {chamadoId:EID,campos,atualizadoEm:new Date().toISOString()};
 }
 function salvarRascunhoExecucao(){
@@ -2611,7 +2628,7 @@ function salvarRascunhoExecucao(){
 function agendarRascunhoExecucao(){clearTimeout(EX_DRAFT_TIMER);EX_DRAFT_TIMER=setTimeout(salvarRascunhoExecucao,150);}
 async function restaurarRascunhoExecucao(c){
   let draft=null;try{draft=JSON.parse(localStorage.getItem(chaveRascunhoExecucao(c.id))||'null');}catch(_e){}
-  if(draft?.campos){for(const [id,valor] of Object.entries(draft.campos)){const campo=el(id);if(!campo)continue;if(id==='ex-total')campo.textContent=valor;else campo.value=valor;}el('ex-esc-d').dataset.id=draft.campos.escd||'';el('ex-avulso-box').classList.toggle('hidden',!(el('ex-atv').value||'').endsWith('|0'));preencherCamposEncerramento();}
+  if(draft?.campos){for(const [id,valor] of Object.entries(draft.campos)){const campo=el(id);if(!campo)continue;if(id==='ex-total')campo.textContent=valor;else if(id==='ex-cobrar-km')campo.checked=valor===true;else campo.value=valor;}el('ex-esc-d').dataset.id=draft.campos.escd||'';el('ex-avulso-box').classList.toggle('hidden',!(el('ex-atv').value||'').endsWith('|0'));preencherCamposEncerramento();}
   try{EX_FOTOS_NOVAS=await lerFotosRascunho(c.id);}catch(err){console.warn('Fotos do rascunho não puderam ser recuperadas',err);EX_FOTOS_NOVAS=[];}atualizarPreviewFotos();
 }
 async function limparRascunhoExecucao(id){
@@ -2711,6 +2728,7 @@ async function opEx(id) {
   el('vistoria-chamado').value=String(c.id);
   el('vistoria-pdf').value='';
   el('vistoria-mensagem').textContent='';
+  el('ex-cobrar-km').checked = anterior.cobrarKm===true;
   el('ex-km').value = anterior.km || ''; el('ex-vkm').value = anterior.vkm || '';
   el('ex-atv').value = anterior.atv || ''; el('ex-vatv').value = anterior.vatv || '';
   el('ex-avulso').value = anterior.avulso || '';
@@ -2725,6 +2743,7 @@ async function opEx(id) {
   el('m-ex').classList.add('a');
   localStorage.setItem(chaveExecucaoAtiva(),String(id));
   await restaurarRascunhoExecucao(c);
+  atualizarCobrancaKm();
 
   el('ex-validacao-status').textContent='Ao enviar, o serviço seguirá diretamente para aprovação do administrador.';
   el('ex-validacao-status').style.borderLeft='';
@@ -2751,9 +2770,10 @@ async function cfEx() {
   const anterior={ex:c.ex,st:c.st,cc:c.cc,ap:c.ap,ajuste:c.ajuste};
   const eraAjuste = !!c.ajuste;
   if(!validarCamposEncerramento())return;
+  atualizarCobrancaKm();
   finalizarMascaraEncerramento();
   const vkmTxt = (el('ex-vkm').value || '').replace('R$ ', '').replace(',', '.');
-  const vkm = parseFloat(vkmTxt) || 0;
+  const vkm = el('ex-cobrar-km')?.checked ? numeroExcel(el('ex-vkm').value) : 0;
   const vatv = parseFloat(el('ex-vatv').value) || 0;
   const tmatTxt = (el('ex-tmat').value || '').replace('R$ ', '').replace(',', '.');
   const tmat = parseFloat(tmatTxt) || 0;
@@ -2762,7 +2782,7 @@ async function cfEx() {
   c.ex = {
     co: el('ex-co').value, cd: el('ex-cd').value, cr: el('ex-cr').value,
     esco: el('ex-esc-o').dataset.id||'', escd: el('ex-esc-d').dataset.id||'', escr: el('ex-esc-r').dataset.id||'',
-    km: el('ex-km').value, vkm: el('ex-vkm').value,
+    km: el('ex-km').value, vkm: el('ex-vkm').value, cobrarKm:!!el('ex-cobrar-km').checked,
     atv: el('ex-atv').value, vatv: el('ex-vatv').value,
     avulso: el('ex-avulso').value,
     utp: el('ex-utp').value, cci: el('ex-cci').value, can: el('ex-can').value,
@@ -2804,17 +2824,15 @@ function valorExcel(v) {
 function atividadesDoTecnicoAtual(dt1, dt2) {
   let list = D.ch.filter(c => c.te === S.u && c.st === 'concluida' && !c.ex?.pagamentoExcluido);
   if (dt1) {
-    const d1 = new Date(dt1 + 'T00:00:00');
-    list = list.filter(c => c.dtexec && new Date(c.dtexec) >= d1);
+    list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= dt1 && !!dataEncerramentoChamado(c));
   }
   if (dt2) {
-    const d2 = new Date(dt2 + 'T23:59:59');
-    list = list.filter(c => c.dtexec && new Date(c.dtexec) <= d2);
+    list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c));
   }
   return list;
 }
 
-const CABECALHOS_PAGAMENTO = ['O.S','SITE','ORIGEM','DESTINO','RETORNO','DATA','ATIVIDADE','MISCELANEA','QTD','KM TOTAL','VALOR KM','VALOR MATERIAL','TOTAL MATERIAL','VALOR ATIVIDADE','VALOR TOTAL','OBSERVAÇÃO'];
+const CABECALHOS_PAGAMENTO = ['O.S','SITE','ORIGEM','DESTINO','RETORNO','DATA ENCERRAMENTO','ATIVIDADE','MISCELANEA','QTD','KM TOTAL','VALOR KM','VALOR MATERIAL','TOTAL MATERIAL','VALOR ATIVIDADE','VALOR TOTAL','OBSERVAÇÃO'];
 
 function numeroExcel(v) {
   if (typeof v === 'number') return isFinite(v) ? v : 0;
@@ -2841,10 +2859,10 @@ function linhaPagamento(c) {
   const materiais = [ex.utp && 'UTP ' + ex.utp + 'm', ex.cci && 'CCI ' + ex.cci + 'm', ex.can && 'Canaleta ' + ex.can + 'm'].filter(Boolean);
   const quantidades = [ex.utp, ex.cci, ex.can].filter(Boolean);
   const status = c.ap && c.ap.status ? c.ap.status.toUpperCase() : 'PENDENTE';
-  const observacao = [ex.relatorio || ex.obs, ex.valorCorrigido!=null?'VALOR CORRIGIDO: '+(ex.pagamentoMotivo||''):null, 'PAGAMENTO: ' + status].filter(Boolean).join(' | ');
+  const observacao = [ex.relatorio || ex.obs, c.ap?.status==='aprovado'?'APROVADO EM: '+formatarDataBrasil(c.ap.data):null, ex.valorCorrigido!=null?'VALOR CORRIGIDO: '+(ex.pagamentoMotivo||''):null, 'PAGAMENTO: ' + status].filter(Boolean).join(' | ');
   return [
     valorExcel(c.pr), valorExcel(c.si), valorExcel(ex.co), valorExcel(ex.cd), valorExcel(ex.cr),
-    c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '',
+    formatarDataBrasil(dataEncerramentoChamado(c)),
     valorExcel(ex.atv ? ex.atv.split('|')[0] : ''), materiais.join(', '), quantidades.join(' / '),
     numeroExcel(ex.km), numeroExcel(ex.vkm), '', numeroExcel(ex.tmat), numeroExcel(ex.vatv), numeroExcel(ex.total), valorExcel(observacao)
   ];
@@ -2870,8 +2888,8 @@ function criarAbaPagamento(nome, list) {
 
 function chamadosPagamentoPeriodo(dt1, dt2) {
   let list = D.ch.filter(c => c.st === 'concluida' && !c.ex?.pagamentoExcluido);
-  if (dt1) { const d1 = new Date(dt1 + 'T00:00:00'); list = list.filter(c => c.dtexec && new Date(c.dtexec) >= d1); }
-  if (dt2) { const d2 = new Date(dt2 + 'T23:59:59'); list = list.filter(c => c.dtexec && new Date(c.dtexec) <= d2); }
+  if (dt1) { list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= dt1 && !!dataEncerramentoChamado(c)); }
+  if (dt2) { list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c)); }
   return list;
 }
 
@@ -2960,7 +2978,7 @@ function expCSV() {
   let csv = 'O.S;SITE;ORIGEM;DESTINO;RETORNO;DATA;ATIVIDADE;MISCELANEA;QTD;KM TOTAL;VALOR KM;VALOR MATERIAL;TOTAL MATERIAL;VALOR ATIVIDADE;VALOR TOTAL;OBSERVACAO\n';
   D.ch.filter(c => c.st === 'concluida' && !c.ex?.pagamentoExcluido).forEach(c => {
     const ex = c.ex || {};
-    const dtexec = c.dtexec ? new Date(c.dtexec).toLocaleDateString('pt-BR') : '';
+    const dtexec = formatarDataBrasil(dataEncerramentoChamado(c));
     const atvNome = ex.atv ? ex.atv.split('|')[0] : '';
     const km = ex.km || '';
     const vkm = ex.vkm ? ex.vkm.replace('R$ ', '').replace(',', '.') : '';
@@ -3137,6 +3155,8 @@ document.addEventListener('DOMContentLoaded', function() {
   el('m-ex').addEventListener('input',agendarRascunhoExecucao);
   el('m-ex').addEventListener('change',agendarRascunhoExecucao);
   el('btn-calc-dist').addEventListener('click', calcDist);
+  el('ex-cobrar-km').addEventListener('change',atualizarCobrancaKm);
+  el('ex-km').addEventListener('input',atualizarCobrancaKm);
 
   // Exportar CSV
   const btnExp = el('btn-exp-csv');
@@ -3540,7 +3560,7 @@ async function sbLoadAll(){
       exclusaoPortal:exclusaoPortal?{nome:exclusaoPortal.excluido_por_nome,email:exclusaoPortal.excluido_por_email,data:exclusaoPortal.excluido_em,statusAnterior:exclusaoPortal.status_anterior}:null
     };
     legacy._trLoadedCount=legacy.tr.length;
-    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
+    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',cobrarKm:ex.deslocamento_cobrado===true,km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
     return legacy;
   });
@@ -3654,19 +3674,19 @@ async function sbPersistirAprovacoes(chamados,status,observacao){
     reenviado:false,
     atualizado_em:atualizadoEm
   }));
-  const {data,error}=await SB.from('aprovacoes').upsert(rows,{onConflict:'chamado_id'}).select('chamado_id,status');
+  const {data,error}=await SB.from('aprovacoes').upsert(rows,{onConflict:'chamado_id'}).select('chamado_id,status,atualizado_em');
   if(error) throw error;
   const confirmados=new Set((data||[]).filter(x=>x.status===status).map(x=>x.chamado_id));
   if(ids.some(id=>!confirmados.has(id))) throw new Error('O servidor não confirmou todos os serviços selecionados.');
   sbSetConnectionBadge(status==='aprovado'?'Aprovação sincronizada':'Rejeição sincronizada',true);
-  return atualizadoEm;
+  return data[0].atualizado_em;
 }
 
 function sbDadosExecucao(c,extras={}){
   return {
     chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex?.co||null,cidade_destino:c.ex?.cd||null,cidade_retorno:c.ex?.cr||null,
     origem_escola_id:c.ex?.esco||null,destino_escola_id:c.ex?.escd||null,retorno_escola_id:c.ex?.escr||null,
-    km_total:sbNum(c.ex?.km),valor_km:sbNum(c.ex?.vkm),atividade:c.ex?.atv||null,valor_atividade:sbNum(c.ex?.vatv),valor_avulso:sbNum(c.ex?.avulso),
+    deslocamento_cobrado:c.ex?.cobrarKm===true,km_total:sbNum(c.ex?.km),valor_km:sbNum(c.ex?.vkm),atividade:c.ex?.atv||null,valor_atividade:sbNum(c.ex?.vatv),valor_avulso:sbNum(c.ex?.avulso),
     utp_metros:sbNum(c.ex?.utp),cci_metros:sbNum(c.ex?.cci),canaleta_metros:sbNum(c.ex?.can),valor_materiais:sbNum(c.ex?.tmat),observacao:c.ex?.obs||null,
     relatorio_encerramento:c.ex?.relatorio||null,valor_total:sbNum(c.ex?.total),atualizado_em:new Date().toISOString(),...extras
   };
@@ -3694,6 +3714,7 @@ async function sbPersistirFinalizacao(c){
   }).eq('id',c.id).eq('tecnico_id',SB_PROFILE.id).select('id,status,concluido_em').single();
   if(error) throw error;
   if(!data || data.status!=='concluida') throw new Error('O servidor não confirmou a conclusão do chamado.');
+  c.cc=data.concluido_em;
   sbSetConnectionBadge('Finalização sincronizada',true);
   return data;
 }
@@ -3712,7 +3733,7 @@ async function sbSyncTecnico(){
     if(error) throw new Error('Chamado: '+error.message);
   }
   for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario && x.ex)){
-    const row={chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()};
+    const row={chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()};
     const {error}=await SB.from('execucoes').upsert(row,{onConflict:'chamado_id'});
     if(error) throw new Error('Execução: '+error.message);
   }
@@ -3766,7 +3787,7 @@ async function sbSyncAll(){
     const exRows=[]; const apRows=[];
     for(const c of D.ch){
       if(!sbUUID(c.id)) continue;
-      if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
+      if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
       if(c.ap) apRows.push({chamado_id:c.id,status:c.ap.status||'pendente',observacao:c.ap.obs||null,administrador_id:SB_PROFILE.tipo==='admin'?SB_PROFILE.id:null,reenviado:!!c.ap.reenviado,atualizado_em:sbIso(c.ap.data)||new Date().toISOString()});
       const start=Number(c._trLoadedCount||0); const novos=(c.tr||[]).slice(start);
       for(const tr of novos){ const {error}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:sbIdByUser(tr.de),para_tecnico_id:sbIdByUser(tr.para),motivo:tr.m||null,realizado_por:tr.adminId||SB_PROFILE.id,criado_em:sbIso(tr.d)||new Date().toISOString()}); if(error) throw error; }

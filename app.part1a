@@ -892,7 +892,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
           <button class="btn btn-g" id="btn-exp-ar-xlsx">📊 Exportar Atividades em Excel</button>
         </div>
         <div style="overflow-x:auto"><table class="table" id="tb-ar">
-          <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Data</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th></tr></thead>
+          <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Encerramento / Aprovação</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th></tr></thead>
           <tbody id="tb-ar-body"></tbody>
         </table></div>
       </div>
@@ -1024,7 +1024,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <div class="modal-bd">
       <div class="info" id="pl-in"></div>
       <div style="overflow-x:auto"><table class="pl-table" id="pl-tb">
-        <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Data</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th><th id="pl-acoes-cab" class="hidden">Ações do seu perfil</th></tr></thead>
+        <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Encerramento / Aprovação</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th><th id="pl-acoes-cab" class="hidden">Ações do seu perfil</th></tr></thead>
         <tbody id="pl-tb-body"></tbody>
       </table></div>
       <div class="pl-ft" style="margin-top:12px">
@@ -1098,11 +1098,12 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       </div>
       <button class="btn btn-p" id="btn-calc-dist" style="padding:6px 10px;font-size:.7rem;margin-bottom:8px">🧮 Calcular Distâncias</button>
       <div class="info-dist hidden" id="ex-dist-info"></div>
+      <label style="display:flex;align-items:center;gap:10px;margin:12px 0"><input type="checkbox" id="ex-cobrar-km"> Cobrar deslocamento neste atendimento</label>
       <div class="grid-2">
-        <div class="form-group"><label class="label">Distância Total (km)</label><input type="number" step="0.1" id="ex-km" class="input" readonly></div>
+        <div class="form-group"><label class="label">Distância Total (km)</label><input type="number" step="0.1" min="0" id="ex-km" class="input"></div>
         <div class="form-group"><label class="label">Valor Km Excedente</label><input type="text" id="ex-vkm" class="input" readonly style="color:var(--r);font-weight:700"></div>
       </div>
-      <div style="font-size:.65rem;color:var(--gr);margin-bottom:10px"><small>(Total - 40km = R$ 1,00/km)</small></div>
+      <div style="font-size:.65rem;color:var(--gr);margin-bottom:10px"><small>Cobrança somente quando marcada: (Total - 40km) × R$ 1,00. Sem cobrança, o valor de KM é zero.</small></div>
       <div style="font-size:.6rem;color:var(--gr);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">🔧 Atividade Realizada</div>
       <div class="grid-2">
         <div class="form-group"><label class="label">Tipo de Atividade</label>

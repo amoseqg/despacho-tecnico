@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.4.1',date:'2026-10-08',title:'Datas de encerramento e confirmação de deslocamento',
+  changes:['Datas de encerramento e aprovação exibidas no horário do Brasil, sem recuar um dia.','Relatórios usam a data real de encerramento.','Cobrança de KM exige confirmação explícita e pode ser desativada.','Deslocamento indevido do protocolo 3674307 corrigido, preservando o valor ajustado por Amós.']
+ },{
   version:'2.4.0',date:'2026-10-08',title:'Ajustes de valores dos parceiros',
   changes:['Perfil de Amós pode excluir e corrigir valores, inclusive aprovados.','Valores excluídos saem dos totais e relatórios de pagamento, preservando o chamado e o histórico.','Ações financeiras protegidas no banco e registradas com motivo, valor anterior e data.']
  },{

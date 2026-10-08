@@ -65,7 +65,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.4\.0'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.4\.1'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
@@ -142,7 +142,7 @@ ctx.D.ch[0].cc='2026-08-31T12:00:00Z';ctx.D.ch[0].ci='99999';assert.equal(ctx.hi
 ctx.SB_PROFILE={id:'admin',tipo:'admin'};ctx.sbExigirSessaoAdmin=async()=>ctx.SB_PROFILE;ctx.sbUUID=()=>true;ctx.sbSetConnectionBadge=()=>{};
 ctx.SB={from:()=>({upsert:()=>({select:async()=>({data:[]})})})};
 await assert.rejects(()=>ctx.sbPersistirAprovacoes([{id:'1'}],'aprovado',''),'Aprovação não confirmada deve falhar');
-ctx.SB={from:()=>({upsert:()=>({select:async()=>({data:[{chamado_id:'1',status:'aprovado'}]})})})};
+ctx.SB={from:()=>({upsert:()=>({select:async()=>({data:[{chamado_id:'1',status:'aprovado',atualizado_em:'2026-10-08T18:00:00Z'}]})})})};
 assert.ok(await ctx.sbPersistirAprovacoes([{id:'1'}],'aprovado',''));
 assert.match(html,/<details id="lg-tramite">\s*<summary/);
 assert.ok(!html.includes('btn-toggle-tramite'),'O clique pertence ao título');

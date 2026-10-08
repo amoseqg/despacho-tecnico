@@ -7,7 +7,7 @@ const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:''
 const owner='391d92ed-3a0d-42f7-9e5f-e3f5172b3e1b';
 const ctx={S:{t:'adm'},SB_PROFILE:{id:owner,tipo:'admin',ativo:true},D:{tc:[{u:'tec',n:'Parceiro',r:'capital'}],ch:[{id:'ativo',te:'tec',st:'concluida',ex:{total:'R$ 1.234,56',valorCorrigido:1234.56},ap:{status:'aprovado'}},{id:'excluido',te:'tec',st:'concluida',ex:{total:'R$ 100,00',pagamentoExcluido:true},ap:{status:'aprovado'}}]},el,nt:()=> 'Parceiro',esc:s=>String(s),valorInfo:()=>'',adminGeral:()=>true};
 vm.createContext(ctx);vm.runInContext("let PLU=null;let RL_DT1_ATUAL='';let RL_DT2_ATUAL='';",ctx);
-for(const name of ['podeGerirValoresParceiros','validarValorParceiro','numeroExcel','opPl','chamadosPagamentoPeriodo','atividadesDoTecnicoAtual'])vm.runInContext(fn(name),ctx);
+for(const name of ['podeGerirValoresParceiros','validarValorParceiro','numeroExcel','dataEncerramentoChamado','dataBrasilISO','formatarDataBrasil','datasPagamentoHtml','opPl','chamadosPagamentoPeriodo','atividadesDoTecnicoAtual'])vm.runInContext(fn(name),ctx);
 assert.equal(ctx.podeGerirValoresParceiros(),true);
 for(const id of ['outro-admin','tecnico']){ctx.SB_PROFILE.id=id;assert.equal(ctx.podeGerirValoresParceiros(),false);ctx.opPl('tec');assert.ok(!el('pl-tb-body').innerHTML.includes('btn-valor-parceiro'));}
 ctx.SB_PROFILE.id=owner;ctx.opPl('tec');assert.ok(el('pl-tb-body').innerHTML.includes('Corrigir valor'));assert.ok(el('pl-tb-body').innerHTML.includes('Restaurar valor'));assert.equal(el('pl-tot').textContent,'R$ 1234,56');
