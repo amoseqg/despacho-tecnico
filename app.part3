@@ -1612,7 +1612,7 @@ function rAt() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento');
   tb.innerHTML = list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
-    const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-pendente">Aguardando operador</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
+    const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
     return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
@@ -2072,7 +2072,7 @@ function rTat() {
   const al = el('t-al');
   if(al) al.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
-    const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-pendente">Aguardando operador</span>':''));
+    const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':''));
     return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}">${t.t}</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
@@ -2614,21 +2614,10 @@ async function opEx(id) {
   localStorage.setItem(chaveExecucaoAtiva(),String(id));
   await restaurarRascunhoExecucao(c);
 
-  if(c.validacaoOperador?.resultado==='validado'){
-    el('ex-validacao').value=c.validacaoOperador.validacao||'';el('ex-senha').value=c.validacaoOperador.senha||'';sincronizarCamposEncerramento();
-    el('ex-validacao-status').innerHTML=`<b>✓ Validado pelo operador</b><br>${new Date(c.validacaoOperador.validadoEm).toLocaleString('pt-BR')}`;
-    el('ex-validacao-status').style.borderLeft='4px solid var(--g)';el('btn-cf-ex').textContent='✅ Encerrar Chamado';el('btn-cf-ex').disabled=false;
-  }else if(c.validacaoOperador?.resultado==='nao_validado'){
-    el('ex-validacao').value='Não validado';el('ex-senha').value='';sincronizarCamposEncerramento();
-    el('ex-validacao-status').innerHTML=`<b>Não validado pelo operador.</b><br><b>Motivo:</b> ${esc(c.validacaoOperador.motivoNaoValidacao||'Não informado')}<br>Corrija a máscara e envie novamente.`;
-    el('ex-validacao-status').style.borderLeft='4px solid var(--r)';el('btn-cf-ex').textContent='📨 Reenviar ao operador';el('btn-cf-ex').disabled=false;
-  }else if(c.ex?.enviadoValidacaoEm){
-    el('ex-validacao').value='';el('ex-senha').value='';sincronizarCamposEncerramento();
-    el('ex-validacao-status').innerHTML='<b>Aguardando validação do operador.</b><br>O encerramento só será liberado após a senha e a validação.';
-    el('ex-validacao-status').style.borderLeft='4px solid var(--y)';el('btn-cf-ex').textContent='Aguardando operador';el('btn-cf-ex').disabled=true;
-  }else{
-    el('ex-validacao-status').textContent='Preencha os dados técnicos e envie ao operador.';el('ex-validacao-status').style.borderLeft='';el('btn-cf-ex').textContent='📨 Enviar ao operador';el('btn-cf-ex').disabled=false;
-  }
+  el('ex-validacao-status').textContent='Ao enviar, o serviço seguirá diretamente para aprovação do administrador.';
+  el('ex-validacao-status').style.borderLeft='';
+  el('btn-cf-ex').textContent='📨 Enviar para aprovação';
+  el('btn-cf-ex').disabled=false;
 
   if (TI) clearInterval(TI);
   TI = setInterval(() => {
@@ -2669,19 +2658,6 @@ async function cfEx() {
     relatorio: el('ex-relatorio').value,
     total: 'R$ ' + total.toFixed(2).replace('.', ',')
   };
-  if(!anterior.ex?.enviadoValidacaoEm||c.validacaoOperador?.resultado==='nao_validado'){
-    try{
-      if(btn){btn.disabled=true;btn.textContent='Enviando ao operador...';}
-      const fotos=await sbEnviarFotos(c);c.ex.fotos=[...(anterior.ex?.fotos||[]),...fotos];
-      await sbEnviarParaValidacaoOperador(c);await limparRascunhoExecucao(c.id);lsSet('dd',D);clsEx();rTat();
-      nfToast('Informações enviadas ao operador. Aguarde a senha e a validação.','sucesso');
-    }catch(err){c.ex=anterior.ex;lsSet('dd',D);sbShowError('Não foi possível enviar o encerramento ao operador',err);}
-    finally{if(btn){btn.disabled=false;btn.textContent=textoBtn||'📨 Enviar ao operador';}}
-    return;
-  }
-  if(!c.validacaoOperador){
-    c.ex=anterior.ex;alert('Aguarde o operador informar a senha e validar o encerramento.');return;
-  }
   c.st = 'concluida'; c.cc = new Date().toISOString();
   if (eraAjuste) {
     c.ap = { status: 'pendente', obs: '', data: ag(), reenviado: true };
@@ -2690,20 +2666,20 @@ async function cfEx() {
   try{
     if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
     const fotos=await sbEnviarFotos(c);
-    c.ex.fotos=[...(c.ex.fotos||[]),...fotos];
+    c.ex.fotos=[...(anterior.ex?.fotos||[]),...fotos];
     await sbPersistirFinalizacao(c);
     await limparRascunhoExecucao(c.id);
     lsSet('dd',D);
     clsEx();
     rTat(); rTco(); rTdb();
     pararRastreamentoTecnico(c.id);
-    nfToast('Chamado encerrado e sincronizado com o administrador!','sucesso');
+    nfToast('Serviço enviado para aprovação do administrador!','sucesso');
   }catch(err){
     c.ex=anterior.ex;c.st=anterior.st;c.cc=anterior.cc;c.ap=anterior.ap;c.ajuste=anterior.ajuste;
     lsSet('dd',D);
     sbShowError('Não foi possível finalizar o chamado no servidor',err);
   }finally{
-    if(btn){btn.disabled=false;btn.textContent=textoBtn||'✅ Encerrar Chamado';}
+    if(btn){btn.disabled=false;btn.textContent=textoBtn||'📨 Enviar para aprovação';}
   }
 }
 

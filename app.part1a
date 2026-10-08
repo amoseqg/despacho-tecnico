@@ -1133,8 +1133,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <p>Preencha a causa e a solução. Depois, envie a máscara ao operador para validação.</p>
       <div class="form-group"><label class="label" for="ex-causa">Causa raiz *</label><select id="ex-causa" class="input" required onchange="sincronizarCamposEncerramento()"><option value="">Selecione...</option><option>Infracliente</option><option>Elétrica cliente</option><option>Elétrica concessionária</option><option>Mau uso</option><option>Vistoria</option></select></div>
       <div class="form-group"><label class="label" for="ex-solucao">Solução técnica *</label><textarea id="ex-solucao" class="input" rows="3" required oninput="sincronizarCamposEncerramento()"></textarea></div>
-      <div class="form-group"><label class="label" for="ex-validacao">Validação do operador</label><input id="ex-validacao" class="input" readonly placeholder="Aguardando o operador"></div>
-      <div class="form-group"><label class="label" for="ex-senha">Senha informada pelo operador</label><input id="ex-senha" class="input" readonly autocomplete="off" placeholder="Aguardando o operador"></div>
+      <div class="form-group"><label class="label" for="ex-validacao">Validação Vectra/UM Telecom (se informada)</label><input id="ex-validacao" class="input" oninput="sincronizarCamposEncerramento()" placeholder="Informe se disponível"></div>
+      <div class="form-group"><label class="label" for="ex-senha">Senha de encerramento (se informada)</label><input id="ex-senha" class="input" oninput="sincronizarCamposEncerramento()" autocomplete="off" placeholder="Informe se disponível"></div>
       <div id="ex-validacao-status" class="info" style="margin-bottom:10px">Preencha os dados técnicos e envie ao operador.</div>
       <div class="form-group"><label class="label">Máscara de encerramento</label><textarea id="ex-relatorio" oninput="preencherCamposEncerramento()" class="input" rows="13" style="font-family:monospace;line-height:1.45" placeholder="Preencha o relatório de encerramento..."></textarea></div>
       <div class="form-group">
