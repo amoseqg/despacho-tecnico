@@ -1479,7 +1479,7 @@ function inicioIndicadoresPainel(){
 function dadosIndicadoresTecnicos(){
   const inicioPainel=inicioIndicadoresPainel();
   const perdas=[];
-  D.ch.forEach(c=>{if(!chamadoVisivel(c)||c.st!=='concluida'||!c.am||!c.cc)return;const inicio=new Date(c.am).getTime(),fim=new Date(c.cc).getTime();if(Number.isFinite(inicio)&&Number.isFinite(fim)&&fim>=inicioPainel&&fim-inicio>LIMITE_PRAZO_MS)perdas.push({chamado:c,duracao:fim-inicio});});
+  D.ch.forEach(c=>{if(!chamadoVisivel(c)||c.st!=='concluida'||!c.am||!c.cc)return;const inicio=new Date(c.am).getTime(),fim=new Date(c.cc).getTime();const avaliacao=avaliacaoPrazoDashboard(c);if(avaliacao&&fim>=inicioPainel&&avaliacao.duracao>LIMITE_PRAZO_MS)perdas.push({chamado:c,duracao:avaliacao.duracao});});
   const reincidencias=[];
   D.ch.forEach(c=>{if(!chamadoVisivel(c)||dataChamadoMs(c)<inicioPainel)return;const anterior=historicoAnteriorCircuito(c);if(anterior)reincidencias.push({chamado:c,anterior:anterior.chamado,intervalo:dataChamadoMs(c)-anterior.data});});
   return {perdas,reincidencias};
@@ -1531,13 +1531,13 @@ function rCh() {
     <div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em aberto</h3></div>';
 
   if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando técnico</span></div>
     <div class="os-r"><b>Site:</b> ${c.si}</div><div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
     ${infoReincidencia(c).html}
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
   if(elRe) elRe.innerHTML = re.length ? re.map(c => {
     const dtexec = c.dtexec ? formatarDataBrasil(c.dtexec) : 'Não definida';
@@ -1546,7 +1546,7 @@ function rCh() {
     <div class="os-r"><b>Técnico:</b> ${nt(c.te)}</div>
     <div class="os-r"><b>Motivo:</b> ${c.mr}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado recusado</h3></div>';
 }
 
@@ -1693,7 +1693,7 @@ function rAt() {
   tb.innerHTML = list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
-    return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
+    return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
@@ -2201,7 +2201,7 @@ function rTat() {
     ${infoReincidencia(c).html}
     ${validacaoStatus?`<div style="margin-top:8px">${validacaoStatus}</div>`:''}
     ${window.NexoFieldPendencias?.resumoTecnico(c.id)||''}
-    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${c.solicitanteId&&!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${window.NexoFieldExpediente?.resumo(c.id)||''}${c.solicitanteId&&!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
 
@@ -4194,11 +4194,12 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/vistorias.js?v=1.4.1"></script>
+<script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
 <script src="/release-info.js?v=2.3.0"></script>
-<script src="/pendencias.js?v=2.0.3"></script>
+<script src="/pendencias.js?v=2.5.0"></script>
+<script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
-<script src="/admin-alerts.js?v=1"></script>\n<script src="/health-monitor.js?v=1.0.0"></script>
+<script src="/admin-alerts.js?v=2.5.0"></script>\n<script src="/health-monitor.js?v=1.0.0"></script>
 </body>
 </html>

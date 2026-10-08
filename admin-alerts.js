@@ -14,10 +14,10 @@
     return Math.round((n-Date.parse(recife(now).day+'T12:00:00Z'))/DAY);
   }
   function build(data,now,helpers){
-    const open=(data.ch||[]).filter(c=>['pendente','andamento'].includes(c.st));
+    const open=(data.ch||[]).filter(c=>['pendente','andamento'].includes(c.st)&&!c.pendenciaAtiva);
     const calls=open.map(c=>{
       const start=time(c.am),valid=Number.isFinite(start)&&start<=now;
-      return {c,remaining:c.st==='andamento'&&valid?helpers.limit-(now-start):null,
+      return {c,remaining:c.st==='andamento'&&valid?helpers.limit-(now-start-Number(c.prazoPausadoSegundos||0)*1000):null,
         previous:helpers.previous(c),slot:Math.max(0,Math.floor((now-(valid?start:time(c.cr)||now))/TWO_HOURS))};
     });
     const deliveries=(data.mr||[]).filter(r=>!['entregue','cancelado'].includes(r.status)&&helpers.interior(r)).map(r=>{

@@ -23,7 +23,7 @@ async function alterarArquivoChamado(id,restaurar=false){
   if(!sbUUID(id))throw new Error('Aguarde a sincronização do chamado antes de excluir da lista.');
   const {data,error}=await SB.from('chamados_arquivados').upsert({chamado_id:id,ativo:!restaurar,alterado_por:perfil.id,alterado_em:new Date().toISOString()},{onConflict:'chamado_id'}).select().single();
   if(error)throw error;
-  NF_ARQUIVOS.set(id,data);sbRenderizarTelas();renderArquivoChamados();
+  NF_ARQUIVOS.set(id,data);sbRenderizarTelas();renderArquivoChamados();window.NexoFieldPendencias?.renderAdmin();window.NexoFieldExpediente?.renderizar();
  }catch(err){sbShowError('Não foi possível alterar o chamado',err);}
  finally{NF_ARQUIVANDO.delete(id);}
 }

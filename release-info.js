@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.5.0',date:'2026-10-08',title:'Pendência administrativa por horário de atendimento',
+  changes:['Administrador pode pausar o chamado por horário de atendimento e programar retorno no expediente válido.','Liberação automática e manual preservam o prazo restante, com validação de dias e feriados informados.','Chamados nas listas de pendência podem ser excluídos da lista com histórico preservado.','Alertas e indicadores descontam o tempo de pendência.']
+ },{
   version:'2.4.2',date:'2026-10-08',title:'Identificação do usuário que validou o atendimento',
   changes:['Campo Nome do usuário que validou o atendimento abaixo da senha de encerramento na área técnica.','Nome preservado no rascunho, no relatório de encerramento e nas exportações da atividade.']
  },{
