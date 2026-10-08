@@ -567,8 +567,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <button type="button" class="card stat y" data-db-filter="reincidencia"><div class="l">Reincidências</div><div class="v" id="s-reincidencia">0</div></button>
       </div>
       <div class="grid-2" style="margin-bottom:14px">
-        <div class="card"><h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Top 5 — técnicos com perda de prazo</h3><div id="db-prazo-detalhes"></div></div>
-        <div class="card"><h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">🔁 Top 5 — técnicos que geraram reincidência</h3><div id="db-reincidencias"></div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p);margin:0">⏱️ Top 5 — técnicos com perda de prazo</h3><button type="button" class="btn btn-r" id="btn-excluir-top-prazo" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir registros</button></div><div id="db-prazo-detalhes"></div></div>
+        <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p);margin:0">🔁 Top 5 — técnicos que geraram reincidência</h3><button type="button" class="btn btn-r" id="btn-excluir-top-reincidencia" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir registros</button></div><div id="db-reincidencias"></div></div>
       </div>
       <div class="card hidden" id="db-card-detalhes">
         <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px"><h3 id="db-detalhes-titulo" style="font-size:.85rem;color:var(--p)">📋 Chamados</h3><button type="button" class="btn btn-s" id="btn-fechar-db-detalhes">Fechar</button></div>

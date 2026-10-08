@@ -1434,6 +1434,28 @@ function dadosIndicadoresTecnicos(){
   D.ch.forEach(c=>{if(dataChamadoMs(c)<inicioPainel)return;const anterior=historicoAnteriorCircuito(c);if(anterior)reincidencias.push({chamado:c,anterior:anterior.chamado,intervalo:dataChamadoMs(c)-anterior.data});});
   return {perdas,reincidencias};
 }
+
+function chaveExclusaoTop5(tipo){return 'nf-top5-excluidos:'+String(SB_PROFILE?.id||S?.u||'')+':'+tipo;}
+function registrosTop5(tipo,itens){
+  try{
+    const salvo=JSON.parse(localStorage.getItem(chaveExclusaoTop5(tipo))||'null');
+    if(salvo?.mes!==chaveMesPainel())return itens;
+    const excluidos=new Set(salvo.ids||[]);
+    return itens.filter(x=>!excluidos.has(String(x.chamado.id)));
+  }catch(e){return itens;}
+}
+function excluirRegistrosTop5(tipo){
+  if(SB_PROFILE?.tipo!=='admin'||!['prazo','reincidencia'].includes(tipo))return;
+  const dados=dadosIndicadoresTecnicos(),itens=tipo==='prazo'?dados.perdas:dados.reincidencias;
+  const visiveis=registrosTop5(tipo,itens);
+  if(!visiveis.length){nfToast('Nenhum registro para excluir neste Top 5.');return;}
+  if(!confirm('Excluir os registros atuais deste Top 5? Os chamados e o histórico serão preservados.'))return;
+  try{
+    localStorage.setItem(chaveExclusaoTop5(tipo),JSON.stringify({mes:chaveMesPainel(),ids:itens.map(x=>String(x.chamado.id)),em:Date.now()}));
+  }catch(err){sbShowError('Não foi possível salvar a exclusão do Top 5',err);return;}
+  rDb();nfToast('Registros excluídos deste Top 5.','sucesso');
+}
+
 function agruparRanking(itens,usuarioFn){
   const mapa={};itens.forEach(item=>{const u=usuarioFn(item)||'nao-informado';(mapa[u]||={usuario:u,nome:u==='nao-informado'?'Não informado':nt(u),qtd:0,itens:[]});mapa[u].qtd++;mapa[u].itens.push(item);});
   return Object.values(mapa).sort((a,b)=>b.qtd-a.qtd||String(a.nome).localeCompare(String(b.nome))).slice(0,5);
@@ -1504,8 +1526,8 @@ function rDb() {
 
   const indicadores=dadosIndicadoresTecnicos();
   const totalReincidencias=indicadores.reincidencias.length;
-  const rankingPerdas=agruparRanking(indicadores.perdas,x=>x.chamado.te);
-  const rankingReincidencias=agruparRanking(indicadores.reincidencias,x=>x.anterior.te);
+  const rankingPerdas=agruparRanking(registrosTop5('prazo',indicadores.perdas),x=>x.chamado.te);
+  const rankingReincidencias=agruparRanking(registrosTop5('reincidencia',indicadores.reincidencias),x=>x.anterior.te);
   const fmtDuracao = ms => {
     const minutos = Math.floor(ms/60000);
     return `${Math.floor(minutos/60)}h ${String(minutos%60).padStart(2,'0')}min`;
@@ -3038,6 +3060,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const btnExpReinc=el('btn-exp-reincidencias');
   if(btnExpReinc) btnExpReinc.addEventListener('click',()=>exportarRelatorioQualidade('reincidencias'));
   document.querySelectorAll('[data-db-filter]').forEach(card=>card.addEventListener('click',()=>abrirCardDashboard(card.dataset.dbFilter)));
+  el('btn-excluir-top-prazo')?.addEventListener('click',()=>excluirRegistrosTop5('prazo'));
+  el('btn-excluir-top-reincidencia')?.addEventListener('click',()=>excluirRegistrosTop5('reincidencia'));
   const limparIndicadores=el('btn-limpar-indicadores');if(limparIndicadores)limparIndicadores.addEventListener('click',limparIndicadoresDashboard);
   const fecharDb=el('btn-fechar-db-detalhes');if(fecharDb)fecharDb.addEventListener('click',()=>el('db-card-detalhes').classList.add('hidden'));
   const expDb=el('btn-db-exp-concluidos');if(expDb)expDb.addEventListener('click',()=>exportarChamadosEncerrados(el('db-dt1').value,el('db-dt2').value));
