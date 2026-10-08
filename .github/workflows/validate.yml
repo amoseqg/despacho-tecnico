@@ -24,3 +24,6 @@ jobs:
       - run: node scripts/validate-encerramento.mjs
       - run: node scripts/validate-appearance.mjs
       - run: node scripts/validate-admin-alerts.mjs
+
+      - run: node scripts/validate-aprovacao-direta.mjs
+      - run: node scripts/validate-cards-ciclo.mjs

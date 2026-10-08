@@ -1419,9 +1419,59 @@ function infoReincidencia(c){
   const data=new Date(anterior.data).toLocaleDateString('pt-BR');
   return {reincidente:true,anterior:a,html:`<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Último técnico:</b> ${esc(nt(a.te)||'Não informado')}<br><b>Último atendimento:</b> ${data}<br><b>Ação realizada:</b> ${valorInfo(acao)}</div>`};
 }
+
+let NF_PAINEL_CONFIG=null;
+const NF_CICLO_MS=30*24*60*60*1000;
+function inicioCicloDashboard(){
+  if(!NF_PAINEL_CONFIG?.zerar_30_dias)return null;
+  const inicio=new Date(NF_PAINEL_CONFIG.inicio_ciclo).getTime();
+  if(!Number.isFinite(inicio))return null;
+  return inicio+Math.max(0,Math.floor((Date.now()-inicio)/NF_CICLO_MS))*NF_CICLO_MS;
+}
+async function carregarConfigPainel(){
+  NF_PAINEL_CONFIG=null;
+  if(SB_PROFILE?.tipo!=='admin')return;
+  const {data,error}=await SB.from('painel_configuracoes').select('*').eq('administrador_id',SB_PROFILE.id).maybeSingle();
+  if(error)throw error;
+  NF_PAINEL_CONFIG=data;
+}
+async function salvarCicloPainel(ativo){
+  const campo=el('db-zerar-30');if(campo)campo.disabled=true;
+  try{
+    const admin=await sbExigirSessaoAdmin();
+    const {data,error}=await SB.from('painel_configuracoes').upsert({administrador_id:admin.id,zerar_30_dias:ativo,inicio_ciclo:new Date().toISOString(),atualizado_em:new Date().toISOString()},{onConflict:'administrador_id'}).select('*').single();
+    if(error)throw error;NF_PAINEL_CONFIG=data;rDb();
+    nfToast(ativo?'Ciclo de 30 dias ativado. O histórico está preservado.':'Ciclo automático desativado.','sucesso');
+  }catch(err){if(campo)campo.checked=!!NF_PAINEL_CONFIG?.zerar_30_dias;sbShowError('Não foi possível salvar o ciclo',err);}
+  finally{if(campo)campo.disabled=false;}
+}
+function atualizarCicloPainel(){
+  const inicio=inicioCicloDashboard(),campo=el('db-zerar-30'),info=el('db-ciclo-info');
+  if(campo)campo.checked=!!NF_PAINEL_CONFIG?.zerar_30_dias;
+  if(info)info.textContent=inicio===null?'Indicadores de qualidade do mês atual. Histórico completo disponível.':'Ciclo de 30 dias: '+new Date(inicio).toLocaleDateString('pt-BR')+' a '+new Date(inicio+NF_CICLO_MS).toLocaleDateString('pt-BR')+'. Chamados ativos permanecem visíveis.';
+}
+function avaliacaoPrazoDashboard(c){
+  if(!c.am||!['andamento','concluida'].includes(c.st))return null;
+  const inicio=new Date(c.am).getTime(),fim=c.st==='concluida'?new Date(c.cc).getTime():Date.now();
+  if(!Number.isFinite(inicio)||!Number.isFinite(fim)||fim<inicio)return null;
+  const pausa=Number(c.prazoPausadoSegundos||0)*1000+(c.pendenciaAtiva&&c.pendenciaDesde?Math.max(0,fim-new Date(c.pendenciaDesde).getTime()):0);
+  return {fim,duracao:Math.max(0,fim-inicio-pausa)};
+}
+function fecharJanelaDashboard(){
+  const dialog=el('db-janela-chamados');if(dialog?.open)dialog.close();
+}
+function exportarListaDashboard(itens,nome){
+  if(!itens.length){nfToast('Nenhum chamado para exportar.');return;}
+  const rows=itens.map(c=>({'Protocolo':c.pr||'','SDM':c.sdm||'','Circuito':c.ci||'','Site / Cliente':c.si||'','Técnico':nt(c.te)||'','Status':c.st||'','Abertura':c.cr||'','Início':c.am||'','Conclusão':c.cc||'','Relatório':c.ex?.relatorio||c.ex?.obs||''}));
+  const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();
+  ws['!cols']=Object.keys(rows[0]).map(()=>({wch:24}));
+  XLSX.utils.book_append_sheet(wb,ws,'Chamados');XLSX.writeFile(wb,nome+'.xlsx');
+}
+
 function inicioMesPainel(){const agora=new Date();return new Date(agora.getFullYear(),agora.getMonth(),1).getTime();}
 function chaveMesPainel(){const agora=new Date();return `${agora.getFullYear()}-${String(agora.getMonth()+1).padStart(2,'0')}`;}
 function inicioIndicadoresPainel(){
+  const ciclo=inicioCicloDashboard();if(ciclo!==null)return ciclo;
   const inicioMes=inicioMesPainel();
   try{const salvo=JSON.parse(localStorage.getItem('nf-indicadores-limpos')||'null');if(salvo?.mes===chaveMesPainel()&&Number(salvo?.em)>inicioMes)return Number(salvo.em);}catch(e){}
   return inicioMes;
@@ -1501,29 +1551,9 @@ function rCh() {
 }
 
 function rDb() {
-  const p = D.ch.filter(chamadoVisivel).filter(c => c.st === 'pendente').length;
-  const a = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento').length;
-  const co = D.ch.filter(chamadoVisivel).filter(c => c.st === 'concluida').length;
-  const r = D.ch.filter(chamadoVisivel).filter(c => c.st === 'recusado').length;
-  const sp = el('s-p'), sa = el('s-a'), sc = el('s-c'), sr = el('s-r');
-  if(sp) sp.textContent = p; if(sa) sa.textContent = a;
-  if(sc) sc.textContent = co; if(sr) sr.textContent = r;
-
-  const limitePrazo = LIMITE_PRAZO_MS;
-  const agora = Date.now();
-  const inicioPainel=inicioIndicadoresPainel();
-  const avaliados = D.ch.map(c => {
-    if(!c.am || !['andamento','concluida'].includes(c.st)) return null;
-    const inicio = new Date(c.am).getTime();
-    const fim = c.st === 'concluida' && c.cc ? new Date(c.cc).getTime() : agora;
-    const pausaAtiva=c.pendenciaAtiva&&c.pendenciaDesde?Math.max(0,fim-new Date(c.pendenciaDesde).getTime()):0;
-    const tempoPausado=Number(c.prazoPausadoSegundos||0)*1000+pausaAtiva;
-    if(!Number.isFinite(inicio) || !Number.isFinite(fim) || fim < inicio || fim < inicioPainel) return null;
-    return { chamado:c, duracao:Math.max(0,fim-inicio-tempoPausado), perda:Math.max(0,fim-inicio-tempoPausado)>limitePrazo };
-  }).filter(Boolean);
-  const dentroPrazo = avaliados.filter(x => x.chamado.st === 'concluida' && !x.perda);
-  const perdas = avaliados.filter(x => x.perda);
-
+  atualizarCicloPainel();
+  const ids={'s-p':'pendente','s-a':'andamento','s-c':'concluida','s-r':'recusado','s-prazo':'dentro-prazo','s-perda':'perda-prazo','s-reincidencia':'reincidencia'};
+  for(const [id,tipo] of Object.entries(ids)){if(el(id))el(id).textContent=chamadosDoCardDashboard(tipo).length;}
   const indicadores=dadosIndicadoresTecnicos();
   const totalReincidencias=indicadores.reincidencias.length;
   const rankingPerdas=agruparRanking(registrosTop5('prazo',indicadores.perdas),x=>x.chamado.te);
@@ -1532,22 +1562,23 @@ function rDb() {
     const minutos = Math.floor(ms/60000);
     return `${Math.floor(minutos/60)}h ${String(minutos%60).padStart(2,'0')}min`;
   };
-  if(el('s-prazo')) el('s-prazo').textContent = dentroPrazo.length;
-  if(el('s-perda')) el('s-perda').textContent = perdas.length;
-  if(el('s-reincidencia')) el('s-reincidencia').textContent = totalReincidencias;
+
   if(el('db-prazo-detalhes')) el('db-prazo-detalhes').innerHTML=barrasRanking(rankingPerdas,'#dc2626');
   if(el('db-reincidencias')) el('db-reincidencias').innerHTML=barrasRanking(rankingReincidencias,'#f59e0b');
   const detalhe=el('db-card-detalhes');
-  if(detalhe && !detalhe.classList.contains('hidden') && detalhe.dataset.tipo) abrirCardDashboard(detalhe.dataset.tipo);
+  if(el('db-janela-chamados')?.open && detalhe && detalhe.dataset.tipo) abrirCardDashboard(detalhe.dataset.tipo);
 }
 
 function dataEncerramentoChamado(c){return c.cc||c.dtexec||'';}
 function chamadosDoCardDashboard(tipo){
-  const agora=Date.now();
-  if(['pendente','andamento','concluida','recusado'].includes(tipo))return D.ch.filter(c=>c.st===tipo);
-  const inicioPainel=inicioIndicadoresPainel();
-  if(tipo==='dentro-prazo')return D.ch.filter(c=>c.st==='concluida'&&c.am&&c.cc&&new Date(c.cc).getTime()>=inicioPainel&&(new Date(c.cc)-new Date(c.am))<=LIMITE_PRAZO_MS);
-  if(tipo==='perda-prazo')return D.ch.filter(c=>{if(!['andamento','concluida'].includes(c.st)||!c.am)return false;const fim=(c.st==='concluida'&&c.cc)?new Date(c.cc).getTime():agora;if(fim<inicioPainel)return false;const pausa=Number(c.prazoPausadoSegundos||0)*1000+(c.pendenciaAtiva&&c.pendenciaDesde?Math.max(0,fim-new Date(c.pendenciaDesde).getTime()):0);return fim-new Date(c.am).getTime()-pausa>LIMITE_PRAZO_MS;});
+  const lista=D.ch.filter(chamadoVisivel),ciclo=inicioCicloDashboard(),inicio=inicioIndicadoresPainel();
+  if(tipo==='historico')return D.ch.slice();
+  if(['pendente','andamento','recusado'].includes(tipo))return lista.filter(c=>c.st===tipo);
+  if(tipo==='concluida')return lista.filter(c=>c.st==='concluida'&&(ciclo===null||new Date(c.cc||c.dtexec||c.cr).getTime()>=ciclo));
+  if(tipo==='dentro-prazo'||tipo==='perda-prazo')return D.ch.filter(c=>{
+    const v=avaliacaoPrazoDashboard(c);if(!v||v.fim<inicio)return false;
+    return tipo==='dentro-prazo'?c.st==='concluida'&&v.duracao<=LIMITE_PRAZO_MS:v.duracao>LIMITE_PRAZO_MS;
+  });
   if(tipo==='reincidencia')return dadosIndicadoresTecnicos().reincidencias.map(x=>x.chamado);
   return [];
 }
@@ -1558,16 +1589,29 @@ function historicoTransferenciasHtml(c){
 function abrirCardDashboard(tipo){
   const box=el('db-card-detalhes'),lista=el('db-lista-chamados'),periodo=el('db-periodo-concluidos');
   if(!box||!lista)return;
-  const titulos={pendente:'Pendentes',andamento:'Em andamento',concluida:'Concluídos',recusado:'Recusados','dentro-prazo':'Concluídos dentro do prazo','perda-prazo':'Chamados com perda de prazo',reincidencia:'Chamados reincidentes'};
+  const titulos={historico:'Histórico completo de chamados',pendente:'Pendentes',andamento:'Em andamento',concluida:'Concluídos',recusado:'Recusados','dentro-prazo':'Concluídos dentro do prazo','perda-prazo':'Chamados com perda de prazo',reincidencia:'Chamados reincidentes'};
   box.dataset.tipo=tipo;box.classList.remove('hidden');el('db-detalhes-titulo').textContent='📋 '+(titulos[tipo]||'Chamados');periodo?.classList.toggle('hidden',tipo!=='concluida');
-  const itens=chamadosDoCardDashboard(tipo).filter(chamadoVisivel).slice().sort((a,b)=>new Date(b.cc||b.cr||0)-new Date(a.cc||a.cr||0));
+  const itens=chamadosDoCardDashboard(tipo).slice().sort((a,b)=>new Date(b.cc||b.cr||0)-new Date(a.cc||a.cr||0));
   lista.innerHTML=itens.map(c=>{const status={aberto:'Aberto',pendente:'Pendente',andamento:'Andamento',concluida:'Concluído',recusado:'Recusado'}[c.st]||c.st;return `<div class="os"><div class="os-h"><span class="os-id">${esc(c.pr||'Sem protocolo')}</span><span class="badge b-${c.st==='concluida'?'concluida':c.st==='andamento'?'andamento':c.st==='recusado'?'recusado':'pendente'}">${esc(status)}</span></div><div class="os-r"><b>Site:</b> ${esc(c.si||'—')}</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||'—')}</div><div class="os-r"><b>Técnico:</b> ${esc(c.te?nt(c.te):'—')}</div>${c.cc?`<div class="os-r"><b>Encerrado em:</b> ${new Date(c.cc).toLocaleString('pt-BR')}</div>`:''}${c.ex?.relatorio?`<div class="os-r"><b>Relatório:</b> ${esc(c.ex.relatorio)}</div>`:''}${historicoTransferenciasHtml(c)}${botaoArquivoChamado(c)}</div>`;}).join('')||'<div class="empty">Nenhum chamado encontrado neste card.</div>';
-  box.scrollIntoView({behavior:'smooth',block:'start'});
+  let dialog=el('db-janela-chamados');
+  if(!dialog){
+    dialog=document.createElement('dialog');dialog.id='db-janela-chamados';
+    dialog.style.cssText='width:min(1000px,calc(100vw - 32px));max-height:85vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 80px #0005;background:var(--bg,#fff);color:var(--tx,#16324f)';
+    dialog.setAttribute('aria-labelledby','db-detalhes-titulo');
+    document.body.append(dialog);dialog.append(box);box.style.margin='0';
+    dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
+    dialog.addEventListener('close',()=>box.classList.add('hidden'));
+    const exportar=document.createElement('button');exportar.type='button';exportar.className='btn btn-p';exportar.textContent='📥 Exportar chamados desta janela';
+    exportar.addEventListener('click',()=>exportarListaDashboard(chamadosDoCardDashboard(box.dataset.tipo),'NexoField_'+box.dataset.tipo));
+    box.insertBefore(exportar,lista);
+  }
+  if(!dialog.open)dialog.showModal();
 }
-function limparIndicadoresDashboard(){
+async function limparIndicadoresDashboard(){
   if(!confirm('Limpar os indicadores de prazo, reincidência e os Top 5 do mês atual? Os chamados não serão excluídos.'))return;
+  if(NF_PAINEL_CONFIG?.zerar_30_dias){await salvarCicloPainel(true);fecharJanelaDashboard();return;}
   localStorage.setItem('nf-indicadores-limpos',JSON.stringify({mes:chaveMesPainel(),em:Date.now()}));
-  const detalhe=el('db-card-detalhes');if(detalhe)detalhe.classList.add('hidden');
+  fecharJanelaDashboard();const detalhe=el('db-card-detalhes');if(detalhe)detalhe.classList.add('hidden');
   rDb();alert('Indicadores do painel limpos. Os chamados permanecem registrados.');
 }
 function chamadosEncerradosPorPeriodo(dt1,dt2){
@@ -3062,8 +3106,11 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('[data-db-filter]').forEach(card=>card.addEventListener('click',()=>abrirCardDashboard(card.dataset.dbFilter)));
   el('btn-excluir-top-prazo')?.addEventListener('click',()=>excluirRegistrosTop5('prazo'));
   el('btn-excluir-top-reincidencia')?.addEventListener('click',()=>excluirRegistrosTop5('reincidencia'));
+  el('db-zerar-30')?.addEventListener('change',e=>salvarCicloPainel(e.target.checked));
+  el('btn-db-historico')?.addEventListener('click',()=>abrirCardDashboard('historico'));
+  setInterval(()=>{if(SB_PROFILE?.tipo==='admin'&&NF_PAINEL_CONFIG?.zerar_30_dias)rDb();},60000);
   const limparIndicadores=el('btn-limpar-indicadores');if(limparIndicadores)limparIndicadores.addEventListener('click',limparIndicadoresDashboard);
-  const fecharDb=el('btn-fechar-db-detalhes');if(fecharDb)fecharDb.addEventListener('click',()=>el('db-card-detalhes').classList.add('hidden'));
+  const fecharDb=el('btn-fechar-db-detalhes');if(fecharDb)fecharDb.addEventListener('click',fecharJanelaDashboard);
   const expDb=el('btn-db-exp-concluidos');if(expDb)expDb.addEventListener('click',()=>exportarChamadosEncerrados(el('db-dt1').value,el('db-dt2').value));
   const expBaseFechados=el('btn-db-exp-base-fechados');if(expBaseFechados)expBaseFechados.addEventListener('click',()=>exportarBaseChamadosFechados(el('db-base-dt1').value,el('db-base-dt2').value));
   el('btn-rl-exp-operadoras')?.addEventListener('click',exportarChamadosPorOperadora);
@@ -3386,13 +3433,23 @@ async function sbCarregarTodasEscolas(){
   return {data:todas,error:null};
 }
 
+async function sbTabelaCompleta(tabela,coluna){
+  const linhas=[],tamanho=500;
+  for(let offset=0;;offset+=tamanho){
+    const {data,error}=await SB.from(tabela).select('*').order(coluna,{ascending:true}).range(offset,offset+tamanho-1);
+    if(error)return {data:null,error};
+    linhas.push(...(data||[]));if((data||[]).length<tamanho)return {data:linhas,error:null};
+  }
+}
+
 async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
+  await carregarConfigPainel();
   const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR,retR,movR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
-    SB.from('chamados').select('*').order('criado_em',{ascending:true}),
-    SB.from('execucoes').select('*'),
+    sbTabelaCompleta('chamados','id'),
+    sbTabelaCompleta('execucoes','chamado_id'),
     SB.from('aprovacoes').select('*'),
     SB.from('chamado_transferencias').select('*').order('criado_em',{ascending:true}),
     SB.from('materiais').select('*').eq('ativo',true).order('nome'),
