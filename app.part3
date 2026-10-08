@@ -2392,7 +2392,7 @@ function mascaraEncerramento(c) {
   const agora = new Date();
   const data = agora.toLocaleDateString('pt-BR');
   const horario = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `NUMERO SDM : ${c.sdm || ''}\nNUMERO MÉTODO: ${c.pr || ''}\nCLIENTE: ${c.si || ''}\nTÉCNICO: ${S && S.n ? S.n : ''}\nCAUSA RAÍZ: \nSOLUÇÃO TECNICA: \nDATA ENCERRAMENTO: ${data}\nHORARIO: ${horario}\nLOCAL: ${c.en || c.cid || ''}\nVALIDAÇÃO VECTRA : \nSENHA: \nMATERIAL: `;
+  return `NUMERO SDM : ${c.sdm || ''}\nNUMERO MÉTODO: ${c.pr || ''}\nCLIENTE: ${c.si || ''}\nTÉCNICO: ${S && S.n ? S.n : ''}\nCAUSA RAÍZ: \nSOLUÇÃO TECNICA: \nDATA ENCERRAMENTO: ${data}\nHORARIO: ${horario}\nLOCAL: ${c.en || c.cid || ''}\nVALIDAÇÃO VECTRA : \nSENHA: \nUSUÁRIO QUE VALIDOU: \nMATERIAL: `;
 }
 
 // Corrige somente os identificadores da máscara; preserva o relato técnico.
@@ -2418,7 +2418,8 @@ function camposObrigatoriosEncerramento() {
     {id:'ex-causa',label:'CAUSA RAÍZ',re:/^CAUSA RA[IÍ]Z[ \t]*:/i},
     {id:'ex-solucao',label:'SOLUÇÃO TECNICA',re:/^SOLU[CÇ][AÃ]O T[EÉ]CNICA[ \t]*:/i},
     {id:'ex-validacao',label:'VALIDAÇÃO VECTRA/UMTELECOM',re:/^VALIDA[CÇ][AÃ]O (?:VECTRA(?:\s*\/\s*UMTELECOM)?|UMTELECOM)[ \t]*:/i},
-    {id:'ex-senha',label:'SENHA',re:/^SENHA[ \t]*:/i}
+    {id:'ex-senha',label:'SENHA',re:/^SENHA[ \t]*:/i},
+    {id:'ex-usuario-validacao',label:'USUÁRIO QUE VALIDOU',re:/^USU[AÁ]RIO QUE VALIDOU[ \t]*:/i}
   ];
 }
 function camposTecnicosEncerramento(){return camposObrigatoriosEncerramento().filter(c=>['ex-causa','ex-solucao'].includes(c.id));}
@@ -2617,7 +2618,7 @@ async function apagarFotosRascunho(id){
   await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
 }
 function dadosRascunhoExecucao(){
-  const ids=['ex-co','ex-cd','ex-cr','ex-km','ex-vkm','ex-atv','ex-vatv','ex-avulso','ex-utp','ex-cci','ex-can','ex-tmat','ex-causa','ex-solucao','ex-validacao','ex-senha','ex-relatorio','ex-obs','ex-total'];
+  const ids=['ex-co','ex-cd','ex-cr','ex-km','ex-vkm','ex-atv','ex-vatv','ex-avulso','ex-utp','ex-cci','ex-can','ex-tmat','ex-causa','ex-solucao','ex-validacao','ex-senha','ex-usuario-validacao','ex-relatorio','ex-obs','ex-total'];
   const campos={};for(const id of ids){const campo=el(id);campos[id]=id==='ex-total'?campo?.textContent||'':campo?.value||'';}
   campos['ex-cobrar-km']=!!el('ex-cobrar-km')?.checked;
   campos['ex-esc-d']=el('ex-esc-d')?.value||'';campos.escd=el('ex-esc-d')?.dataset.id||'';return {chamadoId:EID,campos,atualizadoEm:new Date().toISOString()};

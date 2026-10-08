@@ -2,6 +2,9 @@
 (function(root){
  'use strict';
  const releases=[{
+  version:'2.4.2',date:'2026-10-08',title:'Identificação do usuário que validou o atendimento',
+  changes:['Campo Nome do usuário que validou o atendimento abaixo da senha de encerramento na área técnica.','Nome preservado no rascunho, no relatório de encerramento e nas exportações da atividade.']
+ },{
   version:'2.4.1',date:'2026-10-08',title:'Datas de encerramento e confirmação de deslocamento',
   changes:['Datas de encerramento e aprovação exibidas no horário do Brasil, sem recuar um dia.','Relatórios usam a data real de encerramento.','Cobrança de KM exige confirmação explícita e pode ser desativada.','Deslocamento indevido do protocolo 3674307 corrigido, preservando o valor ajustado por Amós.']
  },{

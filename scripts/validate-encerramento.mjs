@@ -19,7 +19,7 @@ const crlf=ctx.corrigirIdentificadoresEncerramento(antigo.replaceAll('\n','\r\n'
 assert.ok(src.includes('corrigirIdentificadoresEncerramento(anterior.relatorio || mascaraEncerramento(c),c)'));
 console.log('PASS: Método e SDM distintos; máscara antiga corrigida; SDM manual, relato e quebras preservados; correção idempotente.');
 const inputs={};
-for(const id of ['ex-causa','ex-solucao','ex-validacao','ex-senha','ex-relatorio'])inputs[id]={value:'',setCustomValidity(v){this.error=v},reportValidity(){},focus(){}};
+for(const id of ['ex-causa','ex-solucao','ex-validacao','ex-senha','ex-usuario-validacao','ex-relatorio'])inputs[id]={value:'',setCustomValidity(v){this.error=v},reportValidity(){},focus(){}};
 inputs['ex-causa'].options=['','Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso','Vistoria'].map(value=>({value}));
 ctx.el=id=>inputs[id];
 for(const name of ['camposObrigatoriosEncerramento','camposTecnicosEncerramento','trechoCampoEncerramento','preencherCamposEncerramento','sincronizarCamposEncerramento','validarCamposEncerramento'])vm.runInNewContext(src.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))[0],ctx);
@@ -37,3 +37,5 @@ inputs['ex-causa'].value='Vistoria';assert.equal(ctx.validarCamposEncerramento()
 inputs['ex-relatorio'].value=novo;ctx.preencherCamposEncerramento();assert.equal(inputs['ex-senha'].value,'');assert.equal(ctx.validarCamposEncerramento(ctx.camposObrigatoriosEncerramento()),false);
 assert.ok(src.indexOf('if(!validarCamposEncerramento())return;')<src.indexOf("c.st = 'concluida'; c.cc"));
 console.log('PASS: campos vazios e causa inválida bloqueados; relatório multilinha e reabertura preservados; novo chamado limpa campos.');
+
+inputs['ex-causa'].value='Vistoria';inputs['ex-solucao'].value='Teste e validação';inputs['ex-usuario-validacao'].value='Maria Silva';ctx.sincronizarCamposEncerramento();assert.match(inputs['ex-relatorio'].value,/USUÁRIO QUE VALIDOU: Maria Silva/);inputs['ex-usuario-validacao'].value='';ctx.preencherCamposEncerramento();assert.equal(inputs['ex-usuario-validacao'].value,'Maria Silva');assert.match(src,/ex-senha','ex-usuario-validacao','ex-relatorio/);console.log('PASS: nome do validador sincronizado, recuperado do relatório e incluído no rascunho.');

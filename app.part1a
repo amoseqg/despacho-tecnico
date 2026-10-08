@@ -1136,6 +1136,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="form-group"><label class="label" for="ex-solucao">Solução técnica *</label><textarea id="ex-solucao" class="input" rows="3" required oninput="sincronizarCamposEncerramento()"></textarea></div>
       <div class="form-group"><label class="label" for="ex-validacao">Validação Vectra/UM Telecom (se informada)</label><input id="ex-validacao" class="input" oninput="sincronizarCamposEncerramento()" placeholder="Informe se disponível"></div>
       <div class="form-group"><label class="label" for="ex-senha">Senha de encerramento (se informada)</label><input id="ex-senha" class="input" oninput="sincronizarCamposEncerramento()" autocomplete="off" placeholder="Informe se disponível"></div>
+      <div class="form-group"><label class="label" for="ex-usuario-validacao">Nome do usuário que validou o atendimento</label><input id="ex-usuario-validacao" class="input" oninput="sincronizarCamposEncerramento()" maxlength="200" placeholder="Informe o nome de quem validou o atendimento"></div>
       <div id="ex-validacao-status" class="info" style="margin-bottom:10px">Preencha os dados técnicos e envie ao operador.</div>
       <div class="form-group"><label class="label">Máscara de encerramento</label><textarea id="ex-relatorio" oninput="preencherCamposEncerramento()" class="input" rows="13" style="font-family:monospace;line-height:1.45" placeholder="Preencha o relatório de encerramento..."></textarea></div>
       <div class="form-group">
