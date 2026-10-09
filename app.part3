@@ -1900,11 +1900,11 @@ function opPl(u) {
       if (ex.can) parts.push(ex.can);
       qtd = parts.join(' / ');
     }
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td>${valorInfo(ex.relatorio || ex.obs)}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${podeGerirValoresParceiros()?`<td><div style="display:flex;gap:6px;flex-wrap:wrap">${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button></div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
+    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(ex.relatorio || ex.obs)}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
   el('pl-tb-body').innerHTML = rows;
-  el('pl-acoes-cab').classList.toggle('hidden',!podeGerirValoresParceiros());
+  el('pl-acoes-cab').classList.toggle('hidden',S?.t!=='adm');
 
   const pendentes = chamados.filter(c => !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente')).length;
   const aprovados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
@@ -1921,43 +1921,46 @@ function opPl(u) {
   el('pl-res').innerHTML = `<span><b>Total:</b> ${chamados.length}</span><span><b>Aprovados:</b> ${aprovados}</span><span><b>Pendentes:</b> ${pendentes}</span><span><b>Rejeitados:</b> ${rejeitados}</span>`;
   el('pl-tot').textContent = 'R$ ' + totalVal.toFixed(2).replace('.', ',');
 
-  // Mostrar/esconder botões de ação
-  const btnApv = el('btn-apv-pl');
-  const btnRej = el('btn-rej-pl');
-  if (btnApv) btnApv.style.display = (pendentes > 0 || rejeitados > 0) ? '' : 'none';
-  if (btnRej) btnRej.style.display = (pendentes > 0 || aprovados > 0) ? '' : 'none';
-
   const expAp = el('btn-exp-serv-xlsx');
   if (expAp) {
     const aprovados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
     expAp.classList.toggle('hidden', !adminGeral() || aprovados === 0);
   }
   el('m-pl').classList.add('a');
+  requestAnimationFrame(()=>{
+    const tabela=el('pl-scroll'),barra=el('pl-scroll-inferior');
+    if(!tabela||!barra)return;
+    el('pl-scroll-largura').style.width=el('pl-tb').scrollWidth+'px';
+    barra.scrollLeft=tabela.scrollLeft;
+    tabela.onscroll=()=>{if(barra.scrollLeft!==tabela.scrollLeft)barra.scrollLeft=tabela.scrollLeft;};
+    barra.onscroll=()=>{if(tabela.scrollLeft!==barra.scrollLeft)tabela.scrollLeft=barra.scrollLeft;};
+  });
 }
 
 let APT = null;
 
-function opApv(tipo) {
-  if (!PLU) return;
-  APT = tipo;
-  const t = D.tc.find(x => x.u === PLU);
-  const nome = t ? t.n : nt(PLU);
-  el('ap-tit').textContent = tipo === 'aprovado' ? '✅ Aprovar Planilha' : '❌ Rejeitar Planilha';
-  el('ap-in').innerHTML = '<b>' + nome + '</b><br>Todos os serviços que ainda não estão ' + (tipo === 'aprovado' ? 'aprovados serão aprovados' : 'rejeitados serão rejeitados') + ' para pagamento.';
-  const obsBox = el('ap-obs-box');
-  if (tipo === 'rejeitado') { obsBox.classList.remove('hidden'); el('ap-obs').value = ''; }
-  else { obsBox.classList.add('hidden'); }
+let APSERVICO = null;
+function opApv(tipo,id) {
+  if (!PLU || S?.t!=='adm' || !['aprovado','rejeitado'].includes(tipo)) return;
+  const c=D.ch.find(c=>c.id===id && c.te===PLU && c.st==='concluida' && !c.ex?.pagamentoExcluido);
+  if(!c)return;
+  APT = tipo; APSERVICO=id;
+  el('ap-tit').textContent = tipo === 'aprovado' ? '✅ Aprovar serviço' : '❌ Rejeitar serviço';
+  el('ap-in').innerHTML = '<b>OS '+esc(c.pr)+'</b> — '+esc(c.si)+'<br>A decisão será aplicada somente a este serviço.';
+  el('ap-obs-box').classList.toggle('hidden',tipo!=='rejeitado');
+  el('ap-obs').value = '';
   el('m-ap').classList.add('a');
 }
 
 async function cfAp() {
+  if(S?.t!=='adm' || !APSERVICO || !['aprovado','rejeitado'].includes(APT))return;
   const obs = el('ap-obs').value.trim();
   if (APT === 'rejeitado' && !obs) { alert('Informe o motivo da rejeição'); return; }
   // A tela oferece "Aprovar" também quando há itens rejeitados e "Rejeitar"
   // quando há itens aprovados. A confirmação deve seguir a mesma regra visual,
   // permitindo corrigir a decisão anterior sem deixar o modal travado.
   const alvos=D.ch.filter(c=>{
-    if(c.te!==PLU || c.st!=='concluida' || c.ex?.pagamentoExcluido) return false;
+    if(c.id!==APSERVICO || c.te!==PLU || c.st!=='concluida' || c.ex?.pagamentoExcluido) return false;
     const status=c.ap?.status||'pendente';
     return APT==='aprovado' ? status!=='aprovado' : status!=='rejeitado';
   });
@@ -1971,9 +1974,8 @@ async function cfAp() {
     });
     lsSet('dd',D);
     el('m-ap').classList.remove('a');
-    el('m-pl').classList.remove('a');
-    rRl();rDb();
-    alert(APT==='aprovado'?'Planilha aprovada e confirmada no servidor!':'Planilha rejeitada e confirmada no servidor.');
+    rRl(RL_DT1_ATUAL,RL_DT2_ATUAL);rDb();opPl(PLU);
+    alert(APT==='aprovado'?'Serviço aprovado e confirmado no servidor!':'Serviço rejeitado e confirmado no servidor.');
   }catch(err){
     sbShowError('Não foi possível salvar a aprovação',err);
     await sbRecarregarDados();
@@ -3213,12 +3215,8 @@ document.addEventListener('DOMContentLoaded', function() {
   // Modal planilha
   const clsPl = el('cls-pl');
   const canPl = el('btn-can-pl');
-  const btnApvPl = el('btn-apv-pl');
-  const btnRejPl = el('btn-rej-pl');
   if(clsPl) clsPl.addEventListener('click', function() { el('m-pl').classList.remove('a'); });
   if(canPl) canPl.addEventListener('click', function() { el('m-pl').classList.remove('a'); });
-  if(btnApvPl) btnApvPl.addEventListener('click', function() { opApv('aprovado'); });
-  if(btnRejPl) btnRejPl.addEventListener('click', function() { opApv('rejeitado'); });
 
   // Modal confirmação aprovação
   const clsAp = el('cls-ap');
@@ -3230,7 +3228,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ap-servico, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }

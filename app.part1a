@@ -462,6 +462,17 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
   .nf-dashboard-hero small{max-width:100%}
 }
 
+
+#m-pl .modal-box{display:flex;flex-direction:column;overflow:hidden;max-width:1400px!important}
+#m-pl .modal-bd{min-height:0;overflow-y:auto}
+.pl-scroll{overflow-x:auto;scrollbar-gutter:stable}
+#pl-tb{min-width:2100px}
+#pl-tb .pl-observacao{min-width:360px;width:420px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.85rem;line-height:1.65;vertical-align:top}
+#pl-tb .pl-acoes{min-width:250px;width:270px}
+.pl-acoes-lista{display:flex;gap:8px;flex-wrap:wrap}
+.pl-scroll-inferior{overflow-x:scroll;overflow-y:hidden;height:22px;flex-shrink:0;margin:0 20px;scrollbar-color:#64748b #e2e8f0}
+.pl-scroll-inferior>div{height:1px}
+
 </style>
 <base target="_blank">
 <base target="_blank">
@@ -1023,8 +1034,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <div class="modal-hd"><h3 id="pl-tit">📋 Planilha do Técnico</h3><button class="close" id="cls-pl">×</button></div>
     <div class="modal-bd">
       <div class="info" id="pl-in"></div>
-      <div style="overflow-x:auto"><table class="pl-table" id="pl-tb">
-        <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Encerramento / Aprovação</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th><th id="pl-acoes-cab" class="hidden">Ações do seu perfil</th></tr></thead>
+      <div class="pl-scroll" id="pl-scroll"><table class="pl-table" id="pl-tb">
+        <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Encerramento / Aprovação</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th><th id="pl-acoes-cab" class="hidden">Ações do serviço</th></tr></thead>
         <tbody id="pl-tb-body"></tbody>
       </table></div>
       <div class="pl-ft" style="margin-top:12px">
@@ -1034,10 +1045,9 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         </div>
       </div>
     </div>
+    <div class="pl-scroll-inferior" id="pl-scroll-inferior" tabindex="0" role="region" aria-label="Rolagem horizontal dos serviços"><div id="pl-scroll-largura"></div></div>
     <div class="modal-ft">
       <button class="btn btn-s" id="btn-can-pl">Fechar</button>
-      <button class="btn btn-r" id="btn-rej-pl">❌ Rejeitar</button>
-      <button class="btn btn-g" id="btn-apv-pl">✅ Aprovar</button>
       <button class="btn btn-p hidden" id="btn-exp-serv-xlsx">📊 Exportar Serviço Aprovado</button>
     </div>
   </div>

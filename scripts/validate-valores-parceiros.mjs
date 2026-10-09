@@ -5,7 +5,7 @@ const src=fs.readFileSync('app.part3','utf8');
 function fn(name){const a=src.search(new RegExp(`(?:async )?function ${name}\\(`));assert.ok(a>=0);const tail=src.slice(a);const b=tail.slice(1).search(/\n(?:async )?function |\nlet |\nconst |\ndocument\./);return b<0?tail:tail.slice(0,b+1);}
 const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,{innerHTML:'',textContent:'',style:{},classList:{toggle(){},add(){}}});return nodes.get(id);};
 const owner='391d92ed-3a0d-42f7-9e5f-e3f5172b3e1b';
-const ctx={S:{t:'adm'},SB_PROFILE:{id:owner,tipo:'admin',ativo:true},D:{tc:[{u:'tec',n:'Parceiro',r:'capital'}],ch:[{id:'ativo',te:'tec',st:'concluida',ex:{total:'R$ 1.234,56',valorCorrigido:1234.56},ap:{status:'aprovado'}},{id:'excluido',te:'tec',st:'concluida',ex:{total:'R$ 100,00',pagamentoExcluido:true},ap:{status:'aprovado'}}]},el,nt:()=> 'Parceiro',esc:s=>String(s),valorInfo:()=>'',adminGeral:()=>true};
+const ctx={requestAnimationFrame:()=>{},S:{t:'adm'},SB_PROFILE:{id:owner,tipo:'admin',ativo:true},D:{tc:[{u:'tec',n:'Parceiro',r:'capital'}],ch:[{id:'ativo',te:'tec',st:'concluida',ex:{total:'R$ 1.234,56',valorCorrigido:1234.56},ap:{status:'aprovado'}},{id:'excluido',te:'tec',st:'concluida',ex:{total:'R$ 100,00',pagamentoExcluido:true},ap:{status:'aprovado'}}]},el,nt:()=> 'Parceiro',esc:s=>String(s),valorInfo:()=>'',adminGeral:()=>true};
 vm.createContext(ctx);vm.runInContext("let PLU=null;let RL_DT1_ATUAL='';let RL_DT2_ATUAL='';",ctx);
 for(const name of ['podeGerirValoresParceiros','validarValorParceiro','numeroExcel','dataEncerramentoChamado','dataBrasilISO','formatarDataBrasil','datasPagamentoHtml','opPl','chamadosPagamentoPeriodo','atividadesDoTecnicoAtual'])vm.runInContext(fn(name),ctx);
 assert.equal(ctx.podeGerirValoresParceiros(),true);

@@ -1,0 +1,10 @@
+import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
+const src=fs.readFileSync('app.part3','utf8');const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',classList:{toggle(){},add(){},remove(){}},disabled:false});return nodes.get(id);};
+const chamados=[{id:'a',te:'tec',pr:'1',si:'Site A',st:'concluida'},{id:'b',te:'tec',pr:'2',si:'Site B',st:'concluida'},{id:'c',te:'tec',st:'concluida',ex:{pagamentoExcluido:true}}];const writes=[];
+const ctx={S:{t:'adm',n:'Admin'},D:{ch:chamados},el,esc:String,lsSet(){},rRl(){},rDb(){},opPl(){},alert(){},sbShowError(){assert.fail('Erro inesperado')},sbRecarregarDados:async()=>{},sbPersistirAprovacoes:async(items,status)=>{writes.push({ids:items.map(c=>c.id),status});return '2026-10-09T13:00:00Z';}};
+vm.createContext(ctx);vm.runInContext("let PLU='tec',APT=null,APSERVICO=null,RL_DT1_ATUAL='',RL_DT2_ATUAL='';",ctx);
+for(const name of ['opApv','cfAp'])vm.runInContext(src.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\}`))[0],ctx);
+ctx.opApv('aprovado','a');await ctx.cfAp();assert.deepEqual(Array.from(writes[0].ids),['a']);assert.equal(chamados[1].ap,undefined);
+ctx.opApv('rejeitado','b');await ctx.cfAp();assert.equal(writes.length,1);el('ap-obs').value='Valor incorreto';await ctx.cfAp();assert.deepEqual(Array.from(writes[1].ids),['b']);assert.equal(chamados[0].ap.status,'aprovado');assert.equal(chamados[1].ap.obs,'Valor incorreto');
+ctx.S.t='tec';ctx.opApv('aprovado','b');await ctx.cfAp();assert.equal(writes.length,2);
+console.log('PASS: aprovação individual preserva os demais serviços; rejeição exige motivo; técnico não altera pagamentos.');
