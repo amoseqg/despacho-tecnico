@@ -808,7 +808,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 
 <!-- TÉCNICO -->
 <div id="pt" class="hidden">
-  <div class="user-bar"><span>👷 <b>Técnico</b> — <span id="tn"></span> <span id="tr"></span></span><div style="display:flex;gap:5px"><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-tec">Sair</button></div></div>
+  <div class="user-bar"><span>👷 <b>Técnico</b> — <span id="tn"></span> <span id="tr"></span></span><div style="display:flex;gap:5px"><button type="button" id="nf-push-atalho">🔔 Alertas</button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-tec">Sair</button></div></div>
   <div class="header"><h1><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></h1><div class="sub">Área do Técnico</div></div>
   <div class="nav" id="nv2">
     <button class="a" data-tab="db">📊 Dashboard</button>
@@ -820,11 +820,12 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <button data-tab="lab">🧪 Meu teste</button>
   </div>
   <div class="content">
+    <div id="nf-push-painel" class="card" style="margin-bottom:14px"><h3 style="font-size:.95rem;margin-bottom:8px">🔔 Alertas de novos chamados</h3><p id="nf-push-status" role="status" style="line-height:1.6;margin-bottom:12px">Ative para receber novos chamados mesmo com a página fechada.</p><div style="display:flex;flex-wrap:wrap;gap:10px"><button class="btn btn-p" id="nf-push-ativar" type="button">Ativar alertas de chamados</button><button class="btn btn-s" id="nf-push-testar" type="button" style="display:none" hidden>Testar alerta</button><button class="btn btn-s" id="nf-push-desativar" type="button" style="display:none" hidden>Desativar alertas</button></div></div>
     <section class="nf-dashboard-hero nf-dashboard-tech" aria-label="Operação técnica">
       <div><span>Operação de campo</span><strong>Seu trabalho, mais conectado</strong><small>Rotas, atendimentos, escolas, materiais e evidências organizados.</small></div>
     </section>
     <div id="t-lab" class="hidden"><div class="card" style="margin-bottom:12px"><h3 style="font-size:.88rem;color:var(--p);margin-bottom:6px">🧪 Meu teste autenticado</h3><p style="font-size:.7rem;color:var(--gr)">Sua sessão real já foi validada no acesso ao NexoField. O fluxo abaixo usa somente chamados, materiais, relatórios, fotos, protocolo e SDM fictícios.</p><button type="button" class="btn btn-p" id="tlab-iniciar" style="margin-top:8px">▶ Iniciar meu teste isolado</button><div id="tlab-status" style="font-size:.68rem;color:var(--gr);margin-top:8px">Pronto para testar.</div></div><div id="tlab-card"></div></div>
-    <div class="card" style="margin-bottom:14px"><h3 style="font-size:.95rem;margin-bottom:8px">🔔 Alertas de novos chamados</h3><p id="nf-push-status" role="status" style="line-height:1.6;margin-bottom:12px">Ative para receber novos chamados mesmo com a página fechada.</p><div style="display:flex;flex-wrap:wrap;gap:10px"><button class="btn btn-p" id="nf-push-ativar" type="button">Ativar alertas de chamados</button><button class="btn btn-s" id="nf-push-testar" type="button" style="display:none" hidden>Testar alerta</button><button class="btn btn-s" id="nf-push-desativar" type="button" style="display:none" hidden>Desativar alertas</button></div></div>
+
     <div id="t-db">
       <div class="grid-3" style="margin-bottom:14px">
         <div class="card stat"><div class="l">Despachados</div><div class="v" id="ts-d">0</div></div>

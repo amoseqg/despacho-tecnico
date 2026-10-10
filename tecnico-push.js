@@ -39,6 +39,7 @@
   status('Teste enviado. Confira a notificação e o volume do celular.');
  }
  document.addEventListener('click',async event=>{
+  if(event.target.closest('#nf-push-atalho')){el('nf-push-painel')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
   const btn=event.target.closest('#nf-push-ativar,#nf-push-testar,#nf-push-desativar');if(!btn||busy)return;
   busy=true;btn.disabled=true;try{await ({'nf-push-ativar':enable,'nf-push-testar':test,'nf-push-desativar':disable}[btn.id])();}catch(error){status(error.message||'Falha ao configurar o alerta.');}finally{busy=false;btn.disabled=false;}
  });
