@@ -3854,12 +3854,12 @@ doLogin = async function(){
     else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
     localStorage.setItem('dt_portal',loginType);ss();
-    if(S.t==='log')enterLog();else if(S.t==='adm')enterAdm();else enterTec();
+    if(S.t==='log')enterLog();else if(S.t==='adm')enterAdm();else {enterTec();nfAbrirChamadoNotificado();}
   }catch(err){ await SB.auth.signOut().catch(()=>{}); SB_PROFILE=null; el('le').textContent=err?.message||'Falha no login'; el('le').style.display='block'; sbSetConnectionBadge('Não autenticado', false); }
   finally{ if(btn){btn.disabled=false;btn.textContent='Entrar';} }
 };
 
-logout = async function(){ await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
+logout = async function(){ if(SB_PROFILE?.tipo==='tecnico'&&window.nfDesativarPushAoSair){try{await window.nfDesativarPushAoSair();}catch{console.warn('Alerta não removido do servidor ao sair.');}} await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
 
 salvarMinhaSenha = async function(){
   if(!SB_PROFILE) return;
@@ -4065,7 +4065,7 @@ async function sbRestoreSession(){
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
     ss();
     setTimeout(()=>{
-      if(S.t==='log') enterLog(); else if(S.t==='adm') enterAdm(); else {enterTec();reabrirExecucaoRascunho();}
+      if(S.t==='log') enterLog(); else if(S.t==='adm') enterAdm(); else {enterTec();reabrirExecucaoRascunho();nfAbrirChamadoNotificado();}
       if(window.__DT_PASSWORD_RECOVERY){
         setTimeout(()=>{
           try{
@@ -4079,11 +4079,21 @@ async function sbRestoreSession(){
   }catch(err){ console.error(err); SB_PROFILE=null; S=null; lsRemove('ss'); sbSetConnectionBadge('Sessão inválida', false); }
 }
 
+function nfAbrirChamadoNotificado(){
+ if(S?.t!=='tec')return;
+ const id=new URLSearchParams(location.search).get('chamado');if(!id)return;
+ const c=D.ch.find(x=>x.id===id&&x.te===S.u);if(!c)return;
+ const tab=c.st==='pendente'?'dp':c.st==='andamento'?'at':'co';
+ const botao=document.querySelector('#pt [data-tab="'+tab+'"]');
+ if(botao)botao.click();
+ history.replaceState(null,'',location.pathname);
+ setTimeout(()=>{const btn=document.querySelector('[data-id="'+CSS.escape(id)+'"]');btn?.scrollIntoView({block:'center',behavior:'smooth'});},100);
+}
 let SB_REFRESHING=false;
 function sbRenderizarTelas(){
   try{
     if(S?.t==='adm'){rDb();rAt();rCh();rRl();rTc();rMl();}
-    else if(S?.t==='tec'){rTdb();rTdp();rTat();rTco();rTar();rTmat();}
+    else if(S?.t==='tec'){rTdb();rTdp();rTat();rTco();rTar();rTmat();nfAbrirChamadoNotificado();}
     else if(S?.t==='log'){rLog();}
   }catch(e){console.error('Erro ao atualizar telas:',e);}
 }
@@ -4193,6 +4203,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
+<script src="/tecnico-push.js?v=1.0.0"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
 <script src="/release-info.js?v=2.3.0"></script>
