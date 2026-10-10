@@ -4203,7 +4203,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/tecnico-push.js?v=1.0.1"></script>
+<script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
 <script src="/release-info.js?v=2.3.0"></script>

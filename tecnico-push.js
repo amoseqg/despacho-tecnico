@@ -34,8 +34,18 @@
  window.nfDesativarPushAoSair=disable;
  async function test(){
   const reg=await registration(),sub=await reg.pushManager.getSubscription();if(!sub)throw new Error('Ative os alertas primeiro.');
-  const {data,error}=await SB.functions.invoke('tecnico-push',{body:{endpoint:sub.endpoint}});
-  if(error||!data?.sent)throw new Error('O alerta de teste não foi enviado. Desative e ative novamente.');
+  let {data:{session},error:sessionError}=await SB.auth.getSession();
+  if(sessionError||!session?.access_token)throw new Error('Sua sessão expirou. Saia e entre novamente para testar o alerta.');
+  const invoke=token=>SB.functions.invoke('tecnico-push',{headers:{Authorization:'Bearer '+token},body:{endpoint:sub.endpoint}});
+  let result=await invoke(session.access_token);
+  if(result.error?.context?.status===401){
+   const refreshed=await SB.auth.refreshSession();
+   if(refreshed.error||!refreshed.data.session?.access_token)throw new Error('Sua sessão expirou. Saia e entre novamente para testar o alerta.');
+   result=await invoke(refreshed.data.session.access_token);
+  }
+  const {data,error}=result;
+  if(error){if(error.context?.status===401)throw new Error('Sessão não reconhecida. Saia e entre novamente no perfil técnico.');throw new Error('O servidor não conseguiu enviar o alerta de teste. Tente novamente.');}
+  if(!data?.sent)throw new Error('Este celular não recebeu o envio. Desative e ative os alertas novamente.');
   status('Teste enviado. Confira a notificação e o volume do celular.');
  }
  document.addEventListener('click',async event=>{
