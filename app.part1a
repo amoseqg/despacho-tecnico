@@ -702,7 +702,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="card">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Chamados em Atendimento</h3>
         <div style="overflow-x:auto"><table class="table">
-          <thead><tr><th>Protocolo</th><th>Site</th><th>Técnico</th><th>Região</th><th>Timer</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Protocolo</th><th>Site</th><th>Técnico</th><th>Região</th><th>Prazo restante</th><th>Ações</th></tr></thead>
           <tbody id="tb-at"></tbody>
         </table></div>
       </div>
@@ -854,7 +854,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <div class="card stat g"><div class="l">Concluídos</div><div class="v" id="ts-c">0</div></div>
       </div>
       <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Seus Timers</h3>
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏳ Prazo restante dos chamados</h3>
         <div id="t-tm"></div>
       </div>
     </div>

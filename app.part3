@@ -408,18 +408,16 @@ function atualizarCamposRegiao() {
 }
 
 function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='') {
-  if (!iso) return { t: '00:00:00', c: 't-g', s: 0 };
-  const pausaAtiva=pendenciaDesde?Math.max(0,Math.floor((Date.now()-new Date(pendenciaDesde))/1000)):0;
-  const d = Math.max(0,Math.floor((Date.now() - new Date(iso)) / 1000)-Number(pausadoSegundos||0)-pausaAtiva);
-  const s = SLA[reg] || SLA.capital;
-  let c = 't-g';
-  if (d > s.r) c = 't-c';
-  else if (d > s.a) c = 't-r';
-  else if (d > s.v) c = 't-y';
-  const h = String(Math.floor(d / 3600)).padStart(2, '0');
-  const m = String(Math.floor((d % 3600) / 60)).padStart(2, '0');
-  const sec = String(d % 60).padStart(2, '0');
-  return { t: `${h}:${m}:${sec}`, c, s: d };
+  const sla=SLA[reg]||SLA.capital;
+  const inicio=new Date(iso).getTime(),agora=Date.now();
+  const pendencia=new Date(pendenciaDesde).getTime();
+  const pausaAtiva=pendenciaDesde&&Number.isFinite(pendencia)?Math.max(0,Math.floor((agora-pendencia)/1000)):0;
+  const decorrido=iso&&Number.isFinite(inicio)?Math.max(0,Math.floor((agora-inicio)/1000)-Math.max(0,Number(pausadoSegundos)||0)-pausaAtiva):0;
+  const restante=sla.r-decorrido,vencido=restante<0;
+  let c='t-g';
+  if(vencido)c='t-c';else if(decorrido>=sla.a)c='t-r';else if(decorrido>=sla.v)c='t-y';
+  const tempo=Math.abs(restante),h=String(Math.floor(tempo/3600)).padStart(2,'0'),m=String(Math.floor(tempo%3600/60)).padStart(2,'0'),sec=String(tempo%60).padStart(2,'0');
+  return {t:(vencido?'Vencido há ':'Restam ')+`${h}:${m}:${sec}`+(pendenciaDesde?' · Pausado':''),c,s:decorrido,restante};
 }
 
 // ========== NAVEGAÇÃO ==========
@@ -1693,7 +1691,7 @@ function rAt() {
   tb.innerHTML = list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
-    return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
+    return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
@@ -2171,7 +2169,7 @@ function rTdb() {
   const tmEl = el('t-tm');
   if(tmEl) tmEl.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
-    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}">${t.t}</span></div><div class="os-r"><b>Site:</b> ${c.si}</div></div>`;
+    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div><div class="os-r"><b>Site:</b> ${c.si}</div></div>`;
   }).join('') : '<div class="empty">Nenhum chamado em atendimento</div>';
 }
 
@@ -2197,7 +2195,7 @@ function rTat() {
   if(al) al.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':''));
-    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}">${t.t}</span></div>
+    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
@@ -3013,11 +3011,23 @@ function expCSV() {
 }
 
 // ========== LOOP DE ATUALIZAÇÃO ==========
+let NF_LOOP_PRAZOS=null;
 function startLoop() {
-  setInterval(() => {
+  if(NF_LOOP_PRAZOS)return;
+  let ticks=0;
+  NF_LOOP_PRAZOS=setInterval(()=>{
+    if(S){
+      const chamados=new Map(D.ch.map(c=>[String(c.id),c]));
+      document.querySelectorAll('[data-prazo-id]').forEach(node=>{
+        const c=chamados.get(node.dataset.prazoId);if(!c)return;
+        const t=tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+        node.textContent=t.t;node.className='timer '+t.c;
+      });
+    }
+    if(++ticks%5!==0)return;
     if (S && S.t === 'adm') { rAt(); rDb(); if(el('v-ml') && !el('v-ml').classList.contains('hidden')) rMl(); }
     if (S && S.t === 'tec') { rTdb(); rTat(); if(el('t-mt') && !el('t-mt').classList.contains('hidden')) rTmat(); }
-  }, 5000);
+  },1000);
 }
 
 // ========== EVENT LISTENERS ==========
