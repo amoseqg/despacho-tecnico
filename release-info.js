@@ -1,7 +1,7 @@
 /* Histórico público de versões: atualizar antes de cada publicação. */
 (function(root){
  'use strict';
- const releases=[{version:'2.5.1',date:'2026-10-10',title:'Alertas de chamados no celular',changes:['Ativação e teste de notificações push na área técnica.','Atalho Alertas no topo e painel antes do banner para facilitar o acesso no celular.']},{
+ const releases=[{version:'2.5.4',date:'2026-10-10',title:'Prazo regressivo na área técnica',changes:['Capital 6h e interior 8h em contagem regressiva a cada segundo.','Ao vencer, o contador permanece em zero e sinaliza Prazo vencido.','Pausas autorizadas preservam o tempo restante.']},{version:'2.5.1',date:'2026-10-10',title:'Alertas de chamados no celular',changes:['Ativação e teste de notificações push na área técnica.','Atalho Alertas no topo e painel antes do banner para facilitar o acesso no celular.']},{
   version:'2.5.0',date:'2026-10-08',title:'Pendência administrativa por horário de atendimento',
   changes:['Administrador pode pausar o chamado por horário de atendimento e programar retorno no expediente válido.','Liberação automática e manual preservam o prazo restante, com validação de dias e feriados informados.','Chamados nas listas de pendência podem ser excluídos da lista com histórico preservado.','Alertas e indicadores descontam o tempo de pendência.']
  },{

@@ -416,8 +416,8 @@ function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='') {
   const restante=sla.r-decorrido,vencido=restante<0;
   let c='t-g';
   if(vencido)c='t-c';else if(decorrido>=sla.a)c='t-r';else if(decorrido>=sla.v)c='t-y';
-  const tempo=Math.abs(restante),h=String(Math.floor(tempo/3600)).padStart(2,'0'),m=String(Math.floor(tempo%3600/60)).padStart(2,'0'),sec=String(tempo%60).padStart(2,'0');
-  return {t:(vencido?'Vencido há ':'Restam ')+`${h}:${m}:${sec}`+(pendenciaDesde?' · Pausado':''),c,s:decorrido,restante};
+  const tempo=Math.max(0,restante),h=String(Math.floor(tempo/3600)).padStart(2,'0'),m=String(Math.floor(tempo%3600/60)).padStart(2,'0'),sec=String(tempo%60).padStart(2,'0');
+  return {t:(vencido?'Prazo vencido · ':'Restam ')+`${h}:${m}:${sec}`+(pendenciaDesde?' · Pausado':''),c,s:decorrido,restante};
 }
 
 // ========== NAVEGAÇÃO ==========
