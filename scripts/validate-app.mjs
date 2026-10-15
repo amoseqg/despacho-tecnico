@@ -19,6 +19,7 @@ const idsObrigatorios = [
   'btn-criar-os-servico', 'os-servico-atividade', 'os-servico-site',
   'os-servico-cidade', 'os-servico-regiao', 'os-servico-skill', 'os-servico-tecnico',
   'os-servico-circuito', 'os-servico-circuito-opcoes', 'os-servico-circuito-status',
+  'os-servico-descricao-colada', 'os-servico-descricao-status',
   'os-tipo-escolha', 'btn-escolher-os-servico', 'btn-escolher-os-manutencao',
   'form-os-servico', 'form-os-manutencao'
 ];
@@ -43,6 +44,31 @@ const seletorTecnicosServico = parte3.match(/function atualizarTecnicosOsServico
 assert.ok(seletorTecnicosServico, 'Atualizador de técnicos da OS de Serviços não encontrado.');
 assert.match(seletorTecnicosServico, /const lista=D\.tc\.slice\(\)/, 'A OS de Serviços deve listar todos os técnicos ativos.');
 assert.doesNotMatch(seletorTecnicosServico, /D\.tc\.filter|skillsTec\(t\)\.includes|areasTec\(t\)\.includes/, 'A lista da OS de Serviços não deve filtrar técnicos por skill ou área.');
+const extratorRotulado = parte3.match(/function normalizarRotuloDescricao\(v\)\{[\s\S]*?\n\}/)?.[0];
+const leitorRotulos = parte3.match(/function extrairTextoRotulado\(texto,rotulos\)\{[\s\S]*?\n\}/)?.[0];
+const preenchimentoServico = parte3.match(/function preencherDadosOsServicoDaDescricao\(texto\)\{[\s\S]*?\n\}/)?.[0];
+assert.ok(extratorRotulado && leitorRotulos && preenchimentoServico, 'Parser da descrição colada da OS de Serviços não encontrado.');
+const camposServico = Object.fromEntries(['os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-descricao-status'].map(id=>[id,{value:'',dataset:{},style:{}}]));
+const contextoServico = {el:id=>camposServico[id],normalizarCircuito:v=>String(v||'').toUpperCase(),setTimeout:()=>{},buscarCircuitoOsServico:()=>{}};
+const textoServico = 'Circuito: NOVO-123\nSite / Cliente: Unidade Teste\nCidade: Recife\nEndereço: Rua A, 10\nContato: Maria 81999990000\nHorário de Expediente: 08:00 às 17:00';
+vm.runInNewContext([extratorRotulado,leitorRotulos,preenchimentoServico,'preencherDadosOsServicoDaDescricao('+JSON.stringify(textoServico)+')'].join('\n'),contextoServico);
+assert.equal(camposServico['os-servico-circuito'].value,'NOVO-123','Circuito novo deve ser extraído da descrição mesmo sem cadastro.');
+assert.equal(camposServico['os-servico-site'].value,'Unidade Teste','Site deve ser preenchido pela descrição colada.');
+assert.equal(camposServico['os-servico-cidade'].value,'Recife','Cidade deve ser preenchida pela descrição colada.');
+assert.equal(camposServico['os-servico-endereco'].value,'Rua A, 10','Endereço deve ser preenchido pela descrição colada.');
+assert.equal(camposServico['os-servico-contato'].value,'Maria 81999990000','Contato deve ser preenchido pela descrição colada.');
+assert.equal(camposServico['os-servico-horario'].value,'08:00 às 17:00','Horário deve ser preenchido pela descrição colada.');
+const salvarSiteFn = parte3.match(/async function salvarCadastroSiteOsServico\(c\)\{[\s\S]*?\n\}/)?.[0];
+const insertsSites=[];
+let siteEncontradoNoBanco=null;
+const consultaSites={select(){return this;},eq(){return this;},maybeSingle(){return Promise.resolve({data:siteEncontradoNoBanco,error:null});},insert(linha){insertsSites.push(linha);this.linha=linha;return this;},single(){return Promise.resolve({data:{id:1,...this.linha},error:null});}};
+const contextoCadastroSite={SB:{from:tabela=>{assert.equal(tabela,'sites');return consultaSites;}},registrarSiteOsServico:site=>site,siteOsServicoDoBanco:site=>site};
+vm.runInNewContext(salvarSiteFn,contextoCadastroSite);
+await contextoCadastroSite.salvarCadastroSiteOsServico({ci:camposServico['os-servico-circuito'].value,si:camposServico['os-servico-site'].value,cid:camposServico['os-servico-cidade'].value,en:camposServico['os-servico-endereco'].value,contato:camposServico['os-servico-contato'].value,horario:camposServico['os-servico-horario'].value,re:'capital',area:'oeste'});
+assert.equal(insertsSites.length,1,'Circuito ausente no banco deve ser incluído depois da OS.');
+assert.equal(insertsSites[0].circuito,'NOVO-123','Cadastro novo deve salvar o circuito colado.');
+assert.equal(insertsSites[0].site,'Unidade Teste','Cadastro novo deve salvar o site colado.');
+assert.equal(insertsSites[0].endereco,'Rua A, 10','Campos extraídos da descrição devem ser preservados no cadastro.');
 const extrator = parte3.match(/function extrairCampoDaDescricao\(texto,tipo\)\{[\s\S]*?\n\}/)?.[0];
 assert.ok(extrator, 'Função de extração de protocolo não encontrada.');
 const contexto = {};
@@ -74,7 +100,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.5\.8'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.5\.9'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
@@ -94,6 +120,7 @@ assert.match(html,/Criar OS de Serviços/,'A área administrativa deve oferecer 
 assert.match(html,/id="form-os-servico" class="card hidden"/,'O formulário de serviços deve iniciar oculto até a escolha do administrador.');
 assert.match(html,/id="form-os-manutencao" class="card hidden"/,'O formulário de manutenção deve iniciar oculto até a escolha do administrador.');
 assert.match(html,/id="os-servico-circuito"[\s\S]*?id="os-servico-circuito-opcoes"[\s\S]*?id="os-servico-circuito-status"/,'A OS de Serviços deve permitir procurar e selecionar circuitos cadastrados.');
+assert.match(html,/id="os-servico-descricao-colada"/,'OS de Serviços deve permitir colar a descrição do chamado.');
 assert.match(html,/id="btn-escolher-os-servico"[\s\S]*?Criar OS de Serviços[\s\S]*?id="btn-escolher-os-manutencao"[\s\S]*?Nova OS de Manutenção/,'A tela de Chamados deve mostrar as duas opções antes dos formulários.');
 assert.match(parte3,/btn-escolher-os-servico[\s\S]*?abrirFormularioOs\('servico'\)/,'A opção de serviço deve abrir o formulário correspondente.');
 assert.match(parte3,/btn-escolher-os-manutencao[\s\S]*?abrirFormularioOs\('manutencao'\)/,'A opção de manutenção deve abrir o formulário correspondente.');
@@ -104,8 +131,10 @@ assert.match(parte3,/async function addOsServico\(\)/,'O cadastro de OS de Servi
 assert.match(parte3,/async function buscarCircuitoOsServico\(\)[\s\S]*?SITE_INDEX\.get\(chave\)[\s\S]*?SITE_NUMBER_INDEX\.get\(somenteNumero\)/,'O formulário de Serviços deve localizar circuitos pelo mesmo catálogo da Manutenção.');
 assert.match(parte3,/function preencherSiteOsServico\(site\)[\s\S]*?os-servico-site[\s\S]*?os-servico-cidade[\s\S]*?os-servico-endereco/,'Encontrar o circuito deve carregar os dados existentes do site.');
 assert.match(parte3,/SB\.from\('sites'\)\.select\(colunas\)[\s\S]*?ilike\('circuito'/,'A busca também deve consultar circuitos incluídos diretamente no banco.');
-assert.match(parte3,/async function salvarCadastroSiteOsServico\(c\)[\s\S]*?SB\.from\('sites'\)\.insert\(linha\)/,'Circuito desconhecido deve criar cadastro no banco antes de abrir a OS.');
-assert.match(parte3,/await salvarCadastroSiteOsServico\(novoChamado\)/,'A OS deve garantir o cadastro do novo circuito antes de salvá-la.');
+assert.match(parte3,/async function salvarCadastroSiteOsServico\(c\)[\s\S]*?SB\.from\('sites'\)\.select\(colunas\)\.eq\('circuito',circuito\)[\s\S]*?SB\.from\('sites'\)\.insert\(linha\)/,'Circuito ausente no banco deve ser cadastrado em sites.');
+assert.doesNotMatch(parte3.match(/async function salvarCadastroSiteOsServico\(c\)\{[\s\S]*?\n\}/)?.[0]||'',/existenteLocal|!c\.en\|\|!c\.contato\|\|!c\.horario/,'Dados opcionais do site não devem impedir o cadastro.');
+const fluxoOsServico=parte3.match(/async function addOsServico\(\)[\s\S]*?\n\}/)?.[0]||'';
+assert.ok(fluxoOsServico.indexOf("SB.from('chamados').insert(linha)")<fluxoOsServico.indexOf('salvarCadastroSiteOsServico(novoChamado)'),'O cadastro de circuito/site deve acontecer depois que a OS for confirmada.');
 assert.match(parte3,/ci:circuito/,'O circuito informado deve ser salvo junto da OS de Serviços.');
 assert.match(parte3,/circuito:c\.ci\|\|''/,'O circuito deve ser persistido no campo circuito do banco de chamados.');
 assert.match(parte3,/tipoOs:'servico',osPeConectado:[\s\S]*?atividadeServico:atividade/,'A OS deve preservar sua classificação e a OS PE Conectado opcional.');

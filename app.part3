@@ -136,6 +136,29 @@ function registrarSiteOsServico(site){
   return site;
 }
 function siteOsServicoDoBanco(site){return [site.circuito||'',site.site||'',site.cidade||'',site.endereco||'',site.contato||'',site.horario_expediente||'',site.velocidade||'',site.prtm||'',site.pvf_total??'',site.regiao_operacional||'',site.tecnicos_indicados||''];}
+function preencherDadosOsServicoDaDescricao(texto){
+  const dados={
+    circuito:extrairTextoRotulado(texto,['DESIGNAÇÃO DO CIRCUITO','DESIGNACAO DO CIRCUITO','NÚMERO DO CIRCUITO','NUMERO DO CIRCUITO','CIRCUITO','DESIGNAÇÃO','DESIGNACAO']),
+    site:extrairTextoRotulado(texto,['SITE / CLIENTE','SITE/CLIENTE','NOME DO SITE','SITE','CLIENTE']),
+    cidade:extrairTextoRotulado(texto,['CIDADE','MUNICÍPIO','MUNICIPIO']),
+    endereco:extrairTextoRotulado(texto,['ENDEREÇO','ENDERECO']),
+    contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL']),
+    horario:extrairTextoRotulado(texto,['HORÁRIO DE EXPEDIENTE','HORARIO DE EXPEDIENTE','HORÁRIO DE ATENDIMENTO','HORARIO DE ATENDIMENTO','HORÁRIO','HORARIO','EXPEDIENTE'])
+  };
+  const campos={site:'os-servico-site',cidade:'os-servico-cidade',endereco:'os-servico-endereco',contato:'os-servico-contato',horario:'os-servico-horario'};
+  for(const [chave,id] of Object.entries(campos))if(dados[chave])el(id).value=dados[chave];
+  const circuito=el('os-servico-circuito');
+  if(dados.circuito&&normalizarCircuito(circuito.value)!==normalizarCircuito(dados.circuito)){
+    circuito.value=dados.circuito;delete circuito.dataset.circuitoEncontrado;
+    setTimeout(buscarCircuitoOsServico,0);
+  }
+  const descricao=el('os-servico-descricao');
+  if(texto.trim()&&descricao?.dataset.preenchimento!=='manual')descricao.value=texto.trim();
+  const status=el('os-servico-descricao-status');
+  const encontrados=Object.values(dados).filter(Boolean).length;
+  if(status){status.textContent=encontrados?'✓ '+encontrados+' dado(s) identificado(s) na descrição, mesmo que ainda não estejam cadastrados.'+(dados.circuito?' O novo site será salvo após a OS.':' Informe o circuito acima para incluir o site na base após a OS.'):'Nenhum dado de site identificado. Você pode preencher os campos manualmente.';status.style.color=encontrados?'var(--g)':'var(--y)';}
+  return dados;
+}
 async function buscarCircuitoOsServico(){
   const campo=el('os-servico-circuito'),numero=String(campo?.value||'').trim();
   const chave=normalizarCircuito(numero),somenteNumero=numeroCircuito(numero);
@@ -173,9 +196,9 @@ async function buscarCircuitoOsServico(){
     }
   }catch(erro){
     if(campo.dataset.buscaId!==buscaId)return null;
-    status.textContent='Não foi possível consultar a base agora. Você ainda pode preencher os dados manualmente; a OS será salva com as informações digitadas.';status.style.color='var(--y)';return null;
+    status.textContent='Não foi possível consultar a base agora. Os dados colados ou digitados serão mantidos e o cadastro será tentado após salvar a OS.';status.style.color='var(--y)';return null;
   }
-  status.textContent='Circuito não localizado. Preencha os dados manualmente; se informar endereço, contato e horário, o circuito será cadastrado na base junto com a OS.';
+  status.textContent='Circuito ainda não cadastrado. Os dados colados foram mantidos e o novo site será gravado na base após salvar a OS.';
   status.style.color='var(--y)';return null;
 }
 function selecionarCircuitoOsServico(valor){
@@ -184,13 +207,11 @@ function selecionarCircuitoOsServico(valor){
   preencherSiteOsServico(site);el('os-servico-circuito-opcoes').classList.add('hidden');
 }
 async function salvarCadastroSiteOsServico(c){
-  const circuito=String(c.ci||'').trim();if(!circuito)return null;
-  const existenteLocal=SITE_INDEX.get(normalizarCircuito(circuito));if(existenteLocal)return existenteLocal;
+  const circuito=String(c.ci||'').trim();if(!circuito||!String(c.si||'').trim())return null;
   const colunas='circuito,site,cidade,endereco,contato,horario_expediente,velocidade,prtm,pvf_total,regiao_operacional,tecnicos_indicados';
-  const {data:existente,error:erroBusca}=await SB.from('sites').select(colunas).ilike('circuito',circuito).maybeSingle();
+  const {data:existente,error:erroBusca}=await SB.from('sites').select(colunas).eq('circuito',circuito).maybeSingle();
   if(erroBusca)throw erroBusca;
   if(existente)return registrarSiteOsServico(siteOsServicoDoBanco(existente));
-  if(!c.en||!c.contato||!c.horario)throw new Error('Para cadastrar um circuito novo na base, preencha endereço, contato e horário de atendimento.');
   const regiaoOperacional=c.re==='capital'?(c.area||'').replace(/^area\s*/i,''):c.re==='noronha'?'Fernando de Noronha':'Interior';
   const linha={circuito,site:c.si,cidade:c.cid,endereco:c.en,contato:c.contato,horario_expediente:c.horario,regiao_operacional:regiaoOperacional||null,ativo:true};
   const {data,error}=await SB.from('sites').insert(linha).select(colunas).single();
@@ -222,7 +243,7 @@ function normalizarRotuloDescricao(v){
 function extrairTextoRotulado(texto,rotulos){
   const linhas=String(texto||'').split(/\r?\n/);
   const chaves=rotulos.map(normalizarRotuloDescricao);
-  const todosRotulos=['SITE','SITE/CLIENTE','SITE / CLIENTE','CLIENTE','ENDERECO','CIDADE','CONTATO','PROTOCOLO','SDM','CIRCUITO','DESIGNACAO','MOTIVO','MOTIVO DO CHAMADO','DESCRICAO DO PROBLEMA','DEFEITO RECLAMADO'];
+  const todosRotulos=['SITE','SITE/CLIENTE','SITE / CLIENTE','CLIENTE','ENDERECO','CIDADE','CONTATO','RESPONSAVEL LOCAL','PROTOCOLO','SDM','CIRCUITO','NUMERO DO CIRCUITO','DESIGNACAO','DESIGNACAO DO CIRCUITO','HORARIO','HORARIO DE EXPEDIENTE','HORARIO DE ATENDIMENTO','EXPEDIENTE','REGIAO','SKILL','MOTIVO','MOTIVO DO CHAMADO','DESCRICAO DO PROBLEMA','DEFEITO RECLAMADO'];
   for(let i=0;i<linhas.length;i++){
     const original=String(linhas[i]||'').trim();
     const normal=normalizarRotuloDescricao(original);
@@ -1330,21 +1351,24 @@ async function addOsServico() {
   try{
     if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
     const adminAtual=await sbExigirSessaoAdmin();
-    await salvarCadastroSiteOsServico(novoChamado);
     const linha=sbChamadoRow(novoChamado);
     linha.criado_por=adminAtual.id;
     const {data,error}=await SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em,atualizado_em').single();
     if(error)throw error;
     if(!data?.id||data.status!=='pendente'||data.tecnico_id!==linha.tecnico_id)throw new Error('O servidor não confirmou a OS de Serviços e o técnico selecionado.');
     novoChamado.id=data.id;novoChamado.st=data.status;novoChamado.cr=data.criado_em||novoChamado.cr;
+    let erroCadastroSite=null;
+    try{await salvarCadastroSiteOsServico(novoChamado);}catch(erro){erroCadastroSite=erro;console.error('OS salva, mas o cadastro do circuito/site falhou:',erro);}
     D.ch.push(novoChamado);SB_LOADED_CH.add(data.id);lsSet('dd',D);
-    ['os-servico-pe','os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
+    ['os-servico-descricao-colada','os-servico-pe','os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
+    delete el('os-servico-descricao').dataset.preenchimento;
+    el('os-servico-descricao-status').textContent='Cole a descrição para carregar circuito, cliente, endereço, cidade, contato e horário.';el('os-servico-descricao-status').style.color='var(--gr)';
     delete el('os-servico-circuito').dataset.circuitoEncontrado;el('os-servico-circuito-opcoes').classList.add('hidden');
     el('os-servico-circuito-status').textContent='Sem circuito? Informe Site / Cliente, Cidade e os demais dados manualmente.';el('os-servico-circuito-status').style.color='var(--gr)';
     el('os-servico-atividade').value='';el('os-servico-skill').value='';el('os-servico-area').value='';el('os-servico-tecnico').innerHTML='<option value="">Selecione...</option>';
     rCh();rDb();
     sbSetConnectionBadge('OS de Serviço confirmada no Supabase',true);
-    nfToast('OS de Serviço criada e enviada ao técnico!','sucesso');
+    nfToast(erroCadastroSite?'OS criada e enviada; não foi possível gravar o novo circuito/site na base. Verifique o acesso e tente cadastrar novamente.':'OS de Serviço criada e enviada ao técnico!'+(circuito?' Cadastro do site verificado no banco.':''),erroCadastroSite?'erro':'sucesso');
   }catch(err){
     sbShowError('A OS de Serviço não foi salva. Os dados foram mantidos para nova tentativa',err);
     sbSetConnectionBadge('Falha ao salvar OS de Serviço',false);
@@ -3272,6 +3296,14 @@ document.addEventListener('DOMContentLoaded', function() {
   el('tb-solicitantes')?.addEventListener('click', eventoSolicitanteChamados);
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
   el('btn-criar-os-servico')?.addEventListener('click',addOsServico);
+  let osServicoDescricaoTimer=null;
+  el('os-servico-descricao-colada')?.addEventListener('input',function(){
+    clearTimeout(osServicoDescricaoTimer);
+    const texto=this.value;
+    osServicoDescricaoTimer=setTimeout(()=>preencherDadosOsServicoDaDescricao(texto),180);
+  });
+  el('os-servico-descricao-colada')?.addEventListener('change',function(){preencherDadosOsServicoDaDescricao(this.value);});
+  el('os-servico-descricao')?.addEventListener('input',function(){this.dataset.preenchimento='manual';});
   let osServicoCircuitoTimer=null;
   el('os-servico-circuito')?.addEventListener('input',()=>{clearTimeout(osServicoCircuitoTimer);osServicoCircuitoTimer=setTimeout(buscarCircuitoOsServico,250);});
   el('os-servico-circuito')?.addEventListener('change',buscarCircuitoOsServico);
