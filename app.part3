@@ -105,6 +105,52 @@ function buscarCircuito() {
   return null;
 }
 
+function limparDadosSiteOsServico(){
+  ['os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
+  el('os-servico-regiao').value='capital';el('os-servico-area').value='';
+  atualizarTecnicosOsServico();
+}
+function preencherSiteOsServico(site){
+  el('os-servico-circuito').value=site[0]||'';
+  el('os-servico-site').value=site[1]||'';
+  el('os-servico-cidade').value=site[2]||'';
+  el('os-servico-endereco').value=site[3]||'';
+  el('os-servico-contato').value=site[4]||'';
+  el('os-servico-horario').value=site[5]||'';
+  const regiao=detectarRegiaoPlanilha(site[9],site[2]);
+  el('os-servico-regiao').value=regiao.tipo;
+  el('os-servico-area').value=regiao.tipo==='capital'?regiao.area:'';
+  el('os-servico-circuito').dataset.circuitoEncontrado=normalizarCircuito(site[0]);
+  atualizarTecnicosOsServico();
+  const status=el('os-servico-circuito-status');
+  status.textContent='✓ Circuito encontrado — dados do site carregados. Confira e complete as informações, se necessário.';
+  status.style.color='var(--g)';
+  return site;
+}
+function buscarCircuitoOsServico(){
+  const campo=el('os-servico-circuito'),numero=String(campo?.value||'').trim();
+  const chave=normalizarCircuito(numero),somenteNumero=numeroCircuito(numero);
+  const opcoes=el('os-servico-circuito-opcoes'),status=el('os-servico-circuito-status');
+  const anterior=campo?.dataset.circuitoEncontrado||'';
+  if(anterior&&anterior!==chave){limparDadosSiteOsServico();delete campo.dataset.circuitoEncontrado;}
+  opcoes.classList.add('hidden');opcoes.innerHTML='';
+  if(!chave){status.textContent='Sem circuito? Informe Site / Cliente, Cidade e os demais dados manualmente.';status.style.color='var(--gr)';return null;}
+  const exato=SITE_INDEX.get(chave);
+  if(exato)return preencherSiteOsServico(exato);
+  const encontrados=SITE_NUMBER_INDEX.get(somenteNumero)||[];
+  if(encontrados.length===1)return preencherSiteOsServico(encontrados[0]);
+  if(encontrados.length>1){
+    opcoes.innerHTML='<option value="">Selecione o circuito correto...</option>'+encontrados.map(site=>`<option value="${esc(site[0])}">${esc(site[0])} — ${esc(site[1])} (${esc(site[2])})</option>`).join('');
+    opcoes.classList.remove('hidden');status.textContent='Este número aparece em mais de um site. Selecione o circuito correto.';status.style.color='var(--y)';return null;
+  }
+  status.textContent='Circuito não localizado na base. Você pode preencher os dados abaixo manualmente; o circuito informado será salvo na OS.';
+  status.style.color='var(--y)';return null;
+}
+function selecionarCircuitoOsServico(valor){
+  const site=SITE_INDEX.get(normalizarCircuito(valor));if(!site)return;
+  preencherSiteOsServico(site);el('os-servico-circuito-opcoes').classList.add('hidden');
+}
+
 function extrairCampoDaDescricao(texto,tipo){
   const conteudo=String(texto||'');
   const regexRotulo=tipo==='protocolo'
@@ -258,6 +304,7 @@ function seloTipoOs(c){return c?.tipoOs==='servico'?'<span class="badge b-andame
 function dadosSite(c) {
   if(c?.tipoOs==='servico')return `<div class="os-r"><b>Tipo de OS:</b> OS de Serviços — ${esc(nomeAtividadeOsServico(c))}</div>
     <div class="os-r"><b>OS PE Conectado:</b> ${valorInfo(c.osPeConectado)}</div>
+    ${c.ci?`<div class="os-r"><b>Circuito:</b> ${valorInfo(c.ci)}</div>`:''}
     <div class="os-r"><b>Site / Cliente:</b> ${valorInfo(c.si)}</div>
     <div class="os-r"><b>Cidade:</b> ${valorInfo(c.cid)}</div>
     <div class="os-r"><b>Endereço:</b> ${valorInfo(c.en)}</div>
@@ -1213,6 +1260,7 @@ function addAdm() {
 }
 
 async function addOsServico() {
+  const circuito=el('os-servico-circuito').value.trim();
   const atividade=el('os-servico-atividade').value;
   const site=el('os-servico-site').value.trim();
   const cidade=el('os-servico-cidade').value.trim();
@@ -1233,7 +1281,7 @@ async function addOsServico() {
   if(!perfilTecnico?._id){alert('O técnico selecionado não possui vínculo válido com o servidor. Atualize a página e tente novamente.');return;}
   const identificador='OS-SERV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
   const novoChamado={
-    id:'CH-'+Date.now(),pr:identificador,sdm:'',abertura:'OS de Serviços',si:site,ci:'',re:regiao,skill,area:regiao==='capital'?area:'',
+    id:'CH-'+Date.now(),pr:identificador,sdm:'',abertura:'OS de Serviços',si:site,ci:circuito,re:regiao,skill,area:regiao==='capital'?area:'',
     en:endereco,cid:cidade,contato,horario,velocidade:'',prtm:'',pvfTotal:'',de:descricao,dtexec:el('os-servico-data').value,
     tipoOs:'servico',osPeConectado:el('os-servico-pe').value.trim(),atividadeServico:atividade,
     st:'pendente',te:tecnico,mr:'',tr:[],dt:null,ex:null,cr:ag(),ae:null,am:null,cc:null
@@ -1249,7 +1297,9 @@ async function addOsServico() {
     if(!data?.id||data.status!=='pendente'||data.tecnico_id!==linha.tecnico_id)throw new Error('O servidor não confirmou a OS de Serviços e o técnico selecionado.');
     novoChamado.id=data.id;novoChamado.st=data.status;novoChamado.cr=data.criado_em||novoChamado.cr;
     D.ch.push(novoChamado);SB_LOADED_CH.add(data.id);lsSet('dd',D);
-    ['os-servico-pe','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
+    ['os-servico-pe','os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
+    delete el('os-servico-circuito').dataset.circuitoEncontrado;el('os-servico-circuito-opcoes').classList.add('hidden');
+    el('os-servico-circuito-status').textContent='Sem circuito? Informe Site / Cliente, Cidade e os demais dados manualmente.';el('os-servico-circuito-status').style.color='var(--gr)';
     el('os-servico-atividade').value='';el('os-servico-skill').value='';el('os-servico-area').value='';el('os-servico-tecnico').innerHTML='<option value="">Selecione a região e a skill...</option>';
     rCh();rDb();
     sbSetConnectionBadge('OS de Serviço confirmada no Supabase',true);
@@ -3181,6 +3231,11 @@ document.addEventListener('DOMContentLoaded', function() {
   el('tb-solicitantes')?.addEventListener('click', eventoSolicitanteChamados);
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
   el('btn-criar-os-servico')?.addEventListener('click',addOsServico);
+  let osServicoCircuitoTimer=null;
+  el('os-servico-circuito')?.addEventListener('input',()=>{clearTimeout(osServicoCircuitoTimer);osServicoCircuitoTimer=setTimeout(buscarCircuitoOsServico,250);});
+  el('os-servico-circuito')?.addEventListener('change',buscarCircuitoOsServico);
+  el('os-servico-circuito')?.addEventListener('blur',buscarCircuitoOsServico);
+  el('os-servico-circuito-opcoes')?.addEventListener('change',function(){selecionarCircuitoOsServico(this.value);});
   const escolhaOs=el('os-tipo-escolha'),formOsServico=el('form-os-servico'),formOsManutencao=el('form-os-manutencao');
   const abrirFormularioOs=tipo=>{
     escolhaOs?.classList.add('hidden');

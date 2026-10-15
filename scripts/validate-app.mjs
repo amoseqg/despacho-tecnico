@@ -18,6 +18,7 @@ const idsObrigatorios = [
   'c-ci', 'c-si', 'c-en', 'c-opcoes', 'ex-fotos', 'ex-fotos-preview',
   'btn-criar-os-servico', 'os-servico-atividade', 'os-servico-site',
   'os-servico-cidade', 'os-servico-regiao', 'os-servico-skill', 'os-servico-tecnico',
+  'os-servico-circuito', 'os-servico-circuito-opcoes', 'os-servico-circuito-status',
   'os-tipo-escolha', 'btn-escolher-os-servico', 'btn-escolher-os-manutencao',
   'form-os-servico', 'form-os-manutencao'
 ];
@@ -69,7 +70,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.5\.6'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.5\.7'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
@@ -88,12 +89,18 @@ assert.match(carregador,/replace\('<\/body>','<script>'\+stock/,'O módulo do es
 assert.match(html,/Criar OS de Serviços/,'A área administrativa deve oferecer o cadastro de OS de Serviços em Chamados.');
 assert.match(html,/id="form-os-servico" class="card hidden"/,'O formulário de serviços deve iniciar oculto até a escolha do administrador.');
 assert.match(html,/id="form-os-manutencao" class="card hidden"/,'O formulário de manutenção deve iniciar oculto até a escolha do administrador.');
+assert.match(html,/id="os-servico-circuito"[\s\S]*?id="os-servico-circuito-opcoes"[\s\S]*?id="os-servico-circuito-status"/,'A OS de Serviços deve permitir procurar e selecionar circuitos cadastrados.');
 assert.match(html,/id="btn-escolher-os-servico"[\s\S]*?Criar OS de Serviços[\s\S]*?id="btn-escolher-os-manutencao"[\s\S]*?Nova OS de Manutenção/,'A tela de Chamados deve mostrar as duas opções antes dos formulários.');
 assert.match(parte3,/btn-escolher-os-servico[\s\S]*?abrirFormularioOs\('servico'\)/,'A opção de serviço deve abrir o formulário correspondente.');
 assert.match(parte3,/btn-escolher-os-manutencao[\s\S]*?abrirFormularioOs\('manutencao'\)/,'A opção de manutenção deve abrir o formulário correspondente.');
 assert.match(parte3,/btn-voltar-os-escolha[\s\S]*?escolhaOs\?\.classList\.remove\('hidden'\)/,'Os formulários devem permitir voltar à escolha do tipo.');
-assert.match(html,/Não precisa informar protocolo, SDM nem circuito/,'A OS de Serviços não deve exigir protocolo, SDM ou circuito manual.');
+assert.match(html,/Protocolo e SDM são dispensados/,'A OS de Serviços não deve exigir protocolo ou SDM.');
+assert.match(html,/sem circuito ou sem cadastro encontrado, preencha os dados manualmente/i,'A OS de Serviços deve permitir cadastro manual sem circuito cadastrado.');
 assert.match(parte3,/async function addOsServico\(\)/,'O cadastro de OS de Serviços deve ter um fluxo próprio.');
+assert.match(parte3,/function buscarCircuitoOsServico\(\)[\s\S]*?SITE_INDEX\.get\(chave\)[\s\S]*?SITE_NUMBER_INDEX\.get\(somenteNumero\)/,'O formulário de Serviços deve localizar circuitos pelo mesmo catálogo da Manutenção.');
+assert.match(parte3,/function preencherSiteOsServico\(site\)[\s\S]*?os-servico-site[\s\S]*?os-servico-cidade[\s\S]*?os-servico-endereco/,'Encontrar o circuito deve carregar os dados existentes do site.');
+assert.match(parte3,/ci:circuito/,'O circuito informado deve ser salvo junto da OS de Serviços.');
+assert.match(parte3,/circuito:c\.ci\|\|''/,'O circuito deve ser persistido no campo circuito do banco de chamados.');
 assert.match(parte3,/tipoOs:'servico',osPeConectado:[\s\S]*?atividadeServico:atividade/,'A OS deve preservar sua classificação e a OS PE Conectado opcional.');
 assert.match(parte3,/tipo_os:c\.tipoOs==='servico'\?'servico':'manutencao'/,'A classificação da OS deve ser gravada no Supabase.');
 assert.match(parte3,/tipoOs:c\.tipo_os\|\|'manutencao'/,'A classificação deve ser carregada do Supabase para a área do técnico.');
