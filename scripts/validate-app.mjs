@@ -95,10 +95,13 @@ assert.match(parte3,/btn-escolher-os-servico[\s\S]*?abrirFormularioOs\('servico'
 assert.match(parte3,/btn-escolher-os-manutencao[\s\S]*?abrirFormularioOs\('manutencao'\)/,'A opção de manutenção deve abrir o formulário correspondente.');
 assert.match(parte3,/btn-voltar-os-escolha[\s\S]*?escolhaOs\?\.classList\.remove\('hidden'\)/,'Os formulários devem permitir voltar à escolha do tipo.');
 assert.match(html,/Protocolo e SDM são dispensados/,'A OS de Serviços não deve exigir protocolo ou SDM.');
-assert.match(html,/sem circuito ou sem cadastro encontrado, preencha os dados manualmente/i,'A OS de Serviços deve permitir cadastro manual sem circuito cadastrado.');
+assert.match(html,/sem circuito, preencha os dados manualmente/i,'A OS de Serviços deve permitir cadastro manual sem circuito.');
 assert.match(parte3,/async function addOsServico\(\)/,'O cadastro de OS de Serviços deve ter um fluxo próprio.');
-assert.match(parte3,/function buscarCircuitoOsServico\(\)[\s\S]*?SITE_INDEX\.get\(chave\)[\s\S]*?SITE_NUMBER_INDEX\.get\(somenteNumero\)/,'O formulário de Serviços deve localizar circuitos pelo mesmo catálogo da Manutenção.');
+assert.match(parte3,/async function buscarCircuitoOsServico\(\)[\s\S]*?SITE_INDEX\.get\(chave\)[\s\S]*?SITE_NUMBER_INDEX\.get\(somenteNumero\)/,'O formulário de Serviços deve localizar circuitos pelo mesmo catálogo da Manutenção.');
 assert.match(parte3,/function preencherSiteOsServico\(site\)[\s\S]*?os-servico-site[\s\S]*?os-servico-cidade[\s\S]*?os-servico-endereco/,'Encontrar o circuito deve carregar os dados existentes do site.');
+assert.match(parte3,/SB\.from\('sites'\)\.select\(colunas\)[\s\S]*?ilike\('circuito'/,'A busca também deve consultar circuitos incluídos diretamente no banco.');
+assert.match(parte3,/async function salvarCadastroSiteOsServico\(c\)[\s\S]*?SB\.from\('sites'\)\.insert\(linha\)/,'Circuito desconhecido deve criar cadastro no banco antes de abrir a OS.');
+assert.match(parte3,/await salvarCadastroSiteOsServico\(novoChamado\)/,'A OS deve garantir o cadastro do novo circuito antes de salvá-la.');
 assert.match(parte3,/ci:circuito/,'O circuito informado deve ser salvo junto da OS de Serviços.');
 assert.match(parte3,/circuito:c\.ci\|\|''/,'O circuito deve ser persistido no campo circuito do banco de chamados.');
 assert.match(parte3,/tipoOs:'servico',osPeConectado:[\s\S]*?atividadeServico:atividade/,'A OS deve preservar sua classificação e a OS PE Conectado opcional.');

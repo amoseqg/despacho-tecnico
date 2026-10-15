@@ -111,6 +111,7 @@ function limparDadosSiteOsServico(){
   atualizarTecnicosOsServico();
 }
 function preencherSiteOsServico(site){
+  registrarSiteOsServico(site);
   el('os-servico-circuito').value=site[0]||'';
   el('os-servico-site').value=site[1]||'';
   el('os-servico-cidade').value=site[2]||'';
@@ -127,7 +128,15 @@ function preencherSiteOsServico(site){
   status.style.color='var(--g)';
   return site;
 }
-function buscarCircuitoOsServico(){
+function registrarSiteOsServico(site){
+  if(!Array.isArray(site))return site;
+  const chave=normalizarCircuito(site[0]),numero=numeroCircuito(site[0]);
+  if(chave)SITE_INDEX.set(chave,site);
+  if(numero){const lista=SITE_NUMBER_INDEX.get(numero)||[];const idx=lista.findIndex(x=>normalizarCircuito(x[0])===chave);if(idx<0)lista.push(site);else lista[idx]=site;SITE_NUMBER_INDEX.set(numero,lista);}
+  return site;
+}
+function siteOsServicoDoBanco(site){return [site.circuito||'',site.site||'',site.cidade||'',site.endereco||'',site.contato||'',site.horario_expediente||'',site.velocidade||'',site.prtm||'',site.pvf_total??'',site.regiao_operacional||'',site.tecnicos_indicados||''];}
+async function buscarCircuitoOsServico(){
   const campo=el('os-servico-circuito'),numero=String(campo?.value||'').trim();
   const chave=normalizarCircuito(numero),somenteNumero=numeroCircuito(numero);
   const opcoes=el('os-servico-circuito-opcoes'),status=el('os-servico-circuito-status');
@@ -143,12 +152,50 @@ function buscarCircuitoOsServico(){
     opcoes.innerHTML='<option value="">Selecione o circuito correto...</option>'+encontrados.map(site=>`<option value="${esc(site[0])}">${esc(site[0])} — ${esc(site[1])} (${esc(site[2])})</option>`).join('');
     opcoes.classList.remove('hidden');status.textContent='Este número aparece em mais de um site. Selecione o circuito correto.';status.style.color='var(--y)';return null;
   }
-  status.textContent='Circuito não localizado na base. Você pode preencher os dados abaixo manualmente; o circuito informado será salvo na OS.';
+  const buscaId=String(Number(campo.dataset.buscaId||0)+1);campo.dataset.buscaId=buscaId;
+  try{
+    if(!SB?.from)throw new Error('Base de dados indisponível');
+    const colunas='circuito,site,cidade,endereco,contato,horario_expediente,velocidade,prtm,pvf_total,regiao_operacional,tecnicos_indicados';
+    let dados=[];
+    if(somenteNumero&&somenteNumero===numero.replace(/\D/g,'')){
+      const {data,error}=await SB.from('sites').select(colunas).eq('ativo',true).ilike('circuito','%'+somenteNumero+'%').limit(100);
+      if(error)throw error;dados=(data||[]).filter(x=>numeroCircuito(x.circuito)===somenteNumero);
+    }else{
+      const {data,error}=await SB.from('sites').select(colunas).eq('ativo',true).ilike('circuito',numero).limit(2);
+      if(error)throw error;dados=data||[];
+    }
+    if(campo.dataset.buscaId!==buscaId||normalizarCircuito(campo.value)!==chave)return null;
+    const sitesBanco=dados.map(site=>registrarSiteOsServico(siteOsServicoDoBanco(site)));
+    if(sitesBanco.length===1)return preencherSiteOsServico(sitesBanco[0]);
+    if(dados.length>1){
+      opcoes.innerHTML='<option value="">Selecione o circuito correto...</option>'+sitesBanco.map(site=>`<option value="${esc(site[0])}">${esc(site[0])} — ${esc(site[1])} (${esc(site[2])})</option>`).join('');
+      opcoes.classList.remove('hidden');status.textContent='Este número aparece em mais de um site. Selecione o circuito correto.';status.style.color='var(--y)';return null;
+    }
+  }catch(erro){
+    if(campo.dataset.buscaId!==buscaId)return null;
+    status.textContent='Não foi possível consultar a base agora. Você ainda pode preencher os dados manualmente; a OS será salva com as informações digitadas.';status.style.color='var(--y)';return null;
+  }
+  status.textContent='Circuito não localizado. Preencha os dados manualmente; se informar endereço, contato e horário, o circuito será cadastrado na base junto com a OS.';
   status.style.color='var(--y)';return null;
 }
 function selecionarCircuitoOsServico(valor){
-  const site=SITE_INDEX.get(normalizarCircuito(valor));if(!site)return;
+  const chave=normalizarCircuito(valor),site=SITE_INDEX.get(chave);
+  if(!site){const opcao=el('os-servico-circuito-opcoes')?.selectedOptions?.[0];if(!opcao)return;return buscarCircuitoOsServico();}
   preencherSiteOsServico(site);el('os-servico-circuito-opcoes').classList.add('hidden');
+}
+async function salvarCadastroSiteOsServico(c){
+  const circuito=String(c.ci||'').trim();if(!circuito)return null;
+  const existenteLocal=SITE_INDEX.get(normalizarCircuito(circuito));if(existenteLocal)return existenteLocal;
+  const colunas='circuito,site,cidade,endereco,contato,horario_expediente,velocidade,prtm,pvf_total,regiao_operacional,tecnicos_indicados';
+  const {data:existente,error:erroBusca}=await SB.from('sites').select(colunas).ilike('circuito',circuito).maybeSingle();
+  if(erroBusca)throw erroBusca;
+  if(existente)return registrarSiteOsServico(siteOsServicoDoBanco(existente));
+  if(!c.en||!c.contato||!c.horario)throw new Error('Para cadastrar um circuito novo na base, preencha endereço, contato e horário de atendimento.');
+  const regiaoOperacional=c.re==='capital'?(c.area||'').replace(/^area\s*/i,''):c.re==='noronha'?'Fernando de Noronha':'Interior';
+  const linha={circuito,site:c.si,cidade:c.cid,endereco:c.en,contato:c.contato,horario_expediente:c.horario,regiao_operacional:regiaoOperacional||null,ativo:true};
+  const {data,error}=await SB.from('sites').insert(linha).select(colunas).single();
+  if(error)throw error;
+  return registrarSiteOsServico(siteOsServicoDoBanco(data));
 }
 
 function extrairCampoDaDescricao(texto,tipo){
@@ -1290,6 +1337,7 @@ async function addOsServico() {
   try{
     if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
     const adminAtual=await sbExigirSessaoAdmin();
+    await salvarCadastroSiteOsServico(novoChamado);
     const linha=sbChamadoRow(novoChamado);
     linha.criado_por=adminAtual.id;
     const {data,error}=await SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em,atualizado_em').single();
