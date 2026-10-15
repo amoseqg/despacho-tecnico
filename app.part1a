@@ -639,8 +639,36 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       </div>
     </div>
     <div id="v-ch" class="hidden">
+      <div class="card" style="margin-bottom:12px;border-left:4px solid var(--a)">
+        <h3 style="font-size:.9rem;color:var(--p);margin-bottom:5px">🛠️ Criar OS de Serviços</h3>
+        <p class="info">Use para instalação, alteração, mudança de endereço ou vistoria. Não precisa informar protocolo, SDM nem circuito: o sistema gera um identificador interno e envia a OS ao técnico escolhido.</p>
+        <div class="grid-2">
+          <div class="form-group"><label class="label" for="os-servico-pe">Número da OS PE Conectado (opcional)</label><input id="os-servico-pe" class="input" autocomplete="off" placeholder="Se houver, informe aqui"></div>
+          <div class="form-group"><label class="label" for="os-servico-atividade">Tipo de serviço *</label><select id="os-servico-atividade" class="select"><option value="">Selecione...</option><option value="instalacao">Instalação</option><option value="alteracao">Alteração</option><option value="mudanca_endereco">Mudança de endereço</option><option value="vistoria">Vistoria</option></select></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label class="label" for="os-servico-site">Site / Cliente *</label><input id="os-servico-site" class="input" placeholder="Informe o cliente ou local do serviço"></div>
+          <div class="form-group"><label class="label" for="os-servico-cidade">Cidade *</label><input id="os-servico-cidade" class="input" placeholder="Cidade do atendimento"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label class="label" for="os-servico-endereco">Endereço</label><input id="os-servico-endereco" class="input" placeholder="Endereço do serviço"></div>
+          <div class="form-group"><label class="label" for="os-servico-contato">Contato</label><input id="os-servico-contato" class="input" placeholder="Nome e telefone para contato"></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group"><label class="label" for="os-servico-regiao">Região *</label><select id="os-servico-regiao" class="select"><option value="capital">Capital</option><option value="interior">Interior</option><option value="noronha">Fernando de Noronha</option></select></div>
+          <div class="form-group"><label class="label" for="os-servico-skill">Skill necessária *</label><select id="os-servico-skill" class="select"><option value="">Selecione...</option><option value="voz">Voz</option><option value="dados">Dados</option><option value="infra">Infra</option></select></div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group" id="os-servico-area-box"><label class="label" for="os-servico-area">Área de atendimento na Capital *</label><select id="os-servico-area" class="select"><option value="">Selecione...</option><option value="norte">Área Norte</option><option value="leste">Área Leste</option><option value="sul">Área Sul</option><option value="oeste">Área Oeste</option></select></div>
+          <div class="form-group"><label class="label" for="os-servico-tecnico">Técnico responsável *</label><select id="os-servico-tecnico" class="select"><option value="">Selecione a região e a skill...</option></select></div>
+        </div>
+        <div class="form-group"><label class="label" for="os-servico-horario">Horário de atendimento</label><input id="os-servico-horario" class="input" placeholder="Ex.: 08:00 às 17:00"></div>
+        <div class="form-group"><label class="label" for="os-servico-descricao">Descrição / orientação do serviço *</label><textarea id="os-servico-descricao" class="input" rows="3" placeholder="Descreva o que o técnico deverá executar"></textarea></div>
+        <div class="form-group"><label class="label" for="os-servico-data">Data programada (opcional)</label><input type="date" id="os-servico-data" class="input"></div>
+        <button type="button" class="btn btn-p" id="btn-criar-os-servico">🛠️ Criar e enviar OS de Serviço</button>
+      </div>
       <div class="card" style="margin-bottom:12px">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📞 Novo Chamado</h3>
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📞 Nova OS de Manutenção</h3>
         <div class="form-group">
           <label class="label">Cole a descrição do chamado</label>
           <textarea id="c-descricao-colada" class="input" rows="5" placeholder="Cole aqui todo o texto do chamado. O sistema localizará automaticamente a designação do circuito na base."></textarea>
@@ -702,7 +730,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="card">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Chamados em Atendimento</h3>
         <div style="overflow-x:auto"><table class="table">
-          <thead><tr><th>Protocolo</th><th>Site</th><th>Técnico</th><th>Região</th><th>Prazo restante</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Protocolo / OS interna</th><th>Site / Cliente</th><th>Técnico</th><th>Região</th><th>Prazo restante</th><th>Ações</th></tr></thead>
           <tbody id="tb-at"></tbody>
         </table></div>
       </div>
@@ -854,25 +882,25 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <div class="card stat g"><div class="l">Concluídos</div><div class="v" id="ts-c">0</div></div>
       </div>
       <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏳ Prazo restante dos chamados</h3>
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏳ Prazo restante — chamados e OS de Serviços</h3>
         <div id="t-tm"></div>
       </div>
     </div>
     <div id="t-dp" class="hidden">
       <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📥 Chamados Despachados para Você</h3>
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📥 Chamados e OS de Serviços para Você</h3>
         <div id="t-dl"></div>
       </div>
     </div>
     <div id="t-at" class="hidden">
       <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Chamados em Atendimento</h3>
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Chamados e OS de Serviços em Atendimento</h3>
         <div id="t-al"></div>
       </div>
     </div>
     <div id="t-co" class="hidden">
       <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">✅ Chamados Concluídos</h3>
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">✅ Chamados e OS de Serviços Concluídos</h3>
         <div id="t-cl"></div>
       </div>
     </div>
@@ -1083,8 +1111,11 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <div class="modal-bd">
       <div class="card" style="margin-bottom:12px;background:var(--l)">
         <div style="font-size:.6rem;color:var(--gr);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">📋 Dados do Chamado (Somente Leitura)</div>
-        <div class="grid-2"><div class="os-r"><b>Protocolo:</b> <span id="ex-pr"></span></div><div class="os-r"><b>Site:</b> <span id="ex-si"></span></div></div>
-        <div class="os-r"><b>Circuito:</b> <span id="ex-ci"></span></div>
+        <div class="grid-2"><div class="os-r"><b><span id="ex-pr-label">Protocolo:</span></b> <span id="ex-pr"></span></div><div class="os-r"><b>Site:</b> <span id="ex-si"></span></div></div>
+        <div class="os-r" id="ex-ci-row"><b>Circuito:</b> <span id="ex-ci"></span></div>
+        <div class="os-r" id="ex-sdm-row"><b>SDM:</b> <span id="ex-sdm"></span></div>
+        <div class="os-r hidden" id="ex-os-pe-row"><b>OS PE Conectado:</b> <span id="ex-os-pe"></span></div>
+        <div class="os-r hidden" id="ex-os-atividade-row"><b>Tipo de serviço:</b> <span id="ex-os-atividade"></span></div>
         <div class="os-r"><b>Endereço:</b> <span id="ex-en"></span></div>
         <div class="os-r"><b>Descrição:</b> <span id="ex-de"></span></div>
       </div>

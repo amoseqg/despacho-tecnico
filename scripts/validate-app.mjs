@@ -15,7 +15,9 @@ assert.doesNotMatch(html, /Warning: truncated output|Total output lines:/, 'Os a
 
 const idsObrigatorios = [
   'card-adm', 'btn-add-ch', 'c-descricao-colada', 'c-pr', 'c-sdm',
-  'c-ci', 'c-si', 'c-en', 'c-opcoes', 'ex-fotos', 'ex-fotos-preview'
+  'c-ci', 'c-si', 'c-en', 'c-opcoes', 'ex-fotos', 'ex-fotos-preview',
+  'btn-criar-os-servico', 'os-servico-atividade', 'os-servico-site',
+  'os-servico-cidade', 'os-servico-regiao', 'os-servico-skill', 'os-servico-tecnico'
 ];
 for (const id of idsObrigatorios) {
   assert.match(html, new RegExp(`id=["']${id}["']`), `Elemento obrigatório ausente: ${id}`);
@@ -65,7 +67,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.5\.4'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.5\.5'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
@@ -81,6 +83,13 @@ assert.match(estoque,/configurarEstoque\('ml-estoque-lista'\)/,'O estoque do adm
 assert.match(estoque,/configurarEstoque\('lg-estoque-lista'\)/,'O estoque da logística deve ser ocultado.');
 assert.match(carregador,/fetch\('\/stock-export\.js\?v='\+versao/,'O módulo do estoque deve ser carregado sem cache antigo.');
 assert.match(carregador,/replace\('<\/body>','<script>'\+stock/,'O módulo do estoque deve ser incorporado ao aplicativo antes da abertura.');
+assert.match(html,/Criar OS de Serviços/,'A área administrativa deve oferecer o cadastro de OS de Serviços em Chamados.');
+assert.match(html,/Não precisa informar protocolo, SDM nem circuito/,'A OS de Serviços não deve exigir protocolo, SDM ou circuito manual.');
+assert.match(parte3,/async function addOsServico\(\)/,'O cadastro de OS de Serviços deve ter um fluxo próprio.');
+assert.match(parte3,/tipoOs:'servico',osPeConectado:[\s\S]*?atividadeServico:atividade/,'A OS deve preservar sua classificação e a OS PE Conectado opcional.');
+assert.match(parte3,/tipo_os:c\.tipoOs==='servico'\?'servico':'manutencao'/,'A classificação da OS deve ser gravada no Supabase.');
+assert.match(parte3,/tipoOs:c\.tipo_os\|\|'manutencao'/,'A classificação deve ser carregada do Supabase para a área do técnico.');
+assert.match(parte3,/btn-ac[\s\S]*?btn-rc/,'OS de Serviços devem usar o mesmo fluxo de aceite e recusa dos chamados.');
 
 // Executa funções reais da aplicação com respostas controladas do servidor.
 function funcao(nome){

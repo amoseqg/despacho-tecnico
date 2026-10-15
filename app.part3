@@ -252,7 +252,17 @@ function selecionarCircuitoDaDescricao(valor){
   el('c-status').style.color='var(--g)';
 }
 
+function nomeAtividadeOsServico(c){return ({instalacao:'Instalação',alteracao:'Alteração',mudanca_endereco:'Mudança de endereço',vistoria:'Vistoria'})[c.atividadeServico]||'Serviço';}
+function identificacaoOs(c){return c?.tipoOs==='servico'?'OS de Serviço • '+(c.pr||'Sem identificador'):(c?.pr||'—');}
+function seloTipoOs(c){return c?.tipoOs==='servico'?'<span class="badge b-andamento">🛠️ OS de Serviços</span>':'';}
 function dadosSite(c) {
+  if(c?.tipoOs==='servico')return `<div class="os-r"><b>Tipo de OS:</b> OS de Serviços — ${esc(nomeAtividadeOsServico(c))}</div>
+    <div class="os-r"><b>OS PE Conectado:</b> ${valorInfo(c.osPeConectado)}</div>
+    <div class="os-r"><b>Site / Cliente:</b> ${valorInfo(c.si)}</div>
+    <div class="os-r"><b>Cidade:</b> ${valorInfo(c.cid)}</div>
+    <div class="os-r"><b>Endereço:</b> ${valorInfo(c.en)}</div>
+    <div class="os-r"><b>Contato:</b> ${valorInfo(c.contato)}</div>
+    <div class="os-r"><b>Horário de atendimento:</b> ${valorInfo(c.horario)}</div>`;
   return `<div class="os-r"><b>Circuito:</b> ${valorInfo(c.ci)}</div>
      <div class="os-r"><b>SDM:</b> ${valorInfo(c.sdm)}</div>
     <div class="os-r"><b>Site:</b> ${valorInfo(c.si)}</div>
@@ -388,6 +398,25 @@ function atualizarTecnicosChamado() {
   } else if (valorAnterior && lista.some(t => String(t.u || '').trim() === valorAnterior)) {
     select.value = valorAnterior;
   }
+}
+
+function atualizarTecnicosOsServico() {
+  const select=el('os-servico-tecnico');
+  if(!select)return;
+  const skill=el('os-servico-skill')?.value||'';
+  const regiao=el('os-servico-regiao')?.value||'';
+  const area=el('os-servico-area')?.value||'';
+  const lista=D.tc.filter(t=>{
+    if(regiao&&t.r!==regiao)return false;
+    if(skill&&!skillsTec(t).includes(skill))return false;
+    if(regiao==='capital'&&area&&!areasTec(t).includes(area))return false;
+    return true;
+  });
+  const anterior=String(select.value||'').trim();
+  select.innerHTML='<option value="">Selecione...</option>'+lista.map(t=>`<option value="${esc(t.u)}">${esc(t.n)} — ${skillsTec(t).map(nomeSkill).join('/')} — ${areasTec(t).map(nomeArea).join('/')}</option>`).join('');
+  if(!lista.length)select.innerHTML+='<option value="" disabled>Nenhum técnico cadastrado para esta região/skill</option>';
+  else if(anterior&&lista.some(t=>String(t.u||'').trim()===anterior))select.value=anterior;
+  el('os-servico-area-box')?.classList.toggle('hidden',regiao!=='capital');
 }
 
 function atualizarCamposRegiao() {
@@ -1183,6 +1212,54 @@ function addAdm() {
   alert('Administrador cadastrado com sucesso!');
 }
 
+async function addOsServico() {
+  const atividade=el('os-servico-atividade').value;
+  const site=el('os-servico-site').value.trim();
+  const cidade=el('os-servico-cidade').value.trim();
+  const endereco=el('os-servico-endereco').value.trim();
+  const contato=el('os-servico-contato').value.trim();
+  const horario=el('os-servico-horario').value.trim();
+  const regiao=el('os-servico-regiao').value;
+  const skill=el('os-servico-skill').value;
+  const area=el('os-servico-area').value;
+  const tecnico=String(el('os-servico-tecnico').value||'').trim();
+  const descricao=el('os-servico-descricao').value.trim();
+  if(!atividade){alert('Selecione o tipo de serviço.');el('os-servico-atividade').focus();return;}
+  if(!site||!cidade||!descricao){alert('Preencha Site / Cliente, Cidade e a descrição do serviço.');return;}
+  if(!regiao||!skill){alert('Selecione a região e a skill necessária.');return;}
+  if(regiao==='capital'&&!area){alert('Selecione a área de atendimento na Capital.');return;}
+  if(!tecnico){alert('Selecione o técnico responsável.');return;}
+  const perfilTecnico=D.tc.find(t=>t.u===tecnico);
+  if(!perfilTecnico?._id){alert('O técnico selecionado não possui vínculo válido com o servidor. Atualize a página e tente novamente.');return;}
+  const identificador='OS-SERV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+  const novoChamado={
+    id:'CH-'+Date.now(),pr:identificador,sdm:'',abertura:'OS de Serviços',si:site,ci:'',re:regiao,skill,area:regiao==='capital'?area:'',
+    en:endereco,cid:cidade,contato,horario,velocidade:'',prtm:'',pvfTotal:'',de:descricao,dtexec:el('os-servico-data').value,
+    tipoOs:'servico',osPeConectado:el('os-servico-pe').value.trim(),atividadeServico:atividade,
+    st:'pendente',te:tecnico,mr:'',tr:[],dt:null,ex:null,cr:ag(),ae:null,am:null,cc:null
+  };
+  const btn=el('btn-criar-os-servico'),textoBtn=btn?.innerHTML;
+  try{
+    if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
+    const adminAtual=await sbExigirSessaoAdmin();
+    const linha=sbChamadoRow(novoChamado);
+    linha.criado_por=adminAtual.id;
+    const {data,error}=await SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em,atualizado_em').single();
+    if(error)throw error;
+    if(!data?.id||data.status!=='pendente'||data.tecnico_id!==linha.tecnico_id)throw new Error('O servidor não confirmou a OS de Serviços e o técnico selecionado.');
+    novoChamado.id=data.id;novoChamado.st=data.status;novoChamado.cr=data.criado_em||novoChamado.cr;
+    D.ch.push(novoChamado);SB_LOADED_CH.add(data.id);lsSet('dd',D);
+    ['os-servico-pe','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
+    el('os-servico-atividade').value='';el('os-servico-skill').value='';el('os-servico-area').value='';el('os-servico-tecnico').innerHTML='<option value="">Selecione a região e a skill...</option>';
+    rCh();rDb();
+    sbSetConnectionBadge('OS de Serviço confirmada no Supabase',true);
+    nfToast('OS de Serviço criada e enviada ao técnico!','sucesso');
+  }catch(err){
+    sbShowError('A OS de Serviço não foi salva. Os dados foram mantidos para nova tentativa',err);
+    sbSetConnectionBadge('Falha ao salvar OS de Serviço',false);
+  }finally{if(btn){btn.disabled=false;btn.innerHTML=textoBtn||'🛠️ Criar e enviar OS de Serviço';}}
+}
+
 async function addCh() {
   const pr = el('c-pr').value.trim();
   const sdm = el('c-sdm').value.trim();
@@ -1523,7 +1600,7 @@ function rCh() {
   const elRe = el('l-re');
   if(elAb) elAb.innerHTML = ab.length ? ab.map(c => {
     const dtexec = c.dtexec ? formatarDataBrasil(c.dtexec) : 'Não definida';
-    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aberto</span></div>
+    return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aberto</span></div>
     ${dadosSite(c)}
     ${dadosAberturaPortal(c)}
     <div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
@@ -1532,15 +1609,15 @@ function rCh() {
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em aberto</h3></div>';
 
-  if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando técnico</span></div>
-    <div class="os-r"><b>Site:</b> ${c.si}</div><div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
+  if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando técnico</span></div>
+    ${dadosSite(c)}<div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
     ${infoReincidencia(c).html}
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
   if(elRe) elRe.innerHTML = re.length ? re.map(c => {
     const dtexec = c.dtexec ? formatarDataBrasil(c.dtexec) : 'Não definida';
-    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-recusado">Recusado</span></div>
-    <div class="os-r"><b>Site:</b> ${c.si}</div>
+    return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-recusado">Recusado</span></div>
+    ${dadosSite(c)}
     <div class="os-r"><b>Técnico:</b> ${nt(c.te)}</div>
     <div class="os-r"><b>Motivo:</b> ${c.mr}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
@@ -1691,7 +1768,7 @@ function rAt() {
   tb.innerHTML = list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
-    return `<tr><td>${c.pr}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${c.si}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
+    return `<tr><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
 }
 
@@ -2169,7 +2246,7 @@ function rTdb() {
   const tmEl = el('t-tm');
   if(tmEl) tmEl.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
-    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div><div class="os-r"><b>Site:</b> ${c.si}</div></div>`;
+    return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div><div class="os-r"><b>Site:</b> ${valorInfo(c.si)}</div></div>`;
   }).join('') : '<div class="empty">Nenhum chamado em atendimento</div>';
 }
 
@@ -2177,7 +2254,7 @@ function rTdp() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'pendente');
   const dl = el('t-dl');
   if(dl) dl.innerHTML = list.length ? list.map(c =>
-    `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="badge b-pendente">Aguardando</span></div>
+    `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
@@ -2195,7 +2272,7 @@ function rTat() {
   if(al) al.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':''));
-    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div>
+    return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div>
     ${dadosSite(c)}
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
@@ -2211,7 +2288,7 @@ function rTco() {
   if(cl) cl.innerHTML = list.length ? list.map(c => {
     const rejeitado = c.ap && c.ap.status === 'rejeitado';
     const badge = rejeitado ? '<span class="badge b-rejeitado">Rejeitado pelo administrador</span>' : (c.ap && c.ap.status === 'aprovado' ? '<span class="badge b-aprovado">Aprovado</span>' : '<span class="badge b-pag-pendente">Aguardando análise</span>');
-    return `<div class="os"><div class="os-h"><span class="os-id">${c.pr}</span>${badge}</div>
+    return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}${badge}</div>
     <div class="os-r"><b>Site:</b> ${c.si}</div>
     <div class="os-r"><b>Valor Total:</b> ${c.ex && c.ex.total ? c.ex.total : '—'}</div>
     <div class="os-r"><b>Data:</b> ${c.cc || '—'}</div>
@@ -2706,15 +2783,24 @@ async function opEx(id) {
   const c = D.ch.find(x => x.id === id);
   if(!c) return;
   const anterior = c.ex || {};
+  const osServico=c.tipoOs==='servico';
+  el('ex-pr-label').textContent=osServico?'Identificador interno:':'Protocolo:';
   el('ex-pr').textContent = c.pr;
   el('ex-si').textContent = c.si;
   el('ex-ci').textContent = c.ci || '—';
+  el('ex-sdm').textContent = c.sdm || '—';
+  el('ex-ci-row').classList.toggle('hidden',osServico);
+  el('ex-sdm-row').classList.toggle('hidden',osServico);
+  el('ex-os-pe-row').classList.toggle('hidden',!osServico);
+  el('ex-os-atividade-row').classList.toggle('hidden',!osServico);
+  el('ex-os-pe').textContent=c.osPeConectado||'Não informada';
+  el('ex-os-atividade').textContent=osServico?nomeAtividadeOsServico(c):'';
   el('ex-en').textContent = c.en;
   el('ex-de').textContent = c.de;
   const card = el('ex-pr').closest('.card');
   let extra = el('ex-site-extra');
   if (!extra) { extra = document.createElement('div'); extra.id = 'ex-site-extra'; card.insertBefore(extra, card.lastElementChild); }
-  extra.innerHTML = `<div class="os-r"><b>Cidade:</b> ${valorInfo(c.cid)}</div><div class="os-r"><b>Contato:</b> ${valorInfo(c.contato)}</div><div class="os-r"><b>Horário:</b> ${valorInfo(c.horario)}</div><div class="grid-3"><div class="os-r"><b>Velocidade:</b> ${valorInfo(c.velocidade)}</div><div class="os-r"><b>PRTM:</b> ${valorInfo(c.prtm)}</div><div class="os-r"><b>PVF Total:</b> ${valorInfo(c.pvfTotal)}</div></div>${c.exclusaoPortal?`<div class="info" style="border-left:4px solid var(--r)"><b>Chamado excluído pelo operador:</b> ${esc(c.exclusaoPortal.nome)} — ${new Date(c.exclusaoPortal.data).toLocaleString('pt-BR')}</div>`:''}`;
+  extra.innerHTML = `<div class="os-r"><b>Cidade:</b> ${valorInfo(c.cid)}</div><div class="os-r"><b>Contato:</b> ${valorInfo(c.contato)}</div><div class="os-r"><b>Horário:</b> ${valorInfo(c.horario)}</div>${osServico?'':'<div class="grid-3"><div class="os-r"><b>Velocidade:</b> '+valorInfo(c.velocidade)+'</div><div class="os-r"><b>PRTM:</b> '+valorInfo(c.prtm)+'</div><div class="os-r"><b>PVF Total:</b> '+valorInfo(c.pvfTotal)+'</div></div>'}${c.exclusaoPortal?`<div class="info" style="border-left:4px solid var(--r)"><b>Chamado excluído pelo operador:</b> ${esc(c.exclusaoPortal.nome)} — ${new Date(c.exclusaoPortal.data).toLocaleString('pt-BR')}</div>`:''}`;
 
   const opts = '<option value="">Selecione...</option>' + cidades.map(ci => `<option>${ci}</option>`).join('');
   el('ex-co').innerHTML = opts;
@@ -3094,6 +3180,9 @@ document.addEventListener('DOMContentLoaded', function() {
   el('btn-copiar-link-portal')?.addEventListener('click', copiarLinkPortalChamados);
   el('tb-solicitantes')?.addEventListener('click', eventoSolicitanteChamados);
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
+  el('btn-criar-os-servico')?.addEventListener('click',addOsServico);
+  ['os-servico-regiao','os-servico-skill','os-servico-area'].forEach(id=>el(id)?.addEventListener('change',atualizarTecnicosOsServico));
+  atualizarTecnicosOsServico();
   const pesquisaTec=el('tc-pesquisa');if(pesquisaTec)pesquisaTec.addEventListener('input',renderTc);
   const btnAddMaterial=el('btn-add-material'); if(btnAddMaterial) btnAddMaterial.addEventListener('click',addMaterial);
   const btnAjuste=el('btn-ml-ajuste'); if(btnAjuste) btnAjuste.addEventListener('click',ajusteEstoque); const selEst=el('ml-estoque-material'); if(selEst) selEst.addEventListener('change',function(){ const m=materialById(this.value); const q=el('ml-estoque-qtd'); if(q) q.value=(m&&m.estoque!=null)?m.estoque:''; });
@@ -3558,7 +3647,7 @@ async function sbLoadAll(){
   D.ch=(cR.data||[]).map(c=>{
     const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
-      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', si:c.site_nome||'', ci:c.circuito||'',
+      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'',
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
@@ -3643,12 +3732,13 @@ async function sbSeedSitesIfNeeded(){
 
 function sbChamadoRow(c){
   return {
-    protocolo:c.pr, sdm:c.sdm||null, abertura_origem:c.abertura||null, circuito:c.ci||'', site_nome:c.si||null, cidade:c.cid||null,
+    protocolo:c.pr||'', sdm:c.sdm||null, abertura_origem:c.abertura||null, circuito:c.ci||'', site_nome:c.si||null, cidade:c.cid||null,
     endereco:c.en||null, contato:c.contato||null, horario_expediente:c.horario||null, velocidade:c.velocidade||null, prtm:c.prtm||null,
     pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null, regiao_operacional:c.regiaoOperacional||null, tecnicos_indicados:c.tecnicosIndicados||null,
     regiao:c.re, skill:c.skill, area:c.re==='capital'?(c.area||null):null, tecnico_id:sbIdByUser(c.te), criado_por:SB_PROFILE?.id||null,
     descricao:c.de||null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
     solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, vencimento_em:sbIso(c.vencimento),
+    tipo_os:c.tipoOs==='servico'?'servico':'manutencao', os_pe_conectado:c.osPeConectado||null, atividade_servico:c.atividadeServico||null,
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:sbIso(c.cr)||new Date().toISOString(), aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
   };
@@ -4216,7 +4306,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.3.0"></script>
+<script src="/release-info.js?v=2.5.5"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
