@@ -39,6 +39,10 @@ for (const [indice, codigo] of scripts.entries()) {
 }
 
 const parte3 = fs.readFileSync('app.part3', 'utf8');
+const seletorTecnicosServico = parte3.match(/function atualizarTecnicosOsServico\(\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(seletorTecnicosServico, 'Atualizador de técnicos da OS de Serviços não encontrado.');
+assert.match(seletorTecnicosServico, /const lista=D\.tc\.slice\(\)/, 'A OS de Serviços deve listar todos os técnicos ativos.');
+assert.doesNotMatch(seletorTecnicosServico, /D\.tc\.filter|skillsTec\(t\)\.includes|areasTec\(t\)\.includes/, 'A lista da OS de Serviços não deve filtrar técnicos por skill ou área.');
 const extrator = parte3.match(/function extrairCampoDaDescricao\(texto,tipo\)\{[\s\S]*?\n\}/)?.[0];
 assert.ok(extrator, 'Função de extração de protocolo não encontrada.');
 const contexto = {};
@@ -70,7 +74,7 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.5\.7'/,'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/const versao='2\.5\.8'/,'O carregador deve invalidar o cache com a versão atual.');
 assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';

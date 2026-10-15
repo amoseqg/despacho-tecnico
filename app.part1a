@@ -670,7 +670,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         </div>
         <div class="grid-2">
           <div class="form-group" id="os-servico-area-box"><label class="label" for="os-servico-area">Área de atendimento na Capital *</label><select id="os-servico-area" class="select"><option value="">Selecione...</option><option value="norte">Área Norte</option><option value="leste">Área Leste</option><option value="sul">Área Sul</option><option value="oeste">Área Oeste</option></select></div>
-          <div class="form-group"><label class="label" for="os-servico-tecnico">Técnico responsável *</label><select id="os-servico-tecnico" class="select"><option value="">Selecione a região e a skill...</option></select></div>
+          <div class="form-group"><label class="label" for="os-servico-tecnico">Técnico responsável *</label><select id="os-servico-tecnico" class="select"><option value="">Selecione...</option></select><small style="display:block;margin-top:4px;color:#64748b">Todos os técnicos ativos estão disponíveis, mesmo fora da região, área ou skill selecionada.</small></div>
         </div>
         <div class="form-group"><label class="label" for="os-servico-horario">Horário de atendimento</label><input id="os-servico-horario" class="input" placeholder="Ex.: 08:00 às 17:00"></div>
         <div class="form-group"><label class="label" for="os-servico-descricao">Descrição / orientação do serviço *</label><textarea id="os-servico-descricao" class="input" rows="3" placeholder="Descreva o que o técnico deverá executar"></textarea></div>

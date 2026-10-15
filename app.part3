@@ -497,18 +497,11 @@ function atualizarTecnicosChamado() {
 function atualizarTecnicosOsServico() {
   const select=el('os-servico-tecnico');
   if(!select)return;
-  const skill=el('os-servico-skill')?.value||'';
   const regiao=el('os-servico-regiao')?.value||'';
-  const area=el('os-servico-area')?.value||'';
-  const lista=D.tc.filter(t=>{
-    if(regiao&&t.r!==regiao)return false;
-    if(skill&&!skillsTec(t).includes(skill))return false;
-    if(regiao==='capital'&&area&&!areasTec(t).includes(area))return false;
-    return true;
-  });
+  const lista=D.tc.slice();
   const anterior=String(select.value||'').trim();
   select.innerHTML='<option value="">Selecione...</option>'+lista.map(t=>`<option value="${esc(t.u)}">${esc(t.n)} — ${skillsTec(t).map(nomeSkill).join('/')} — ${areasTec(t).map(nomeArea).join('/')}</option>`).join('');
-  if(!lista.length)select.innerHTML+='<option value="" disabled>Nenhum técnico cadastrado para esta região/skill</option>';
+  if(!lista.length)select.innerHTML+='<option value="" disabled>Nenhum técnico ativo cadastrado</option>';
   else if(anterior&&lista.some(t=>String(t.u||'').trim()===anterior))select.value=anterior;
   el('os-servico-area-box')?.classList.toggle('hidden',regiao!=='capital');
 }
@@ -1348,7 +1341,7 @@ async function addOsServico() {
     ['os-servico-pe','os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
     delete el('os-servico-circuito').dataset.circuitoEncontrado;el('os-servico-circuito-opcoes').classList.add('hidden');
     el('os-servico-circuito-status').textContent='Sem circuito? Informe Site / Cliente, Cidade e os demais dados manualmente.';el('os-servico-circuito-status').style.color='var(--gr)';
-    el('os-servico-atividade').value='';el('os-servico-skill').value='';el('os-servico-area').value='';el('os-servico-tecnico').innerHTML='<option value="">Selecione a região e a skill...</option>';
+    el('os-servico-atividade').value='';el('os-servico-skill').value='';el('os-servico-area').value='';el('os-servico-tecnico').innerHTML='<option value="">Selecione...</option>';
     rCh();rDb();
     sbSetConnectionBadge('OS de Serviço confirmada no Supabase',true);
     nfToast('OS de Serviço criada e enviada ao técnico!','sucesso');
