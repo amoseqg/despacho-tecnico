@@ -4144,6 +4144,8 @@ const SB_ACCOUNT_CREATOR = window.supabase.createClient(SUPABASE_URL, SUPABASE_P
 });
 
 async function sbCriarContaPerfil({nome,usuario,email,senha,tipo,regiao=null,skills=[],areas=[],adminGeral=false,enderecoEntrega=null}){
+  // Atualiza o perfil a partir da sessão Supabase antes de validar permissões.
+  await sbExigirSessaoAdmin();
   if(!SB_PROFILE || SB_PROFILE.tipo!=='admin') throw new Error('Somente um administrador autenticado pode criar novas contas.');
   if(adminGeral && !SB_PROFILE.admin_geral) throw new Error('Somente o Administrador Geral pode criar ou reativar outro perfil com esse nível de acesso.');
 
