@@ -40,6 +40,23 @@ for (const [indice, codigo] of scripts.entries()) {
 }
 
 const parte3 = fs.readFileSync('app.part3', 'utf8');
+const seletorChamado = parte3.match(/function atualizarTecnicosChamado\\(\\) \\{[\\s\\S]*?\\n\\}/)?.[0];
+assert.ok(seletorChamado,'Seletor de técnicos de chamados não encontrado.');
+const campoTecnico={value:'',innerHTML:''};
+const contextoTecnicos={
+ D:{tc:[{u:'andre',n:'André Pereira Barbosa',r:'capital',sk:['voz','infra'],ar:['norte','leste']}]},
+ el:id=>id==='c-tecnico'?campoTecnico:{value:id==='c-sk'?'dados':id==='c-re'?'capital':id==='c-area'?'leste':''},
+ nomesTecnicosPlanilha:()=>['ANDRÉ','FERNANDO'],
+ tecnicoIndicado:(t,indicados)=>indicados.some(i=>String(t.n).toLowerCase().includes(String(i).toLowerCase())),
+ tecnicoCompativel:(t,c)=>t.r===c.re&&(!c.skill||t.sk.includes(c.skill))&&(!c.area||t.ar.includes(c.area)),
+ areasTec:t=>t.ar,skillsTec:t=>t.sk,nomeArea:x=>x,nomeSkill:x=>x,esc:x=>String(x)
+};
+vm.runInNewContext(`${seletorChamado}\\natualizarTecnicosChamado()`,contextoTecnicos);
+assert.match(campoTecnico.innerHTML,/André Pereira Barbosa/,'Técnico indicado permanece visível sem a skill cadastrada.');
+assert.match(campoTecnico.innerHTML,/FERNANDO — indicado na planilha, sem cadastro ativo/,'Indicado sem perfil ativo deve aparecer como pendente de cadastro.');
+assert.match(seletorChamado,/D\\.tc\\.slice\\(\\)\\.sort/,'Todos os técnicos ativos devem aparecer, com os compatíveis primeiro.');
+const validacaoExcecao=parte3.match(/const tecnicoSelecionado = D\\.tc\\.find[\\s\\S]*?const dtexec = el\\('c-dtexec'\\)\\.value;/)?.[0]||'';
+assert.match(validacaoExcecao,/!tecnicoCompativelComChamado && !liberarArea/,'Técnicos fora da skill/cobertura exigem liberação excepcional.');
 const seletorTecnicosServico = parte3.match(/function atualizarTecnicosOsServico\(\) \{[\s\S]*?\n\}/)?.[0];
 assert.ok(seletorTecnicosServico, 'Atualizador de técnicos da OS de Serviços não encontrado.');
 assert.match(seletorTecnicosServico, /const lista=D\.tc\.slice\(\)/, 'A OS de Serviços deve listar todos os técnicos ativos.');
@@ -100,8 +117,11 @@ console.log(`Validação concluída: ${ids.length} elementos, ${scripts.length} 
 assert.ok(html.includes('NexoField'), 'A identidade NexoField deve estar no código-fonte');
 assert.ok(!html.includes('Despacho Técnico'), 'A marca antiga não pode permanecer no código-fonte');
 const carregador=fs.readFileSync('index.html','utf8');
-assert.match(carregador,/const versao='2\.5\.9'/,'O carregador deve invalidar o cache com a versão atual.');
-assert.match(carregador,/html\.includes\('Warning: truncated output'\)/,'O carregador deve rejeitar arquivos incompletos.');
+const historicoVersoes=fs.readFileSync('release-info.js','utf8');
+const versaoAtual=historicoVersoes.match(/version:'([^']+)'/)?.[1];
+assert.ok(versaoAtual,'O histórico deve informar a versão atual.');
+assert.ok(carregador.includes(`const versao='${versaoAtual}'`),'O carregador deve invalidar o cache com a versão atual.');
+assert.match(carregador,/html\\.includes\\('Warning: truncated output'\\)/,'O carregador deve rejeitar arquivos incompletos.');
 for(const parte of ['app.part1a','app.part1b','app.part2','app.part3'])assert.match(carregador,new RegExp(`/${parte}\\?v=`),`Cache busting ausente para ${parte}.`);
 const salvarEstoque=parte3.match(/async function salvarQuantidadeEstoqueConfirmada\([\s\S]*?\n\}/)?.[0]||'';
 assert.ok(salvarEstoque.indexOf('q=Number(qCampo?.value)')<salvarEstoque.indexOf('m=resolverMaterialEstoque(selectId,buscaId)'),'A quantidade deve ser capturada antes de resolver novamente o material.');
