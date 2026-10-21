@@ -759,7 +759,12 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <div id="v-at" class="hidden">
       <div class="card">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Chamados em Atendimento</h3>
-        <div class="form-group" style="max-width:360px;margin:0 0 12px"><label class="label" for="at-filtro-tecnico">Filtrar por técnico</label><input class="input" id="at-filtro-tecnico" type="search" placeholder="Digite o nome do técnico" autocomplete="off" oninput="rAt()"></div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),360px));gap:10px;margin-bottom:12px">
+          <div class="form-group" style="margin:0"><label class="label" for="at-filtro-tecnico">Filtrar por técnico</label><input class="input" id="at-filtro-tecnico" type="search" placeholder="Digite o nome do técnico" autocomplete="off" oninput="rAt()"></div>
+          <div class="form-group" style="margin:0"><label class="label" for="at-filtro-acao">Filtrar por ação</label><select class="select" id="at-filtro-acao" onchange="rAt()">
+            <option value="">Todas as ações</option><option value="aprovar">Aprovar ou rejeitar</option><option value="redirecionar">Redirecionar</option><option value="encerrar">Encerrar</option><option value="rastreamento">Rastreamento</option><option value="pendenciar">Pendenciar chamado</option><option value="pendencia_ativa">Pendência ativa</option><option value="excluir">Excluir chamado</option>
+          </select></div>
+        </div>
         <div style="overflow-x:auto"><table class="table">
           <thead><tr><th>Protocolo / OS interna</th><th>Site / Cliente</th><th>Técnico</th><th>Região</th><th>Prazo restante</th><th>Ações</th></tr></thead>
           <tbody id="tb-at"></tbody>
