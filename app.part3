@@ -1916,10 +1916,16 @@ function exportarBaseChamadosFechados(dt1,dt2){
 function rAt() {
   const tb = el('tb-at');
   if(!tb) return;
+  const filtroTecnico=String(el('at-filtro-tecnico')?.value||'').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const normalizarTecnico=valor=>String(valor||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const list = D.ch.filter(chamadoVisivel).filter(c =>
     c.st === 'andamento' ||
     (S?.t === 'adm' && c.st === 'concluida' && !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente'))
-  );
+  ).filter(c=>{
+    if(!filtroTecnico) return true;
+    const nome=nt(c.te)||D.tc.find(t=>t.u===c.te)?.n||c.te||'';
+    return normalizarTecnico(nome).includes(filtroTecnico);
+  });
   tb.innerHTML = list.map(c => {
     const aguardandoEncerramento = c.st === 'concluida';
     const t = aguardandoEncerramento ? null : tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');

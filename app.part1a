@@ -747,6 +747,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <div id="v-at" class="hidden">
       <div class="card">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Chamados em Atendimento</h3>
+        <div class="form-group" style="max-width:360px;margin:0 0 12px"><label class="label" for="at-filtro-tecnico">Filtrar por técnico</label><input class="input" id="at-filtro-tecnico" type="search" placeholder="Digite o nome do técnico" autocomplete="off" oninput="rAt()"></div>
         <div style="overflow-x:auto"><table class="table">
           <thead><tr><th>Protocolo / OS interna</th><th>Site / Cliente</th><th>Técnico</th><th>Região</th><th>Prazo restante</th><th>Ações</th></tr></thead>
           <tbody id="tb-at"></tbody>
