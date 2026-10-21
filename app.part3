@@ -1978,7 +1978,7 @@ function abrirInformacaoChamado(id){
       const base=chamado.informacoesAdicionais??null;
       const dataRegistro=new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(new Date());
       const registro=`• ${dataRegistro} — ${admin.nome}: ${texto}`;
-      const informacoes=[base,registro].filter(Boolean).join('\\n');
+      const informacoes=[base,registro].filter(Boolean).join('\n');
       let query=SB.from('chamados').update({informacoes_adicionais:informacoes,atualizado_em:new Date().toISOString()}).eq('id',chamado.id);
       query=base===null?query.is('informacoes_adicionais',null):query.eq('informacoes_adicionais',base);
       const {data,error}=await query.select('id,informacoes_adicionais').maybeSingle();
@@ -1995,6 +1995,96 @@ function abrirInformacaoChamado(id){
     }
   });
   dialog.showModal();
+}
+let NF_CHAT_DIALOG=null;
+let NF_CHAT_THREAD=null;
+let NF_CHAT_LOADING=false;
+let NF_CHAT_PENDING=false;
+function nfAbrirChat(){
+  if(!SB_PROFILE || !S) { nfToast('Entre no portal para acessar o chat.','erro'); return; }
+  const administrador=SB_PROFILE.tipo==='admin' && S.t==='adm';
+  const tecnico=SB_PROFILE.tipo==='tecnico' && S.t==='tec';
+  if(!administrador && !tecnico) { nfToast('O chat está disponível para administradores e técnicos.','erro'); return; }
+  if(NF_CHAT_DIALOG?.open) NF_CHAT_DIALOG.close();
+  const tecnicos=(D.tc||[]).filter(t=>t.tipo==='tecnico' && t._id);
+  const tecnicoId=tecnico?SB_PROFILE.id:(tecnicos[0]?._id||'');
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(720px,calc(100% - 24px));height:min(720px,88vh);max-height:88vh;border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';
+  const opcoes=tecnicos.map(t=>`<option value="${escM(t._id)}">${esc(t.n)}</option>`).join('');
+  dialog.innerHTML=`<div style="height:100%;display:flex;flex-direction:column;padding:18px;font-family:system-ui;gap:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0;color:#16324f">💬 Chat com ${administrador?'técnico':'administradores'}</h3><small style="color:#526273">${administrador?'Selecione o técnico para abrir a conversa.':'Envie uma mensagem para a equipe de administradores.'}</small></div><button type="button" id="nf-chat-fechar" class="btn btn-s">Fechar</button></div>
+    ${administrador?`<div class="form-group" style="margin:0"><label class="label" for="nf-chat-tecnico">Técnico</label><select id="nf-chat-tecnico" class="select" ${tecnicos.length?'':'disabled'}>${opcoes||'<option value="">Nenhum técnico cadastrado</option>'}</select></div>`:''}
+    <div id="nf-chat-mensagens" aria-live="polite" style="flex:1;min-height:180px;overflow:auto;border:1px solid var(--b);border-radius:10px;background:#f8fafc;padding:12px;display:flex;flex-direction:column;gap:8px"></div>
+    <form id="nf-chat-form" style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end"><div><label class="label" for="nf-chat-texto">Mensagem</label><textarea id="nf-chat-texto" class="input" rows="2" maxlength="4000" placeholder="Digite sua mensagem..." required></textarea></div><button type="submit" class="btn btn-p" id="nf-chat-enviar">Enviar</button></form>
+  </div>`;
+  document.body.append(dialog);
+  NF_CHAT_DIALOG=dialog;
+  NF_CHAT_THREAD=tecnicoId||null;
+  const select=dialog.querySelector('#nf-chat-tecnico');
+  const enviar=dialog.querySelector('#nf-chat-enviar');
+  if(enviar) enviar.disabled=!tecnicoId;
+  dialog.querySelector('#nf-chat-fechar').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>{if(NF_CHAT_DIALOG===dialog){NF_CHAT_DIALOG=null;NF_CHAT_THREAD=null;}dialog.remove();},{once:true});
+  if(select) select.addEventListener('change',()=>{
+    NF_CHAT_THREAD=select.value||null;
+    enviar.disabled=!NF_CHAT_THREAD;
+    void nfChatCarregarMensagens();
+  });
+  dialog.querySelector('#nf-chat-form').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const campo=dialog.querySelector('#nf-chat-texto'),botao=dialog.querySelector('#nf-chat-enviar');
+    const texto=campo.value.trim(),thread=NF_CHAT_THREAD;
+    if(!thread||!texto) return;
+    botao.disabled=true;
+    try{
+      if(SB_PROFILE.tipo==='admin') await sbExigirSessaoAdmin();
+      if(SB_PROFILE.tipo==='tecnico' && thread!==SB_PROFILE.id) throw new Error('Técnicos só podem enviar mensagens na própria conversa.');
+      const {error}=await SB.from('mensagens_chat').insert({tecnico_id:thread,remetente_id:SB_PROFILE.id,mensagem:texto});
+      if(error) throw error;
+      campo.value='';
+      await nfChatCarregarMensagens();
+      campo.focus();
+    }catch(error){sbShowError('Não foi possível enviar a mensagem',error);}
+    finally{if(botao.isConnected)botao.disabled=!NF_CHAT_THREAD;}
+  });
+  dialog.showModal();
+  if(tecnicoId) void nfChatCarregarMensagens();
+}
+function nfChatEvento(payload){
+  const registro=payload?.new||payload?.old;
+  if(!registro||!NF_CHAT_DIALOG?.open||registro.tecnico_id!==NF_CHAT_THREAD)return;
+  void nfChatCarregarMensagens();
+}
+async function nfChatCarregarMensagens(){
+  const dialog=NF_CHAT_DIALOG,thread=NF_CHAT_THREAD;
+  if(!dialog?.open||!thread)return;
+  if(NF_CHAT_LOADING){NF_CHAT_PENDING=true;return;}
+  NF_CHAT_LOADING=true;
+  try{
+    const area=dialog.querySelector('#nf-chat-mensagens');
+    if(!area)return;
+    const {data,error}=await SB.from('mensagens_chat')
+      .select('id,tecnico_id,remetente_id,mensagem,criado_em')
+      .eq('tecnico_id',thread).order('criado_em',{ascending:true}).limit(250);
+    if(error)throw error;
+    if(NF_CHAT_DIALOG!==dialog||NF_CHAT_THREAD!==thread)return;
+    const mensagens=data||[];
+    area.innerHTML=mensagens.map(m=>{
+      const eu=m.remetente_id===SB_PROFILE?.id;
+      const perfil=[...(D.tc||[]),...(D.ad||[])].find(p=>p._id===m.remetente_id);
+      const autor=perfil?.n||(eu?S?.n:'Usuário');
+      const hora=m.criado_em?new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(new Date(m.criado_em)):'';
+      return `<div style="max-width:88%;align-self:${eu?'flex-end':'flex-start'};background:${eu?'#dbeafe':'#fff'};border:1px solid #d7e0ea;border-radius:12px;padding:8px 11px;white-space:pre-wrap;overflow-wrap:anywhere"><strong style="font-size:11px;color:#344054">${esc(autor)} · ${esc(hora)}</strong><div style="margin-top:4px;font-size:14px">${esc(m.mensagem)}</div></div>`;
+    }).join('')||'<div class="empty">Nenhuma mensagem ainda. Inicie a conversa.</div>';
+    area.scrollTop=area.scrollHeight;
+  }catch(error){
+    console.error('Erro ao carregar chat:',error);
+    const area=dialog.querySelector('#nf-chat-mensagens');
+    if(area) area.textContent='Não foi possível carregar as mensagens. Tente novamente.';
+  }finally{
+    NF_CHAT_LOADING=false;
+    if(NF_CHAT_PENDING){NF_CHAT_PENDING=false;setTimeout(()=>{void nfChatCarregarMensagens();},120);}
+  }
 }
 function abrirAprovacaoAtendimento(usuario) {
   if(!usuario)return;
@@ -4507,6 +4597,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_pendencia'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'nao_pendenciamentos_chamados'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'pendencias_expediente_admin'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'mensagens_chat'},nfChatEvento)
     .subscribe((status,error)=>{
       if(status==='SUBSCRIBED'){
         if(SB_PROFILE) sbSetConnectionBadge('Atualização em tempo real ativa',true);
