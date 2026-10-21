@@ -756,6 +756,7 @@ function enterTec() {
     : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
   el('tr').innerHTML = b;
   tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
+  nfIniciarPresencaTecnico();
   startLoop();
 }
 
@@ -767,12 +768,22 @@ function admTab(btn, a) {
   }
   document.querySelectorAll('#nv button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','tc','ch','at','rl','ml','ad','vi','ft','aq','pn','lab'].forEach(x => {
+  ['db','tc','online','ch','at','rl','ml','ad','vi','ft','aq','pn','lab'].forEach(x => {
     const e = el('v-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
   if (a === 'db') rDb();
   if (a === 'tc') rTc();
+  if (a === 'online') {
+    nfCarregarTecnicosOnline();
+    if (NF_ONLINE_REFRESH_TIMER) clearInterval(NF_ONLINE_REFRESH_TIMER);
+    NF_ONLINE_REFRESH_TIMER = setInterval(() => {
+      if (!el('v-online')?.classList.contains('hidden')) nfCarregarTecnicosOnline();
+    }, 30000);
+  } else if (NF_ONLINE_REFRESH_TIMER) {
+    clearInterval(NF_ONLINE_REFRESH_TIMER);
+    NF_ONLINE_REFRESH_TIMER = null;
+  }
   if (a === 'ch') rCh();
   if (a === 'at') rAt();
   if (a === 'rl') rRl();
@@ -3864,6 +3875,90 @@ SB.auth.onAuthStateChange((event) => {
   if(event === 'PASSWORD_RECOVERY') window.__DT_PASSWORD_RECOVERY = true;
 });
 let SB_PROFILE = null;
+let NF_PRESENCA_TIMER = null;
+let NF_ONLINE_REFRESH_TIMER = null;
+const NF_PRESENCA_SESSAO_ID = (() => {
+  try {
+    let id = sessionStorage.getItem('nf-presenca-sessao');
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id)) {
+      id = window.crypto?.randomUUID ? window.crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); });
+      sessionStorage.setItem('nf-presenca-sessao', id);
+    }
+    return id;
+  } catch { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }); }
+})();
+async function nfSinalizarPresencaTecnico() {
+  if (SB_PROFILE?.tipo !== 'tecnico' || !SB_PROFILE.id) return;
+  const { error } = await SB.from('presenca_tecnicos').upsert({
+    tecnico_id: SB_PROFILE.id,
+    sessao_id: NF_PRESENCA_SESSAO_ID,
+    ultimo_sinal_em: new Date().toISOString()
+  }, { onConflict: 'tecnico_id,sessao_id' });
+  if (error) console.warn('Não foi possível atualizar a presença do técnico.', error);
+}
+function nfIniciarPresencaTecnico() {
+  if (SB_PROFILE?.tipo !== 'tecnico') return;
+  if (NF_PRESENCA_TIMER) clearInterval(NF_PRESENCA_TIMER);
+  nfSinalizarPresencaTecnico();
+  NF_PRESENCA_TIMER = setInterval(nfSinalizarPresencaTecnico, 30000);
+}
+async function nfEncerrarPresencaTecnico() {
+  if (NF_PRESENCA_TIMER) clearInterval(NF_PRESENCA_TIMER);
+  NF_PRESENCA_TIMER = null;
+  if (SB_PROFILE?.tipo !== 'tecnico' || !SB_PROFILE.id) return;
+  const { error } = await SB.from('presenca_tecnicos')
+    .delete().eq('tecnico_id', SB_PROFILE.id).eq('sessao_id', NF_PRESENCA_SESSAO_ID);
+  if (error) console.warn('Não foi possível encerrar o registro de presença.', error);
+}
+async function nfCarregarTecnicosOnline() {
+  const resumo = el('tecnicos-online-resumo'), lista = el('tecnicos-online-lista');
+  if (!resumo || !lista || SB_PROFILE?.tipo !== 'admin') return;
+  resumo.textContent = 'Atualizando lista...';
+  const limite = new Date(Date.now() - 90000).toISOString();
+  const { data, error } = await SB.from('presenca_tecnicos')
+    .select('tecnico_id,ultimo_sinal_em').gte('ultimo_sinal_em', limite);
+  if (error) {
+    resumo.textContent = 'Não foi possível carregar os técnicos online. Tente atualizar novamente.';
+    lista.replaceChildren();
+    console.warn('Falha ao consultar presença dos técnicos.', error);
+    return;
+  }
+  const ultimos = new Map();
+  (data || []).forEach(row => {
+    const id = String(row.tecnico_id), atual = ultimos.get(id);
+    if (!atual || row.ultimo_sinal_em > atual) ultimos.set(id, row.ultimo_sinal_em);
+  });
+  const tecnicos = (D.tc || []).filter(t => ultimos.has(String(t._id)))
+    .sort((a,b) => String(a.n).localeCompare(String(b.n), 'pt-BR'));
+  resumo.textContent = tecnicos.length
+    ? tecnicos.length + (tecnicos.length === 1 ? ' técnico online' : ' técnicos online')
+    : 'Nenhum técnico online neste momento.';
+  lista.replaceChildren();
+  tecnicos.forEach(t => {
+    const card = document.createElement('div');
+    card.className = 'os';
+    card.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap';
+    const nome = document.createElement('strong');
+    nome.className = 'os-id';
+    nome.textContent = t.n || 'Técnico';
+    const sinal = document.createElement('span');
+    sinal.style.cssText = 'font-size:.72rem;color:var(--gr)';
+    const quando = new Date(ultimos.get(String(t._id))).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    sinal.textContent = '🟢 Online · último sinal às ' + quando;
+    card.append(nome, sinal);
+    lista.appendChild(card);
+  });
+}
+function nfEventoPresencaTecnico() {
+  if (SB_PROFILE?.tipo === 'admin' && !el('v-online')?.classList.contains('hidden')) {
+    nfCarregarTecnicosOnline();
+  }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') nfSinalizarPresencaTecnico();
+});
+
+
 let SB_SYNC_TIMER = null;
 let SB_SYNCING = false;
 let SB_SYNC_AGAIN = false;
@@ -4312,7 +4407,7 @@ doLogin = async function(){
   finally{ if(btn){btn.disabled=false;btn.textContent='Entrar';} }
 };
 
-logout = async function(){ if(SB_PROFILE?.tipo==='tecnico'&&window.nfDesativarPushAoSair){try{await window.nfDesativarPushAoSair();}catch{console.warn('Alerta não removido do servidor ao sair.');}} await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
+logout = async function(){ if(SB_PROFILE?.tipo==='tecnico') await nfEncerrarPresencaTecnico(); if(SB_PROFILE?.tipo==='tecnico'&&window.nfDesativarPushAoSair){try{await window.nfDesativarPushAoSair();}catch{console.warn('Alerta não removido do servidor ao sair.');}} await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
 
 salvarMinhaSenha = async function(){
   if(!SB_PROFILE) return;
@@ -4598,6 +4693,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     .on('postgres_changes',{event:'*',schema:'public',table:'nao_pendenciamentos_chamados'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'pendencias_expediente_admin'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'mensagens_chat'},nfChatEvento)
+    .on('postgres_changes',{event:'*',schema:'public',table:'presenca_tecnicos'},nfEventoPresencaTecnico)
     .subscribe((status,error)=>{
       if(status==='SUBSCRIBED'){
         if(SB_PROFILE) sbSetConnectionBadge('Atualização em tempo real ativa',true);
