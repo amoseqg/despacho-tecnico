@@ -1927,9 +1927,13 @@ function rAt() {
     const marcador=aguardandoEncerramento
       ? '<span class="badge b-pag-pendente">Concluído aguardando encerramento</span>'
       : `<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span>`;
+    const administrador=SB_PROFILE?.tipo==='admin'||S?.t==='adm';
+    const pendenciaAdmin=administrador&&c.st==='andamento'
+      ? (c.pendenciaAtiva?(window.NexoFieldExpediente?.botao(c)||'<span class="badge b-pendente">⏸ Pendência ativa</span>'):`<button type="button" class="btn btn-y nf-pendenciar-expediente" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">⏸ Pendenciar chamado</button>`)
+      : (window.NexoFieldExpediente?.botao(c)||'');
     const acao=aguardandoEncerramento
       ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
-      : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
+      : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
     return `<tr><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${acao}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando encerramento</td></tr>';
 }
@@ -2450,7 +2454,7 @@ function rTat() {
     ${infoReincidencia(c).html}
     ${validacaoStatus?`<div style="margin-top:8px">${validacaoStatus}</div>`:''}
     ${window.NexoFieldPendencias?.resumoTecnico(c.id)||''}
-    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${window.NexoFieldExpediente?.resumo(c.id)||''}${c.solicitanteId&&!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${window.NexoFieldExpediente?.resumo(c.id)||''}${!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
 
