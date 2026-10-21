@@ -4125,7 +4125,7 @@ async function sbSyncAll(){
     const detalhe=String(err?.message||'Falha desconhecida').slice(0,90);
     sbSetConnectionBadge('Erro: '+detalhe,false);
   }
-  finally{ SB_SYNCING=false; if(SB_SYNC_AGAIN){SB_SYNC_AGAIN=false; sbSyncAll();} }
+  finally{ SB_SYNCING=false; if(SB_SYNC_AGAIN){SB_SYNC_AGAIN=false; sbSyncAll();} if(SB_REFRESH_PENDING) sbProgramarRecarregamento(); }
 }
 
 // Mantém compatibilidade com todas as funções antigas que já chamam sv().
@@ -4396,6 +4396,12 @@ function nfAbrirChamadoNotificado(){
  setTimeout(()=>{const btn=document.querySelector('[data-id="'+CSS.escape(id)+'"]');btn?.scrollIntoView({block:'center',behavior:'smooth'});},100);
 }
 let SB_REFRESHING=false;
+let SB_REFRESH_PENDING=false;
+let SB_REFRESH_TIMER=null;
+function sbProgramarRecarregamento(delay=180){
+  clearTimeout(SB_REFRESH_TIMER);
+  SB_REFRESH_TIMER=setTimeout(()=>{void sbRecarregarDados();},delay);
+}
 function sbRenderizarTelas(){
   try{
     if(S?.t==='adm'){rDb();rAt();rCh();rRl();rTc();rMl();}
@@ -4404,11 +4410,18 @@ function sbRenderizarTelas(){
   }catch(e){console.error('Erro ao atualizar telas:',e);}
 }
 async function sbRecarregarDados(){
-  if(!SB_PROFILE || SB_SYNCING || SB_REFRESHING || limpezaEntreguesEmCurso) return;
+  if(!SB_PROFILE) return;
+  if(SB_SYNCING || SB_REFRESHING || limpezaEntreguesEmCurso){SB_REFRESH_PENDING=true;return;}
   SB_REFRESHING=true;
   try{await sbLoadAll();sbRenderizarTelas();}
   catch(err){console.error('Erro ao recarregar dados:',err);sbSetConnectionBadge('Erro ao atualizar dados',false);}
-  finally{SB_REFRESHING=false;}
+  finally{
+    SB_REFRESHING=false;
+    if(SB_REFRESH_PENDING && !SB_SYNCING && !limpezaEntreguesEmCurso){
+      SB_REFRESH_PENDING=false;
+      sbProgramarRecarregamento();
+    }
+  }
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
@@ -4416,17 +4429,34 @@ document.addEventListener('DOMContentLoaded',()=>{
   S=null; lsRemove('ss');
   setTimeout(sbRestoreSession,0);
 
-  // Realtime: recarrega os dados quando outro navegador altera tabelas operacionais.
+  // Realtime: cada tabela operacional publicada dispara uma recarga do servidor.
   SB.channel('despacho-tecnico-realtime')
     .on('postgres_changes',{event:'*',schema:'public',table:'perfis'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'solicitantes_chamados'},()=>carregarSolicitantesChamados())
+    .on('postgres_changes',{event:'*',schema:'public',table:'solicitantes_chamados'},()=>{void carregarSolicitantesChamados();})
     .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'validacoes_encerramento'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'aprovacoes'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'chamado_transferencias'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbRecarregarDados)
-    .subscribe();
+    .on('postgres_changes',{event:'*',schema:'public',table:'escolas'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'fotos_atividade'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'exclusoes_chamados_portal'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'materiais_retirados'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'movimentacoes_estoque'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_pendencia'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'nao_pendenciamentos_chamados'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'pendencias_expediente_admin'},sbRecarregarDados)
+    .subscribe((status,error)=>{
+      if(status==='SUBSCRIBED'){
+        if(SB_PROFILE) sbSetConnectionBadge('Atualização em tempo real ativa',true);
+      }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+        console.warn('Canal Realtime indisponível; a sincronização periódica continuará ativa.',error||status);
+        if(SB_PROFILE) sbSetConnectionBadge('Reconectando atualizações...',false);
+        sbProgramarRecarregamento(500);
+      }
+    });
 
   // Segurança adicional: os três perfis conferem o servidor a cada 10 segundos,
   // mesmo quando o navegador não recebe um evento Realtime.
