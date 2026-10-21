@@ -1916,8 +1916,8 @@ function exportarBaseChamadosFechados(dt1,dt2){
 function rAt() {
   const tb = el('tb-at');
   if(!tb) return;
-  const filtroTecnico=String(el('at-filtro-tecnico')?.value||'').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
-  const normalizarTecnico=valor=>String(valor||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'');
+  const filtroTecnico=String(el('at-filtro-tecnico')?.value||'').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const normalizarTecnico=valor=>String(valor||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const list = D.ch.filter(chamadoVisivel).filter(c =>
     c.st === 'andamento' ||
     (S?.t === 'adm' && c.st === 'concluida' && !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente'))
