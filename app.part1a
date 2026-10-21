@@ -536,6 +536,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
   <div class="nav" id="nv">
     <button class="a" data-tab="db">📊 Dashboard</button>
     <button data-tab="tc">👷 Técnicos</button>
+    <button data-tab="online">🟢 Técnicos online</button>
     <button data-tab="ch">📞 Chamados</button>
     <button data-tab="at">⏱️ Atendimento</button>
     <button data-tab="rl">📊 Relatório</button>
@@ -636,6 +637,17 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
           <thead><tr><th>Nome</th><th>Usuário</th><th>E-mail</th><th>Região</th><th>Endereço de entrega</th><th>Skills</th><th>Áreas</th><th>Ativas</th><th></th></tr></thead>
           <tbody id="tb-tc"></tbody>
         </table></div>
+      </div>
+    </div>
+    <div id="v-online" class="hidden">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div><h3 style="font-size:.95rem;color:var(--p);margin-bottom:4px">🟢 Técnicos online</h3>
+          <p style="font-size:.75rem;color:var(--gr)">Técnicos com atividade nos últimos 90 segundos.</p></div>
+          <button type="button" class="btn btn-s" onclick="nfCarregarTecnicosOnline()">↻ Atualizar</button>
+        </div>
+        <div id="tecnicos-online-resumo" style="font-size:.75rem;color:var(--gr);margin:12px 0">Carregando...</div>
+        <div id="tecnicos-online-lista"></div>
       </div>
     </div>
     <div id="v-ch" class="hidden">
