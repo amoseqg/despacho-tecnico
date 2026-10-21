@@ -2604,8 +2604,8 @@ function rTdp() {
   const dl = el('t-dl');
   if(dl) dl.innerHTML = list.length ? list.map(c =>
     `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando</span></div>
-    ${dadosSite(c)}
-    <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
+     ${dadosSite(c)}
+     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     ${infoReincidencia(c).html}
     <div style="margin-top:8px;display:flex;gap:6px">
@@ -2623,6 +2623,7 @@ function rTat() {
     const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':''));
     return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div>
     ${dadosSite(c)}
+     <div class="os-r"><b>Descrição:</b> ${valorInfo(c.de)}</div>
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
     ${validacaoStatus?`<div style="margin-top:8px">${validacaoStatus}</div>`:''}
@@ -4801,7 +4802,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.5"></script>
+<script src="/release-info.js?v=2.5.12"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
