@@ -1940,8 +1940,151 @@ function rAt() {
     const acao=aguardandoEncerramento
       ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
       : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
-    return `<tr><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${acao}</div></td></tr>`;
+    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${acao}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando encerramento</td></tr>';
+  tb.onclick=event=>{
+    if(event.target.closest('button,a,input,select,textarea,[role="button"]')) return;
+    const linha=event.target.closest('tr[data-at-chamado-id]');
+    if(linha) void abrirInformacaoChamado(linha.dataset.atChamadoId);
+  };
+}
+function abrirInformacaoChamado(id){
+  if(SB_PROFILE?.tipo!=='admin' && S?.t!=='adm') return;
+  const chamado=D.ch.find(c=>String(c.id)===String(id));
+  if(!chamado) return;
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(760px,calc(100% - 28px));max-height:88vh;border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';
+  dialog.innerHTML=`<form id="at-nota-form" style="padding:20px;font-family:system-ui;display:grid;gap:12px">
+    <div><h3 style="margin:0 0 5px;color:#16324f">Detalhes do chamado ${esc(identificacaoOs(chamado))}</h3><div style="color:#526273;font-size:13px">${esc(chamado.si||'Cliente não informado')} · Técnico: ${esc(nt(chamado.te))}</div></div>
+    <div><strong style="font-size:13px;color:#344054">Descrição original</strong><div id="at-nota-descricao" style="margin-top:5px;max-height:130px;overflow:auto;padding:10px;background:#f5f7fa;border-radius:8px;white-space:pre-wrap;font-size:13px"></div></div>
+    <div><strong style="font-size:13px;color:#344054">Informações adicionais registradas</strong><div id="at-nota-historico" style="margin-top:5px;max-height:180px;overflow:auto;padding:10px;background:#f5f7fa;border-radius:8px;white-space:pre-wrap;font-size:13px"></div></div>
+    <div><label class="label" for="at-nota-nova">Adicionar informação</label><textarea id="at-nota-nova" class="input" maxlength="4000" rows="5" placeholder="Digite uma informação complementar para este chamado"></textarea></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn btn-s" id="at-nota-cancelar">Fechar</button><button type="submit" class="btn btn-p" id="at-nota-salvar">Salvar informação</button></div>
+  </form>`;
+  dialog.querySelector('#at-nota-descricao').textContent=String(chamado.de||'Descrição não informada.');
+  dialog.querySelector('#at-nota-historico').textContent=String(chamado.informacoesAdicionais||'Nenhuma informação adicional registrada.');
+  document.body.append(dialog);
+  dialog.querySelector('#at-nota-cancelar').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  dialog.querySelector('#at-nota-form').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const campo=dialog.querySelector('#at-nota-nova'),botao=dialog.querySelector('#at-nota-salvar');
+    const texto=campo.value.trim();
+    if(!texto){campo.focus();return;}
+    const textoOriginal=botao.textContent;
+    botao.disabled=true;botao.textContent='Salvando...';
+    try{
+      const admin=await sbExigirSessaoAdmin();
+      const base=chamado.informacoesAdicionais??null;
+      const dataRegistro=new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(new Date());
+      const registro=`• ${dataRegistro} — ${admin.nome}: ${texto}`;
+      const informacoes=[base,registro].filter(Boolean).join('\n');
+      let query=SB.from('chamados').update({informacoes_adicionais:informacoes,atualizado_em:new Date().toISOString()}).eq('id',chamado.id);
+      query=base===null?query.is('informacoes_adicionais',null):query.eq('informacoes_adicionais',base);
+      const {data,error}=await query.select('id,informacoes_adicionais').maybeSingle();
+      if(error) throw error;
+      if(!data) throw new Error('Outro administrador atualizou este chamado. Feche e abra novamente para incluir sua informação.');
+      chamado.informacoesAdicionais=data.informacoes_adicionais;
+      lsSet('dd',D);
+      nfToast('Informação adicionada ao chamado.','sucesso');
+      dialog.close();
+      rAt();
+    }catch(error){
+      sbShowError('Não foi possível salvar a informação',error);
+      botao.disabled=false;botao.textContent=textoOriginal;
+    }
+  });
+  dialog.showModal();
+}
+let NF_CHAT_DIALOG=null;
+let NF_CHAT_THREAD=null;
+let NF_CHAT_LOADING=false;
+let NF_CHAT_PENDING=false;
+function nfAbrirChat(){
+  if(!SB_PROFILE || !S) { nfToast('Entre no portal para acessar o chat.','erro'); return; }
+  const administrador=SB_PROFILE.tipo==='admin' && S.t==='adm';
+  const tecnico=SB_PROFILE.tipo==='tecnico' && S.t==='tec';
+  if(!administrador && !tecnico) { nfToast('O chat está disponível para administradores e técnicos.','erro'); return; }
+  if(NF_CHAT_DIALOG?.open) NF_CHAT_DIALOG.close();
+  const tecnicos=(D.tc||[]).filter(t=>t.tipo==='tecnico' && t._id);
+  const tecnicoId=tecnico?SB_PROFILE.id:(tecnicos[0]?._id||'');
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(720px,calc(100% - 24px));height:min(720px,88vh);max-height:88vh;border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';
+  const opcoes=tecnicos.map(t=>`<option value="${escM(t._id)}">${esc(t.n)}</option>`).join('');
+  dialog.innerHTML=`<div style="height:100%;display:flex;flex-direction:column;padding:18px;font-family:system-ui;gap:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0;color:#16324f">💬 Chat com ${administrador?'técnico':'administradores'}</h3><small style="color:#526273">${administrador?'Selecione o técnico para abrir a conversa.':'Envie uma mensagem para a equipe de administradores.'}</small></div><button type="button" id="nf-chat-fechar" class="btn btn-s">Fechar</button></div>
+    ${administrador?`<div class="form-group" style="margin:0"><label class="label" for="nf-chat-tecnico">Técnico</label><select id="nf-chat-tecnico" class="select" ${tecnicos.length?'':'disabled'}>${opcoes||'<option value="">Nenhum técnico cadastrado</option>'}</select></div>`:''}
+    <div id="nf-chat-mensagens" aria-live="polite" style="flex:1;min-height:180px;overflow:auto;border:1px solid var(--b);border-radius:10px;background:#f8fafc;padding:12px;display:flex;flex-direction:column;gap:8px"></div>
+    <form id="nf-chat-form" style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end"><div><label class="label" for="nf-chat-texto">Mensagem</label><textarea id="nf-chat-texto" class="input" rows="2" maxlength="4000" placeholder="Digite sua mensagem..." required></textarea></div><button type="submit" class="btn btn-p" id="nf-chat-enviar">Enviar</button></form>
+  </div>`;
+  document.body.append(dialog);
+  NF_CHAT_DIALOG=dialog;
+  NF_CHAT_THREAD=tecnicoId||null;
+  const select=dialog.querySelector('#nf-chat-tecnico');
+  const enviar=dialog.querySelector('#nf-chat-enviar');
+  if(enviar) enviar.disabled=!tecnicoId;
+  dialog.querySelector('#nf-chat-fechar').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>{if(NF_CHAT_DIALOG===dialog){NF_CHAT_DIALOG=null;NF_CHAT_THREAD=null;}dialog.remove();},{once:true});
+  if(select) select.addEventListener('change',()=>{
+    NF_CHAT_THREAD=select.value||null;
+    enviar.disabled=!NF_CHAT_THREAD;
+    void nfChatCarregarMensagens();
+  });
+  dialog.querySelector('#nf-chat-form').addEventListener('submit',async event=>{
+    event.preventDefault();
+    const campo=dialog.querySelector('#nf-chat-texto'),botao=dialog.querySelector('#nf-chat-enviar');
+    const texto=campo.value.trim(),thread=NF_CHAT_THREAD;
+    if(!thread||!texto) return;
+    botao.disabled=true;
+    try{
+      if(SB_PROFILE.tipo==='admin') await sbExigirSessaoAdmin();
+      if(SB_PROFILE.tipo==='tecnico' && thread!==SB_PROFILE.id) throw new Error('Técnicos só podem enviar mensagens na própria conversa.');
+      const {error}=await SB.from('mensagens_chat').insert({tecnico_id:thread,remetente_id:SB_PROFILE.id,mensagem:texto});
+      if(error) throw error;
+      campo.value='';
+      await nfChatCarregarMensagens();
+      campo.focus();
+    }catch(error){sbShowError('Não foi possível enviar a mensagem',error);}
+    finally{if(botao.isConnected)botao.disabled=!NF_CHAT_THREAD;}
+  });
+  dialog.showModal();
+  if(tecnicoId) void nfChatCarregarMensagens();
+}
+function nfChatEvento(payload){
+  const registro=payload?.new||payload?.old;
+  if(!registro||!NF_CHAT_DIALOG?.open||registro.tecnico_id!==NF_CHAT_THREAD)return;
+  void nfChatCarregarMensagens();
+}
+async function nfChatCarregarMensagens(){
+  const dialog=NF_CHAT_DIALOG,thread=NF_CHAT_THREAD;
+  if(!dialog?.open||!thread)return;
+  if(NF_CHAT_LOADING){NF_CHAT_PENDING=true;return;}
+  NF_CHAT_LOADING=true;
+  try{
+    const area=dialog.querySelector('#nf-chat-mensagens');
+    if(!area)return;
+    const {data,error}=await SB.from('mensagens_chat')
+      .select('id,tecnico_id,remetente_id,mensagem,criado_em')
+      .eq('tecnico_id',thread).order('criado_em',{ascending:true}).limit(250);
+    if(error)throw error;
+    if(NF_CHAT_DIALOG!==dialog||NF_CHAT_THREAD!==thread)return;
+    const mensagens=data||[];
+    area.innerHTML=mensagens.map(m=>{
+      const eu=m.remetente_id===SB_PROFILE?.id;
+      const perfil=[...(D.tc||[]),...(D.ad||[])].find(p=>p._id===m.remetente_id);
+      const autor=perfil?.n||(eu?S?.n:'Usuário');
+      const hora=m.criado_em?new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(new Date(m.criado_em)):'';
+      return `<div style="max-width:88%;align-self:${eu?'flex-end':'flex-start'};background:${eu?'#dbeafe':'#fff'};border:1px solid #d7e0ea;border-radius:12px;padding:8px 11px;white-space:pre-wrap;overflow-wrap:anywhere"><strong style="font-size:11px;color:#344054">${esc(autor)} · ${esc(hora)}</strong><div style="margin-top:4px;font-size:14px">${esc(m.mensagem)}</div></div>`;
+    }).join('')||'<div class="empty">Nenhuma mensagem ainda. Inicie a conversa.</div>';
+    area.scrollTop=area.scrollHeight;
+  }catch(error){
+    console.error('Erro ao carregar chat:',error);
+    const area=dialog.querySelector('#nf-chat-mensagens');
+    if(area) area.textContent='Não foi possível carregar as mensagens. Tente novamente.';
+  }finally{
+    NF_CHAT_LOADING=false;
+    if(NF_CHAT_PENDING){NF_CHAT_PENDING=false;setTimeout(()=>{void nfChatCarregarMensagens();},120);}
+  }
 }
 function abrirAprovacaoAtendimento(usuario) {
   if(!usuario)return;
@@ -3858,7 +4001,7 @@ async function sbLoadAll(){
     const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
       id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'',
-      re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', dtexec:c.data_execucao||'',
+      re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
       solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', operadora:c.operadora||'', vencimento:c.vencimento_em||'',pendenciaAtiva:!!c.pendencia_ativa,pendenciaDesde:c.pendencia_desde||'',prazoPausadoSegundos:Number(c.prazo_pausado_segundos||0),
@@ -3946,7 +4089,7 @@ function sbChamadoRow(c){
     endereco:c.en||null, contato:c.contato||null, horario_expediente:c.horario||null, velocidade:c.velocidade||null, prtm:c.prtm||null,
     pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null, regiao_operacional:c.regiaoOperacional||null, tecnicos_indicados:c.tecnicosIndicados||null,
     regiao:c.re, skill:c.skill, area:c.re==='capital'?(c.area||null):null, tecnico_id:sbIdByUser(c.te), criado_por:SB_PROFILE?.id||null,
-    descricao:c.de||null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
+    descricao:c.de||null, informacoes_adicionais:c.informacoesAdicionais??null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
     solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, vencimento_em:sbIso(c.vencimento),
     tipo_os:c.tipoOs==='servico'?'servico':'manutencao', os_pe_conectado:c.osPeConectado||null, atividade_servico:c.atividadeServico||null,
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
@@ -4454,6 +4597,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_pendencia'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'nao_pendenciamentos_chamados'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'pendencias_expediente_admin'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'mensagens_chat'},nfChatEvento)
     .subscribe((status,error)=>{
       if(status==='SUBSCRIBED'){
         if(SB_PROFILE) sbSetConnectionBadge('Atualização em tempo real ativa',true);

@@ -531,7 +531,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 
 <!-- ADMIN -->
 <div id="pa" class="hidden">
-  <div class="user-bar"><span>🛡️ <b>Admin</b> — <span id="an"></span></span><div style="display:flex;gap:5px"><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-adm">Sair</button></div></div>
+  <div class="user-bar"><span>🛡️ <b>Admin</b> — <span id="an"></span></span><div style="display:flex;gap:5px"><button type="button" onclick="nfAbrirChat()">💬 Chat</button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-adm">Sair</button></div></div>
   <div class="header"><h1><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></h1><div class="sub">Painel Administrativo</div></div>
   <div class="nav" id="nv">
     <button class="a" data-tab="db">📊 Dashboard</button>
@@ -876,7 +876,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 
 <!-- TÉCNICO -->
 <div id="pt" class="hidden">
-  <div class="user-bar"><span>👷 <b>Técnico</b> — <span id="tn"></span> <span id="tr"></span></span><div style="display:flex;gap:5px"><button type="button" id="nf-push-atalho">🔔 Alertas</button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-tec">Sair</button></div></div>
+  <div class="user-bar"><span>👷 <b>Técnico</b> — <span id="tn"></span> <span id="tr"></span></span><div style="display:flex;gap:5px"><button type="button" onclick="nfAbrirChat()">💬 Chat</button><button type="button" id="nf-push-atalho">🔔 Alertas</button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-tec">Sair</button></div></div>
   <div class="header"><h1><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></h1><div class="sub">Área do Técnico</div></div>
   <div class="nav" id="nv2">
     <button class="a" data-tab="db">📊 Dashboard</button>
