@@ -31,6 +31,7 @@ let S = lsGet('ss', null);
 let CID = null, EID = null, TI = null, loginType = '';
 
 const SITE_FIELDS = ['c-si','c-cd','c-en','c-co','c-ho','c-ve','c-pt','c-pv','c-regiao-planilha','c-tecnicos-planilha'];
+let MODO_MANUAL_CHAMADO = false;
 const SITE_INDEX = new Map();
 const SITE_NUMBER_INDEX = new Map();
 SITES_PEII.forEach(site => {
@@ -49,11 +50,29 @@ function normalizarCircuito(v) { return String(v || '').normalize('NFD').replace
 function numeroCircuito(v) { return (String(v || '').match(/\d+/g) || []).join(''); }
 function esc(v) { const d = document.createElement('div'); d.textContent = String(v == null ? '' : v); return d.innerHTML; }
 function valorInfo(v) { return v ? esc(v).replace(/\n/g, '<br>') : 'Não informado'; }
-function limparSite() { SITE_FIELDS.forEach(id => { if (el(id)) el(id).value = ''; }); }
+function definirModoManualChamado(ativo) {
+  MODO_MANUAL_CHAMADO = !!ativo;
+  const caixa=el('c-ci-manual-box'),campoCircuito=el('c-ci-manual'),botao=el('c-manual-toggle');
+  caixa?.classList.toggle('hidden',!MODO_MANUAL_CHAMADO);
+  document.querySelectorAll('[data-manual-site="1"]').forEach(campo=>{
+    if(campo.id==='c-re')campo.disabled=!MODO_MANUAL_CHAMADO;
+    else campo.readOnly=!MODO_MANUAL_CHAMADO;
+  });
+  if(campoCircuito){
+    if(MODO_MANUAL_CHAMADO&&!campoCircuito.value)campoCircuito.value=el('c-ci')?.value||'';
+    campoCircuito.disabled=!MODO_MANUAL_CHAMADO;
+  }
+  if(botao)botao.textContent=MODO_MANUAL_CHAMADO?'✓ Preenchimento manual ativado':'✍️ Preencher dados manualmente';
+}
+function limparSite() {
+  if(MODO_MANUAL_CHAMADO)return;
+  SITE_FIELDS.forEach(id=>{if(el(id))el(id).value='';});
+}
 function preencherSite(site) {
   const ids = ['c-si','c-cd','c-en','c-co','c-ho','c-ve','c-pt','c-pv'];
   ids.forEach((id, i) => { el(id).value = site[i + 1] || ''; });
   el('c-ci').value = site[0];
+  if(el('c-ci-manual'))el('c-ci-manual').value=site[0]||'';
   el('c-regiao-planilha').value = site[9] || '';
   el('c-tecnicos-planilha').value = site[10] || '';
   definirRegiaoPlanilha(site[9], site[2]);
@@ -98,10 +117,18 @@ function buscarCircuito() {
     return null;
   }
 
+  if(MODO_MANUAL_CHAMADO){
+    const manual=[numero,el('c-si').value.trim(),el('c-cd').value.trim(),el('c-en').value.trim(),el('c-co').value.trim(),el('c-ho').value.trim(),el('c-ve').value.trim(),el('c-pt').value.trim(),el('c-pv').value.trim(),el('c-regiao-planilha').value.trim(),el('c-tecnicos-planilha').value.trim()];
+    if(manual[0]&&manual[1]&&manual[2]&&manual[3]){
+      status.textContent='✓ Dados manuais preenchidos. Serão gravados no servidor com o chamado.';
+      status.style.color='var(--g)';
+      return manual;
+    }
+  }
   limparSite();
   opcoes.classList.add('hidden');
-  status.textContent = 'Circuito não encontrado na base de dados.';
-  status.style.color = 'var(--r)';
+  status.textContent='Circuito não encontrado na base de dados. Use “Preencher dados manualmente” para informar os dados.';
+  status.style.color='var(--r)';
   return null;
 }
 
@@ -271,10 +298,10 @@ function preencherDadosDaDescricao(texto){
     cidade:extrairTextoRotulado(texto,['CIDADE','MUNICÍPIO','MUNICIPIO']),
     contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL'])
   };
-  if(dados.site) el('c-si').value=dados.site;
-  if(dados.endereco) el('c-en').value=dados.endereco;
-  if(dados.cidade) el('c-cd').value=dados.cidade;
-  if(dados.contato) el('c-co').value=dados.contato;
+  if(dados.site&&(!MODO_MANUAL_CHAMADO||!el('c-si').value.trim()))el('c-si').value=dados.site;
+  if(dados.endereco&&(!MODO_MANUAL_CHAMADO||!el('c-en').value.trim()))el('c-en').value=dados.endereco;
+  if(dados.cidade&&(!MODO_MANUAL_CHAMADO||!el('c-cd').value.trim()))el('c-cd').value=dados.cidade;
+  if(dados.contato&&(!MODO_MANUAL_CHAMADO||!el('c-co').value.trim()))el('c-co').value=dados.contato;
   return dados;
 }
 
@@ -283,7 +310,7 @@ function buscarCircuitoNaDescricao() {
   const texto=String(campo?.value||'').trim();
   const status=el('c-status'), opcoes=el('c-opcoes');
   const campoProtocolo=el('c-pr'), campoSdm=el('c-sdm');
-  el('c-ci').value='';
+  if(!MODO_MANUAL_CHAMADO){el('c-ci').value='';if(el('c-ci-manual'))el('c-ci-manual').value='';}
   limparSite();
   opcoes.classList.add('hidden');
 
@@ -318,6 +345,11 @@ function buscarCircuitoNaDescricao() {
     delete campoSdm.dataset.preenchimento;
   }
   const dadosDescricao=preencherDadosDaDescricao(texto);
+  const circuitoExtraido=extrairTextoRotulado(texto,['DESIGNAÇÃO DO CIRCUITO','DESIGNACAO DO CIRCUITO','NÚMERO DO CIRCUITO','NUMERO DO CIRCUITO','CIRCUITO']);
+  if(circuitoExtraido&&!SITE_INDEX.has(normalizarCircuito(circuitoExtraido))){
+    el('c-ci').value=circuitoExtraido;
+    if(el('c-ci-manual')&&!MODO_MANUAL_CHAMADO)el('c-ci-manual').value=circuitoExtraido;
+  }
 
   const textoNormalizado=normalizarCircuito(texto);
   let encontrados=SITES_PEII.filter(site=>{
@@ -351,10 +383,21 @@ function buscarCircuitoNaDescricao() {
 
   const camposPreenchidos=[dadosDescricao.site,dadosDescricao.endereco,dadosDescricao.cidade,dadosDescricao.contato].filter(Boolean).length;
   status.textContent=camposPreenchidos
-    ? 'Circuito não localizado na base — '+camposPreenchidos+' dado(s) preenchido(s) diretamente pela descrição.'
-    : 'Nenhuma designação ou dado de site foi localizado no texto colado.';
+    ? 'Circuito não localizado na base — '+camposPreenchidos+' dado(s) preenchido(s) pela descrição. Use “Preencher dados manualmente” para revisar e completar.'
+    : 'Nenhuma designação ou dado de site foi localizado no texto colado. Use “Preencher dados manualmente” para informar.';
   status.style.color=camposPreenchidos?'var(--y)':'var(--r)';
   return null;
+}
+
+async function salvarCadastroSiteManualChamado(c){
+  if(!MODO_MANUAL_CHAMADO)return null;
+  const circuito=String(c.ci||'').trim(),site=String(c.si||'').trim(),cidade=String(c.cid||'').trim(),endereco=String(c.en||'').trim();
+  if(!circuito||!site||!cidade||!endereco)throw new Error('Para salvar o cadastro manual, informe circuito, site/cliente, cidade e endereço.');
+  const regiaoOperacional=String(c.regiaoOperacional||'').trim()||(c.re==='capital'?(c.area||'').toUpperCase():c.re==='noronha'?'Fernando de Noronha':'Interior');
+  const linha={circuito,site,cidade,endereco,contato:c.contato||null,horario_expediente:c.horario||null,velocidade:c.velocidade||null,prtm:c.prtm||null,pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null,regiao_operacional:regiaoOperacional,tecnicos_indicados:c.tecnicosIndicados||null,ativo:true,atualizado_em:new Date().toISOString()};
+  const {data,error}=await SB.from('sites').upsert(linha,{onConflict:'circuito'}).select('circuito,site,cidade,endereco,contato,horario_expediente,velocidade,prtm,pvf_total,regiao_operacional,tecnicos_indicados').single();
+  if(error)throw error;
+  return registrarSiteOsServico(siteOsServicoDoBanco(data));
 }
 
 function selecionarCircuitoDaDescricao(valor){
@@ -1405,6 +1448,7 @@ async function addCh() {
   try{
     if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
     const adminAtual=await sbExigirSessaoAdmin();
+    if(MODO_MANUAL_CHAMADO)await salvarCadastroSiteManualChamado(novoChamado);
     const linha=sbChamadoRow(novoChamado);
     linha.criado_por=adminAtual.id;
     const {data,error}=await SB.from('chamados').insert(linha)
@@ -1422,7 +1466,7 @@ async function addCh() {
     SB_LOADED_CH.add(data.id);
     lsSet('dd',D);
 
-    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; limparSite();
+    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
     el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
     el('c-de').value = ''; el('c-dtexec').value = '';
     el('c-sk').value = ''; el('c-area').value = '';
@@ -1872,12 +1916,32 @@ function exportarBaseChamadosFechados(dt1,dt2){
 function rAt() {
   const tb = el('tb-at');
   if(!tb) return;
-  const list = D.ch.filter(chamadoVisivel).filter(c => c.st === 'andamento');
+  const list = D.ch.filter(chamadoVisivel).filter(c =>
+    c.st === 'andamento' ||
+    (S?.t === 'adm' && c.st === 'concluida' && !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente'))
+  );
   tb.innerHTML = list.map(c => {
-    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+    const aguardandoEncerramento = c.st === 'concluida';
+    const t = aguardandoEncerramento ? null : tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
-    return `<tr><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}</div></td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento</td></tr>';
+    const marcador=aguardandoEncerramento
+      ? '<span class="badge b-pag-pendente">Concluído aguardando encerramento</span>'
+      : `<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span>`;
+    const acao=aguardandoEncerramento
+      ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
+      : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
+    return `<tr><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${acao}</div></td></tr>`;
+  }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando encerramento</td></tr>';
+}
+function abrirAprovacaoAtendimento(usuario) {
+  if(!usuario)return;
+  RL_DT1_ATUAL='';RL_DT2_ATUAL='';
+  const inicio=el('rl-dt1'),fim=el('rl-dt2');
+  if(inicio)inicio.value='';
+  if(fim)fim.value='';
+  document.querySelector('.nav button[data-tab="rl"]')?.click();
+  rRl('','',true);
+  opPl(usuario);
 }
 
 let RL_DT1_ATUAL = '';
@@ -3332,6 +3396,9 @@ document.addEventListener('DOMContentLoaded', function() {
     circuitoDescricaoTimer=setTimeout(buscarCircuitoNaDescricao,180);
   });
   el('c-descricao-colada').addEventListener('change',buscarCircuitoNaDescricao);
+  el('c-manual-toggle')?.addEventListener('click',()=>definirModoManualChamado(!MODO_MANUAL_CHAMADO));
+  el('c-ci-manual')?.addEventListener('input',function(){el('c-ci').value=this.value.trim();});
+  document.querySelectorAll('[data-manual-site="1"]').forEach(campo=>campo.addEventListener('input',()=>{if(campo.id==='c-tecnicos-planilha')atualizarTecnicosChamado();}));
   ['c-pr','c-sdm'].forEach(id=>el(id).addEventListener('input',function(){
     this.dataset.preenchimento='manual';
   }));
@@ -3459,8 +3526,9 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ap-servico, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
+    if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
