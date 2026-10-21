@@ -1928,6 +1928,8 @@ function rAt() {
   const tb = el('tb-at');
   if(!tb) return;
   const filtroTecnico=String(el('at-filtro-tecnico')?.value||'').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const filtroAcao=String(el('at-filtro-acao')?.value||'');
+  const administrador=SB_PROFILE?.tipo==='admin'||S?.t==='adm';
   const normalizarTecnico=valor=>String(valor||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const list = D.ch.filter(chamadoVisivel).filter(c =>
     c.st === 'andamento' ||
@@ -1936,6 +1938,17 @@ function rAt() {
     if(!filtroTecnico) return true;
     const nome=nt(c.te)||D.tc.find(t=>t.u===c.te)?.n||c.te||'';
     return normalizarTecnico(nome).includes(filtroTecnico);
+  }).filter(c=>{
+    if(!filtroAcao) return true;
+    const emAtendimento=c.st==='andamento';
+    const aguardandoAprovacao=c.st==='concluida';
+    if(filtroAcao==='aprovar') return aguardandoAprovacao;
+    if(filtroAcao==='redirecionar'||filtroAcao==='rastreamento') return emAtendimento;
+    if(filtroAcao==='encerrar') return emAtendimento&&!c.solicitanteId;
+    if(filtroAcao==='pendenciar') return administrador&&emAtendimento&&!c.pendenciaAtiva;
+    if(filtroAcao==='pendencia_ativa') return administrador&&emAtendimento&&!!c.pendenciaAtiva;
+    if(filtroAcao==='excluir') return administrador&&emAtendimento;
+    return true;
   });
   tb.innerHTML = list.map(c => {
     const aguardandoEncerramento = c.st === 'concluida';
