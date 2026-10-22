@@ -1120,6 +1120,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <div class="modal-hd"><h3 id="pl-tit">📋 Planilha do Técnico</h3><button class="close" id="cls-pl">×</button></div>
     <div class="modal-bd">
       <div class="info" id="pl-in"></div>
+      <div class="form-group" style="max-width:360px;margin:10px 0"><label class="label" for="pl-filtro-protocolo">Filtrar protocolo do técnico</label><input class="input" id="pl-filtro-protocolo" type="search" placeholder="Digite o protocolo para localizar" autocomplete="off" oninput="filtrarProtocoloPlanilha()"></div>
       <div class="pl-scroll" id="pl-scroll"><table class="pl-table" id="pl-tb">
         <thead><tr><th>O.S</th><th>Site</th><th>Origem</th><th>Destino</th><th>Retorno</th><th>Encerramento / Aprovação</th><th>Atividade</th><th>Miscelânea</th><th>Qtd</th><th>KM Total</th><th>Valor KM</th><th>Valor Mat.</th><th>Total Mat.</th><th>Valor Ativ.</th><th>Valor Total</th><th>Observação</th><th>Status Pag.</th><th id="pl-acoes-cab" class="hidden">Ações do serviço</th></tr></thead>
         <tbody id="pl-tb-body"></tbody>

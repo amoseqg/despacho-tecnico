@@ -21,7 +21,7 @@ const idsObrigatorios = [
   'os-servico-circuito', 'os-servico-circuito-opcoes', 'os-servico-circuito-status',
   'os-servico-descricao-colada', 'os-servico-descricao-status',
   'os-tipo-escolha', 'btn-escolher-os-servico', 'btn-escolher-os-manutencao',
-  'form-os-servico', 'form-os-manutencao', 'at-filtro-protocolo'
+  'form-os-servico', 'form-os-manutencao', 'at-filtro-protocolo', 'pl-filtro-protocolo'
 ];
 for (const id of idsObrigatorios) {
   assert.match(html, new RegExp(`id=["']${id}["']`), `Elemento obrigatório ausente: ${id}`);
@@ -68,6 +68,22 @@ const filtroAtendimento = parte3.match(/function rAt\(\) \{[\s\S]*?\n\}/)?.[0] |
 assert.ok(filtroAtendimento, 'A lista de Atendimento deve existir.');
 assert.match(parte1a, /id="at-filtro-protocolo"[^>]*oninput="rAt\(\)"/, 'A busca de protocolo deve atualizar a lista ao digitar.');
 assert.match(filtroAtendimento, /el\('at-filtro-protocolo'\)[\s\S]*?identificacaoOs\(c\)[\s\S]*?c\.sdm[\s\S]*?includes\(normalizarProtocolo\(filtroProtocolo\)\)/, 'Atendimento deve filtrar por protocolo, SDM e identificadores de OS.');
+assert.match(parte1a, /id="pl-filtro-protocolo"[^>]*oninput="filtrarProtocoloPlanilha\(\)"/, 'A planilha de aprovação deve permitir filtrar por protocolo.');
+const filtroAprovacao = parte3.match(/function filtrarProtocoloPlanilha\(\)\{[\s\S]*?\n\}/)?.[0] || '';
+assert.match(filtroAprovacao, /dataset\.protocolo[\s\S]*?includes\(termo\)/, 'A busca da aprovação deve filtrar as linhas pelo protocolo.');
+const removerDuplicados = parte3.match(/function removerBlocosDuplicados\(texto\)\{[\s\S]*?\n\}/)?.[0] || '';
+assert.ok(removerDuplicados, 'A limpeza de blocos repetidos do relatório deve existir.');
+const ctxDuplicados = {}; vm.runInNewContext(removerDuplicados, ctxDuplicados);
+assert.equal(ctxDuplicados.removerBlocosDuplicados('PROTOCOLO: 123\nRELATÓRIO: ok\nPROTOCOLO: 123\nRELATÓRIO: ok'), 'PROTOCOLO: 123\nRELATÓRIO: ok', 'Relatório duplicado deve aparecer somente uma vez.');
+const funcaoRmat = parte3.match(/function rTmat\(\)\{[\s\S]*?\n\}/)?.[0] || '';
+assert.ok(funcaoRmat, 'A lista de materiais do técnico deve existir.');
+const camposRmat = Object.fromEntries(['tm-protocolo','tm-material','tm-lista'].map(id=>[id,{value:'',innerHTML:''}]));
+const ctxRmat = {el:id=>camposRmat[id],S:{u:'tecnico-a'},D:{ch:[{id:'aberto',te:'tecnico-a',st:'andamento',pr:'PROTO-ATIVO',si:'Atendimento atual'},{id:'fechado',te:'tecnico-a',st:'concluida',pr:'PROTO-FECHADO',si:'Chamado encerrado'},{id:'outro',te:'tecnico-b',st:'andamento',pr:'PROTO-OUTRO',si:'Outro técnico'}],mat:[],mr:[]},escM:v=>String(v||''),materialById:()=>null};
+vm.runInNewContext(`${funcaoRmat}\nrTmat()`,ctxRmat);
+assert.match(camposRmat['tm-protocolo'].innerHTML,/PROTO-ATIVO/,'A solicitação deve listar chamado ativo do técnico.');
+assert.doesNotMatch(camposRmat['tm-protocolo'].innerHTML,/PROTO-FECHADO|PROTO-OUTRO/,'A solicitação deve ocultar chamados encerrados e de outros técnicos.');
+assert.match(parte3,/const protocolosExibidos=new Set\(\)[\s\S]*?protocolosExibidos\.has\(protocolo\)/,'A aprovação deve remover protocolos duplicados da planilha.');
+assert.match(parte3,/x\.te===S\.u&&x\.st==='andamento'/,'A gravação da solicitação de material deve validar que o chamado continua em atendimento.');
 const validacaoExcecao=parte3.match(/const tecnicoSelecionado = D\.tc\.find[\s\S]*?const dtexec = el\('c-dtexec'\)\.value;/)?.[0]||'';
 assert.match(validacaoExcecao,/!tecnicoCompativelComChamado && !liberarArea/,'Técnicos fora da skill/cobertura exigem liberação excepcional.');
 const seletorTecnicosServico = parte3.match(/function atualizarTecnicosOsServico\(\) \{[\s\S]*?\n\}/)?.[0];
