@@ -94,6 +94,22 @@ for(const [tipo,id,esperado,badgeId,area] of [['admin','admin-1',3,'nf-chat-admi
  assert.equal(badge.textContent,String(esperado),`Contador incorreto para ${tipo}.`);
  assert.equal(badge.hidden,false,`Bolinha de mensagens não lidas deveria aparecer para ${tipo}.`);
 }
+const barrasTop5=parte3.match(/function barrasRanking\(ranking,cor,tipo=''\)\{[\s\S]*?\n\}/)?.[0]||'';
+assert.ok(barrasTop5,'A renderização dos rankings deve existir.');
+const ctxBarrasTop5={esc:v=>String(v||'')};vm.runInNewContext(`${barrasTop5}\nresultadoTop5=barrasRanking([{usuario:'tec-1',nome:'André Pereira',qtd:2}],'#dc2626','prazo')`,ctxBarrasTop5);
+assert.match(ctxBarrasTop5.resultadoTop5,/class="btn-top5-tecnico"[\s\S]*?data-top5-tipo="prazo"[\s\S]*?data-top5-tecnico="tec-1"/,'O nome no Top 5 deve ser clicável e carregar o técnico e o indicador corretos.');
+assert.match(parte3,/btn-top5-tecnico[\s\S]*?abrirDetalhesTop5Tecnico\(t\.dataset\.top5Tipo,t\.dataset\.top5Tecnico\)/,'O clique no nome do técnico deve abrir os chamados correspondentes.');
+const abrirDetalhesTop5=parte3.match(/function abrirDetalhesTop5Tecnico\(tipo,tecnicoId\)\{[\s\S]*?\n\}/)?.[0]||'';
+assert.ok(abrirDetalhesTop5,'A janela de chamados do técnico no Top 5 deve existir.');
+const dadosTop5Teste={perdas:[{chamado:{id:'p1',te:'tec-1',pr:'PERDA-01',sdm:'SDM-1',ci:'CIR-1',si:'Site A',am:'2026-10-20',cc:'2026-10-20'},duracao:6*60*60*1000}],reincidencias:[{chamado:{id:'r1',te:'tec-2',pr:'NOVO-01',ci:'CIR-2',si:'Site B',cr:'2026-10-20'},anterior:{te:'tec-1',pr:'ANT-01',ci:'CIR-2',si:'Site B',cc:'2026-10-15'},intervalo:7*24*60*60*1000}]};
+let dialogTop5Atual;const contextoTop5={dadosIndicadoresTecnicos:()=>dadosTop5Teste,registrosTop5:(tipo,itens)=>itens,nt:id=>({"tec-1":"André Pereira","tec-2":"Técnico dois"}[id]||id||''),esc:v=>String(v??''),formatarDataBrasil:()=> '20/10/2026',document:{createElement:()=>dialogTop5Atual,body:{append(){}}}};
+vm.runInNewContext(abrirDetalhesTop5,contextoTop5);
+dialogTop5Atual={style:{},innerHTML:'',showModal(){this.opened=true;},addEventListener(){},querySelector(){return {onclick:null};}};contextoTop5.abrirDetalhesTop5Tecnico('prazo','tec-1');
+assert.equal(dialogTop5Atual.opened,true,'Clicar no ranking de perda de prazo deve abrir a janela de chamados.');
+assert.match(dialogTop5Atual.innerHTML,/PERDA-01[\s\S]*?6h 00min/,'A janela de perda deve identificar o protocolo e a duração do atendimento.');
+dialogTop5Atual={style:{},innerHTML:'',showModal(){this.opened=true;},addEventListener(){},querySelector(){return {onclick:null};}};contextoTop5.abrirDetalhesTop5Tecnico('reincidencia','tec-1');
+assert.equal(dialogTop5Atual.opened,true,'Clicar no ranking de reincidência deve abrir a janela de chamados.');
+assert.match(dialogTop5Atual.innerHTML,/NOVO-01[\s\S]*?ANT-01[\s\S]*?7\.0 dia/,'A janela de reincidência deve mostrar o protocolo novo, o anterior e o intervalo.');
 const filtroAtendimento = parte3.match(/function rAt\(\) \{[\s\S]*?\n\}/)?.[0] || '';
 assert.ok(filtroAtendimento, 'A lista de Atendimento deve existir.');
 assert.match(parte1a, /id="at-filtro-protocolo"[^>]*oninput="rAt\(\)"/, 'A busca de protocolo deve atualizar a lista ao digitar.');

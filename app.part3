@@ -1842,10 +1842,10 @@ function agruparRanking(itens,usuarioFn){
   const mapa={};itens.forEach(item=>{const u=usuarioFn(item)||'nao-informado';(mapa[u]||={usuario:u,nome:u==='nao-informado'?'Não informado':nt(u),qtd:0,itens:[]});mapa[u].qtd++;mapa[u].itens.push(item);});
   return Object.values(mapa).sort((a,b)=>b.qtd-a.qtd||String(a.nome).localeCompare(String(b.nome))).slice(0,5);
 }
-function barrasRanking(ranking,cor){
+function barrasRanking(ranking,cor,tipo=''){
   if(!ranking.length)return '<div class="empty">Nenhum registro encontrado.</div>';
   const max=ranking[0].qtd||1;
-  return ranking.map((x,i)=>`<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:.72rem"><b>${i+1}. ${esc(x.nome)}</b><span>${x.qtd}</span></div><div style="height:9px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${Math.max(8,x.qtd/max*100)}%;background:${cor};border-radius:999px"></div></div></div>`).join('');
+  return ranking.map((x,i)=>{const nome=tipo?`<button type="button" class="btn-top5-tecnico" data-top5-tipo="${tipo}" data-top5-tecnico="${esc(x.usuario)}" aria-label="Ver chamados de ${esc(x.nome)}" style="padding:0;border:0;background:none;color:var(--p);font:inherit;font-weight:700;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${i+1}. ${esc(x.nome)}</button>`:`<b>${i+1}. ${esc(x.nome)}</b>`;return `<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:.72rem">${nome}<span>${x.qtd}</span></div><div style="height:9px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${Math.max(8,x.qtd/max*100)}%;background:${cor};border-radius:999px"></div></div></div>`;}).join('');
 }
 
 function rCh() {
@@ -1895,13 +1895,31 @@ function rDb() {
     return `${Math.floor(minutos/60)}h ${String(minutos%60).padStart(2,'0')}min`;
   };
 
-  if(el('db-prazo-detalhes')) el('db-prazo-detalhes').innerHTML=barrasRanking(rankingPerdas,'#dc2626');
-  if(el('db-reincidencias')) el('db-reincidencias').innerHTML=barrasRanking(rankingReincidencias,'#f59e0b');
+  if(el('db-prazo-detalhes')) el('db-prazo-detalhes').innerHTML=barrasRanking(rankingPerdas,'#dc2626','prazo');
+  if(el('db-reincidencias')) el('db-reincidencias').innerHTML=barrasRanking(rankingReincidencias,'#f59e0b','reincidencia');
   const detalhe=el('db-card-detalhes');
   if(el('db-janela-chamados')?.open && detalhe && detalhe.dataset.tipo) abrirCardDashboard(detalhe.dataset.tipo);
 }
 
 function dataEncerramentoChamado(c){return c.cc||c.dtexec||'';}
+function abrirDetalhesTop5Tecnico(tipo,tecnicoId){
+ if(!['prazo','reincidencia'].includes(tipo))return;
+ const dados=dadosIndicadoresTecnicos(),todos=tipo==='prazo'?dados.perdas:dados.reincidencias;
+ const campoTecnico=tipo==='prazo'?x=>x.chamado.te:x=>x.anterior.te;
+ const itens=registrosTop5(tipo,todos).filter(x=>String(campoTecnico(x)||'nao-informado')===String(tecnicoId));
+ const nome=tecnicoId==='nao-informado'?'Técnico não informado':nt(tecnicoId),titulo=tipo==='prazo'?'Chamados com perda de prazo':'Chamados reincidentes';
+ const data=v=>v?formatarDataBrasil(v):'—',duracao=ms=>{const minutos=Math.floor(Number(ms||0)/60000);return `${Math.floor(minutos/60)}h ${String(minutos%60).padStart(2,'0')}min`;};
+ const conteudo=itens.map(x=>{
+  if(tipo==='prazo'){
+   const c=x.chamado;return `<article class="os"><div class="os-h"><span class="os-id">Protocolo ${esc(c.pr||'Não informado')}</span><span class="badge b-recusado">Perda de prazo</span></div><div class="os-r"><b>SDM:</b> ${esc(c.sdm||'—')} &nbsp; <b>Circuito:</b> ${esc(c.ci||'—')}</div><div class="os-r"><b>Site / Cliente:</b> ${esc(c.si||'—')}</div><div class="os-r"><b>Início do atendimento:</b> ${data(c.am)} &nbsp; <b>Encerramento:</b> ${data(c.cc||c.dtexec)}</div><div class="os-r"><b>Duração considerada:</b> ${duracao(x.duracao)} (limite 5h)</div></article>`;
+  }
+  const c=x.chamado,a=x.anterior,dias=(Number(x.intervalo||0)/86400000).toFixed(1);
+  return `<article class="os"><div class="os-h"><span class="os-id">Novo protocolo ${esc(c.pr||'Não informado')}</span><span class="badge b-pendente">Reincidência</span></div><div class="os-r"><b>Protocolo anterior:</b> ${esc(a.pr||'Não informado')} &nbsp; <b>Intervalo:</b> ${esc(dias)} dia(s)</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||a.ci||'—')} &nbsp; <b>Site / Cliente:</b> ${esc(c.si||a.si||'—')}</div><div class="os-r"><b>Técnico do chamado anterior:</b> ${esc(nt(a.te)||'Não informado')} &nbsp; <b>Técnico do novo chamado:</b> ${esc(nt(c.te)||'Não informado')}</div><div class="os-r"><b>Atendimento anterior:</b> ${data(a.cc||a.dtexec)} &nbsp; <b>Abertura da reincidência:</b> ${data(c.cr)}</div></article>`;
+ }).join('')||'<div class="empty">Nenhum chamado deste técnico neste indicador.</div>';
+ const dialog=document.createElement('dialog');dialog.style.cssText='width:min(900px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 80px #0005;background:var(--bg,#fff);color:var(--tx,#16324f)';
+ dialog.innerHTML=`<header style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><div><h3 style="margin:0;color:var(--p)">${esc(titulo)}</h3><div style="margin-top:4px;font-size:.8rem">${esc(nome)} · ${itens.length} registro(s)</div></div><button type="button" class="btn btn-s btn-fechar-top5">Fechar</button></header><div>${conteudo}</div>`;
+ document.body.append(dialog);dialog.querySelector('.btn-fechar-top5').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+}
 function dataBrasilISO(valor){
   if(!valor)return '';
   const texto=String(valor);
@@ -3855,7 +3873,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
@@ -3883,6 +3901,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-log-liberar')) { liberarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-tech-aceitar-material')) { aceitarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-tech-consultar-entrega')) { consultarPrevisaoMaterialTecnico(t.dataset.id); }
+    if(t.classList.contains('btn-top5-tecnico')) { abrirDetalhesTop5Tecnico(t.dataset.top5Tipo,t.dataset.top5Tecnico); }
     if(t.classList.contains('btn-correios')) { consultarCorreiosOficial(t.dataset.id); }
     if(t.classList.contains('btn-rm-mat')) { removerMaterial(t.dataset.id); }
     if(t.classList.contains('btn-recuperar-material')) { recuperarMaterialEstoque(t.dataset.id); }
