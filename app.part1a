@@ -288,12 +288,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Entrada e autenticação */
 .login-screen{position:relative;isolation:isolate;overflow:hidden;min-height:100dvh;
-  background:linear-gradient(145deg,#081426 0%,#10284b 58%,#17457c 100%);padding:clamp(20px,5vw,64px)}
+  background:linear-gradient(145deg,#12313b 0%,#328d8e 58%,#246f71 100%);padding:clamp(20px,5vw,64px)}
 .login-screen:before,.login-screen:after{content:"";position:absolute;z-index:-1;border-radius:999px;filter:blur(2px)}
-.login-screen:before{width:460px;height:460px;right:-150px;top:-170px;background:rgba(56,189,248,.12)}
-.login-screen:after{width:380px;height:380px;left:-160px;bottom:-190px;background:rgba(37,99,235,.18)}
+.login-screen:before{width:460px;height:460px;right:-150px;top:-170px;background:rgba(214,164,67,.12)}
+.login-screen:after{width:380px;height:380px;left:-160px;bottom:-190px;background:rgba(190,232,226,.16)}
 .nf-login-brand{margin-bottom:10px!important}.nf-login-brand .nf-logo{
-  background:linear-gradient(135deg,#3b82f6,#06b6d4)!important;box-shadow:0 14px 35px rgba(14,165,233,.3)!important
+  background:linear-gradient(135deg,#328d8e,#54aaa5)!important;box-shadow:0 14px 35px rgba(18,49,59,.3)!important
 }
 #t0 .nf-login-brand .nf-brand-name{font-size:clamp(1.7rem,4vw,2.3rem);letter-spacing:-.055em}
 #t0 .nf-login-brand+ p{font-size:.82rem!important;letter-spacing:.03em;color:#a9bed8!important}
@@ -301,11 +301,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .area-card{position:relative;overflow:hidden;min-height:176px;padding:26px 22px;border:1px solid rgba(255,255,255,.7);
   border-radius:20px;background:linear-gradient(160deg,rgba(255,255,255,.98),rgba(244,248,253,.96));
   box-shadow:0 16px 45px rgba(2,12,27,.18);display:flex;flex-direction:column;align-items:center;justify-content:center}
-.area-card:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#2563eb,#06b6d4);
+.area-card:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#328d8e,#d6a443);
   transform:scaleX(0);transform-origin:left;transition:transform .25s ease}
-.area-card:hover,.area-card:focus-visible{border-color:#7db2ff;transform:translateY(-6px);box-shadow:0 24px 60px rgba(2,12,27,.28)}
+.area-card:hover,.area-card:focus-visible{border-color:#a5d8d2;transform:translateY(-6px);box-shadow:0 24px 60px rgba(2,12,27,.28)}
 .area-card:hover:before,.area-card:focus-visible:before{transform:scaleX(1)}
-.area-card .icon{width:52px;height:52px;margin:0 0 13px;border-radius:16px;background:#eaf2ff;display:grid;place-items:center;font-size:1.7rem}
+.area-card .icon{width:52px;height:52px;margin:0 0 13px;border-radius:16px;background:#e5f2f0;display:grid;place-items:center;font-size:1.7rem}
 .area-card h3{font-size:1rem;letter-spacing:-.015em}.area-card p{max-width:230px;line-height:1.45;color:var(--nf-muted)}
 .login-box{max-width:420px;padding:30px;border:1px solid rgba(255,255,255,.75);border-radius:22px;box-shadow:var(--nf-shadow-lg)}
 .login-box h2{font-size:1.3rem;letter-spacing:-.025em}.login-box p{margin-top:5px;margin-bottom:22px}
