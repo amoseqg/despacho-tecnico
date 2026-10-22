@@ -29,6 +29,7 @@ D.mat = Array.isArray(D.mat) ? D.mat : [];
 D.mr = Array.isArray(D.mr) ? D.mr : [];
 let S = lsGet('ss', null);
 let CID = null, EID = null, TI = null, loginType = '';
+let EX_MATERIAIS = [];
 
 const SITE_FIELDS = ['c-si','c-cd','c-en','c-co','c-ho','c-ve','c-pt','c-pv','c-regiao-planilha','c-tecnicos-planilha'];
 let MODO_MANUAL_CHAMADO = false;
@@ -446,10 +447,11 @@ function nt(u) { const t = D.tc.find(x => x.u === u); return t ? t.n : u; }
 function adminGeral() { return !!(S && S.t === 'adm' && D.ad.some(a => a.u === S.u && a.p)); }
 function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
-function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra' })[v] || 'Não definida'; }
+function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra', vistoria: 'Vistoria' })[v] || 'Não definida'; }
 function nomeArea(v) { return ({ norte: 'Norte', leste: 'Leste', sul: 'Sul', oeste: 'Oeste', interior: 'Interior', noronha: 'Fernando de Noronha' })[v] || 'Não definida'; }
 function nomeRegiao(v) { return ({ capital: '🏙️ Capital', interior: '🌾 Interior', noronha: '🏝️ Fernando de Noronha' })[v] || 'Região não definida'; }
-function slaRegiao(v) { return v === 'interior' ? '8h' : '6h'; }
+function slaRegiao(v,skill='') { return skill==='vistoria'?'24h':(v === 'interior' ? '8h' : '6h'); }
+function skillChamado(c){return c?.atividadeServico==='vistoria'?'vistoria':(c?.skill||'');}
 function skillsTec(t) { return t.sk && t.sk.length ? t.sk : ['voz','dados','infra']; }
 const ENDERECO_TAG='__ENTREGA__:';
 function codificarEnderecoEntrega(d){try{return ENDERECO_TAG+encodeURIComponent(JSON.stringify(d||{}));}catch(e){return ENDERECO_TAG+'%7B%7D';}}
@@ -572,8 +574,8 @@ function atualizarCamposRegiao() {
   atualizarTecnicosChamado();
 }
 
-function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='') {
-  const sla=SLA[reg]||SLA.capital;
+function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='', skill='') {
+  const sla=skill==='vistoria'?{v:12*3600,a:18*3600,r:24*3600}:(SLA[reg]||SLA.capital);
   const inicio=new Date(iso).getTime(),agora=Date.now();
   const pendencia=new Date(pendenciaDesde).getTime();
   const pausaAtiva=pendenciaDesde&&Number.isFinite(pendencia)?Math.max(0,Math.floor((agora-pendencia)/1000)):0;
@@ -675,7 +677,7 @@ async function enviarChamadosRealizadosEmail() {
     .map(linha => linha.map(v => `"${String(v).replace(/"/g,'""')}"`).join(';')).join('\r\n');
   const periodo = `${dt1 || 'início'} a ${dt2 || 'atual'}`;
   const arquivo = new File([new Uint8Array([0xEF,0xBB,0xBF]),csv], `chamados_realizados_${new Date().toISOString().slice(0,10)}.csv`, {type:'text/csv;charset=utf-8'});
-  await prepararEmailAssistido({prefixo:'chamados',assunto:`NexoField — Chamados realizados (${periodo})`,corpo:`Segue o relatório com ${chamados.length} chamado(s) realizado(s) no período ${periodo}.`,arquivos:[arquivo]});
+  await prepararEmailAssistido({prefixo:'chamados',assunto:`MÉTODO Telecom — Chamados realizados (${periodo})`,corpo:`Segue o relatório com ${chamados.length} chamado(s) realizado(s) no período ${periodo}.`,arquivos:[arquivo]});
 }
 
 function abrirMinhaSenha() {
@@ -710,7 +712,7 @@ function recuperarSenha() {
   const conta = lista.find(x => x.u === usuario && x.e && x.e.toLowerCase() === email);
   if (!conta) { alert('Usuário e e-mail não correspondem a uma conta cadastrada'); return; }
   const nova = gerarSenha(); conta.s = nova; sv();
-  const assunto = encodeURIComponent('Nova senha — NexoField');
+  const assunto = encodeURIComponent('Nova senha — MÉTODO Telecom');
   const corpo = encodeURIComponent(`Olá, ${conta.n}.\n\nSua nova senha temporária é: ${nova}\n\nEntre no sistema e altere-a em “Alterar senha”.`);
   el('m-rec').classList.remove('a');
   window.location.href = `mailto:${encodeURIComponent(conta.e)}?subject=${assunto}&body=${corpo}`;
@@ -1766,14 +1768,14 @@ function rCh() {
     return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aberto</span></div>
     ${dadosSite(c)}
     ${dadosAberturaPortal(c)}
-    <div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
+    <div class="os-r"><b>Skill:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em aberto</h3></div>';
 
   if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando técnico</span></div>
-    ${dadosSite(c)}<div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re)}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
+    ${dadosSite(c)}<div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re,skillChamado(c))}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
     ${infoReincidencia(c).html}
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
@@ -1854,7 +1856,7 @@ function abrirCardDashboard(tipo){
     dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
     dialog.addEventListener('close',()=>box.classList.add('hidden'));
     const exportar=document.createElement('button');exportar.type='button';exportar.className='btn btn-p';exportar.textContent='📥 Exportar chamados desta janela';
-    exportar.addEventListener('click',()=>exportarListaDashboard(chamadosDoCardDashboard(box.dataset.tipo),'NexoField_'+box.dataset.tipo));
+    exportar.addEventListener('click',()=>exportarListaDashboard(chamadosDoCardDashboard(box.dataset.tipo),'METODO_'+box.dataset.tipo));
     box.insertBefore(exportar,lista);
   }
   if(!dialog.open)dialog.showModal();
@@ -1952,7 +1954,7 @@ function rAt() {
   });
   tb.innerHTML = list.map(c => {
     const aguardandoEncerramento = c.st === 'concluida';
-    const t = aguardandoEncerramento ? null : tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+    const t = aguardandoEncerramento ? null : tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
     const marcador=aguardandoEncerramento
       ? '<span class="badge b-pag-pendente">Concluído aguardando encerramento</span>'
@@ -1964,7 +1966,7 @@ function rAt() {
     const acao=aguardandoEncerramento
       ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
       : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
-    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${acao}</div></td></tr>`;
+    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando encerramento</td></tr>';
   tb.onclick=event=>{
     if(event.target.closest('button,a,input,select,textarea,[role="button"]')) return;
@@ -2024,6 +2026,40 @@ let NF_CHAT_DIALOG=null;
 let NF_CHAT_THREAD=null;
 let NF_CHAT_LOADING=false;
 let NF_CHAT_PENDING=false;
+function nfChatChaveInicio(){return `metodoChatInicio:${SB_PROFILE?.id||''}`;}
+function nfChatChaveLido(thread){return `metodoChatLido:${SB_PROFILE?.id||''}:${thread}`;}
+function nfChatLerMarco(thread){
+  const salvo=Number(localStorage.getItem(nfChatChaveLido(thread))||0),inicio=Number(localStorage.getItem(nfChatChaveInicio())||0);
+  return Math.max(salvo,inicio);
+}
+function nfChatMarcarComoLido(thread,mensagens){
+  const maior=(mensagens||[]).filter(m=>m.tecnico_id===thread&&m.remetente_id!==SB_PROFILE?.id).reduce((n,m)=>Math.max(n,Date.parse(m.criado_em)||0),nfChatLerMarco(thread));
+  try{localStorage.setItem(nfChatChaveLido(thread),String(maior));}catch(_e){}
+}
+async function nfChatAtualizarBadge(){
+  const perfil=SB_PROFILE;
+  const tecnicoBadge=document.getElementById('nf-chat-tecnico-badge'),adminBadge=document.getElementById('nf-chat-admin-badge');
+  if(!perfil||!['admin','tecnico'].includes(perfil.tipo)){if(tecnicoBadge)tecnicoBadge.hidden=true;if(adminBadge)adminBadge.hidden=true;return;}
+  try{
+    let inicio=Number(localStorage.getItem(nfChatChaveInicio())||0);
+    if(!inicio){inicio=Date.now();localStorage.setItem(nfChatChaveInicio(),String(inicio));}
+    const {data,error}=await SB.from('mensagens_chat').select('tecnico_id,remetente_id,criado_em').gte('criado_em',new Date(inicio).toISOString()).order('criado_em',{ascending:false}).limit(1000);
+    if(error)throw error;
+    if(SB_PROFILE?.id!==perfil.id)return;
+    const naoLidas=new Map();
+    for(const m of data||[]){
+      if(m.remetente_id===perfil.id)continue;
+      const instante=Date.parse(m.criado_em)||0;
+      if(instante>nfChatLerMarco(m.tecnico_id))naoLidas.set(m.tecnico_id,(naoLidas.get(m.tecnico_id)||0)+1);
+    }
+    const total=perfil.tipo==='tecnico'?(naoLidas.get(perfil.id)||0):[...naoLidas.values()].reduce((a,b)=>a+b,0);
+    const alvo=perfil.tipo==='tecnico'?tecnicoBadge:adminBadge;
+    if(alvo){alvo.textContent=total>99?'99+':String(total);alvo.hidden=total===0;alvo.setAttribute('aria-label',`${total} mensagem(ns) nova(s)`);}
+    const select=NF_CHAT_DIALOG?.querySelector('#nf-chat-tecnico'),aviso=NF_CHAT_DIALOG?.querySelector('#nf-chat-thread-unread');
+    if(select&&aviso){const quantidade=naoLidas.get(select.value)||0;aviso.textContent=quantidade?`${quantidade} mensagem(ns) nova(s) nesta conversa.`:'Nenhuma mensagem nova nesta conversa.';aviso.style.color=quantidade?'#8a671b':'#64748b';}
+  }catch(error){console.warn('Não foi possível atualizar o indicador de mensagens novas:',error);}
+}
+
 function nfAbrirChat(){
   if(!SB_PROFILE || !S) { nfToast('Entre no portal para acessar o chat.','erro'); return; }
   const administrador=SB_PROFILE.tipo==='admin' && S.t==='adm';
@@ -2037,7 +2073,7 @@ function nfAbrirChat(){
   const opcoes=tecnicos.map(t=>`<option value="${escM(t._id)}">${esc(t.n)}</option>`).join('');
   dialog.innerHTML=`<div style="height:100%;display:flex;flex-direction:column;padding:18px;font-family:system-ui;gap:10px">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0;color:#16324f">💬 Chat com ${administrador?'técnico':'administradores'}</h3><small style="color:#526273">${administrador?'Selecione o técnico para abrir a conversa.':'Envie uma mensagem para a equipe de administradores.'}</small></div><button type="button" id="nf-chat-fechar" class="btn btn-s">Fechar</button></div>
-    ${administrador?`<div class="form-group" style="margin:0"><label class="label" for="nf-chat-tecnico">Técnico</label><select id="nf-chat-tecnico" class="select" ${tecnicos.length?'':'disabled'}>${opcoes||'<option value="">Nenhum técnico cadastrado</option>'}</select></div>`:''}
+    ${administrador?`<div class="form-group" style="margin:0"><label class="label" for="nf-chat-tecnico">Técnico</label><select id="nf-chat-tecnico" class="select" ${tecnicos.length?'':'disabled'}>${opcoes||'<option value="">Nenhum técnico cadastrado</option>'}</select><small id="nf-chat-thread-unread" style="display:block;margin-top:5px;color:#64748b"></small></div>`:''}
     <div id="nf-chat-mensagens" aria-live="polite" style="flex:1;min-height:180px;overflow:auto;border:1px solid var(--b);border-radius:10px;background:#f8fafc;padding:12px;display:flex;flex-direction:column;gap:8px"></div>
     <form id="nf-chat-form" style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end"><div><label class="label" for="nf-chat-texto">Mensagem</label><textarea id="nf-chat-texto" class="input" rows="2" maxlength="4000" placeholder="Digite sua mensagem..." required></textarea></div><button type="submit" class="btn btn-p" id="nf-chat-enviar">Enviar</button></form>
   </div>`;
@@ -2052,7 +2088,7 @@ function nfAbrirChat(){
   if(select) select.addEventListener('change',()=>{
     NF_CHAT_THREAD=select.value||null;
     enviar.disabled=!NF_CHAT_THREAD;
-    void nfChatCarregarMensagens();
+    void nfChatCarregarMensagens();void nfChatAtualizarBadge();
   });
   dialog.querySelector('#nf-chat-form').addEventListener('submit',async event=>{
     event.preventDefault();
@@ -2072,10 +2108,12 @@ function nfAbrirChat(){
     finally{if(botao.isConnected)botao.disabled=!NF_CHAT_THREAD;}
   });
   dialog.showModal();
+  void nfChatAtualizarBadge();
   if(tecnicoId) void nfChatCarregarMensagens();
 }
 function nfChatEvento(payload){
   const registro=payload?.new||payload?.old;
+  if(registro)void nfChatAtualizarBadge();
   if(!registro||!NF_CHAT_DIALOG?.open||registro.tecnico_id!==NF_CHAT_THREAD)return;
   void nfChatCarregarMensagens();
 }
@@ -2093,6 +2131,7 @@ async function nfChatCarregarMensagens(){
     if(error)throw error;
     if(NF_CHAT_DIALOG!==dialog||NF_CHAT_THREAD!==thread)return;
     const mensagens=data||[];
+    nfChatMarcarComoLido(thread,mensagens);
     area.innerHTML=mensagens.map(m=>{
       const eu=m.remetente_id===SB_PROFILE?.id;
       const perfil=[...(D.tc||[]),...(D.ad||[])].find(p=>p._id===m.remetente_id);
@@ -2101,6 +2140,7 @@ async function nfChatCarregarMensagens(){
       return `<div style="max-width:88%;align-self:${eu?'flex-end':'flex-start'};background:${eu?'#dbeafe':'#fff'};border:1px solid #d7e0ea;border-radius:12px;padding:8px 11px;white-space:pre-wrap;overflow-wrap:anywhere"><strong style="font-size:11px;color:#344054">${esc(autor)} · ${esc(hora)}</strong><div style="margin-top:4px;font-size:14px">${esc(m.mensagem)}</div></div>`;
     }).join('')||'<div class="empty">Nenhuma mensagem ainda. Inicie a conversa.</div>';
     area.scrollTop=area.scrollHeight;
+    void nfChatAtualizarBadge();
   }catch(error){
     console.error('Erro ao carregar chat:',error);
     const area=dialog.querySelector('#nf-chat-mensagens');
@@ -2110,6 +2150,7 @@ async function nfChatCarregarMensagens(){
     if(NF_CHAT_PENDING){NF_CHAT_PENDING=false;setTimeout(()=>{void nfChatCarregarMensagens();},120);}
   }
 }
+setInterval(()=>{if(SB_PROFILE)void nfChatAtualizarBadge();},15000);
 function abrirAprovacaoAtendimento(usuario) {
   if(!usuario)return;
   RL_DT1_ATUAL='';RL_DT2_ATUAL='';
@@ -2308,22 +2349,9 @@ function opPl(u) {
       aprovado: '<span class="badge b-aprovado">Aprovado</span>',
       rejeitado: '<span class="badge b-rejeitado">Rejeitado</span>'
     }[ap.status];
-    let misc = '—';
-    if (ex.utp || ex.cci || ex.can) {
-      const parts = [];
-      if (ex.utp) parts.push('UTP ' + ex.utp + 'm');
-      if (ex.cci) parts.push('CCI ' + ex.cci + 'm');
-      if (ex.can) parts.push('Canaleta ' + ex.can + 'm');
-      misc = parts.join(', ');
-    }
-    let qtd = '—';
-    if (ex.utp || ex.cci || ex.can) {
-      const parts = [];
-      if (ex.utp) parts.push(ex.utp);
-      if (ex.cci) parts.push(ex.cci);
-      if (ex.can) parts.push(ex.can);
-      qtd = parts.join(' / ');
-    }
+    const itensMaterial=normalizarMateriaisUtilizados(ex);
+    const misc=itensMaterial.length?itensMaterial.map(m=>`${m.nome} ${m.quantidade} ${m.unidade} × ${moedaMaterial(m.valorUnitario)} = ${moedaMaterial(m.total)}`).join('; '):'—';
+    const qtd=itensMaterial.length?itensMaterial.map(m=>`${m.quantidade} ${m.unidade}`).join(' / '):'—';
     return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(ex.relatorio || ex.obs)}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
@@ -2441,9 +2469,9 @@ function opRedirecionar(id) {
   const c = D.ch.find(x => x.id === id);
   if (!c) return;
   el('d-in').innerHTML = `<b>${c.pr}</b> — ${c.si}<br><small>Técnico atual: ${c.te ? nt(c.te) : 'Nenhum'}</small>`;
-  const compativeis = D.tc.filter(t => t.u !== c.te && tecnicoCompativel(t, c));
-  el('d-te').innerHTML = '<option value="">Selecione o novo técnico...</option>' + compativeis.map(t => `<option value="${t.u}">${t.n} — ${skillsTec(t).map(nomeSkill).join('/')}${t.r === 'capital' ? ' — '+areasTec(t).map(nomeArea).join('/') : ''}</option>`).join('');
-  if (!compativeis.length) el('d-te').innerHTML = '<option value="">Nenhum outro técnico compatível</option>';
+  const tecnicosRedirecionamento = D.tc.filter(t => t.u !== c.te).slice().sort((a, b) => a.n.localeCompare(b.n, 'pt-BR'));
+  el('d-te').innerHTML = '<option value="">Selecione o novo técnico...</option>' + tecnicosRedirecionamento.map(t => `<option value="${t.u}">${t.n} — ${skillsTec(t).map(nomeSkill).join('/')}${t.r === 'capital' ? ' — '+areasTec(t).map(nomeArea).join('/') : ''}</option>`).join('');
+  if (!tecnicosRedirecionamento.length) el('d-te').innerHTML = '<option value="">Nenhum outro técnico cadastrado</option>';
   el('d-tit').textContent = '👷 Redirecionar Chamado';
   el('btn-cf-dp').textContent = '👷 Confirmar redirecionamento';
   el('d-tr').classList.add('hidden'); el('d-q').value = ''; el('d-m').value = '';
@@ -2594,7 +2622,7 @@ function rTdb() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'andamento');
   const tmEl = el('t-tm');
   if(tmEl) tmEl.innerHTML = list.length ? list.map(c => {
-    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
     return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div><div class="os-r"><b>Site:</b> ${valorInfo(c.si)}</div></div>`;
   }).join('') : '<div class="empty">Nenhum chamado em atendimento</div>';
 }
@@ -2605,7 +2633,7 @@ function rTdp() {
   if(dl) dl.innerHTML = list.length ? list.map(c =>
     `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando</span></div>
      ${dadosSite(c)}
-     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
+     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     <div class="os-r"><b>Descrição:</b> ${c.de}</div>
     ${infoReincidencia(c).html}
     <div style="margin-top:8px;display:flex;gap:6px">
@@ -2619,16 +2647,16 @@ function rTat() {
   const list = D.ch.filter(chamadoVisivel).filter(c => c.te === S.u && c.st === 'andamento');
   const al = el('t-al');
   if(al) al.innerHTML = list.length ? list.map(c => {
-    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
     const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':''));
     return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div>
     ${dadosSite(c)}
      <div class="os-r"><b>Descrição:</b> ${valorInfo(c.de)}</div>
-    <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(c.skill)}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
+    <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
     ${validacaoStatus?`<div style="margin-top:8px">${validacaoStatus}</div>`:''}
     ${window.NexoFieldPendencias?.resumoTecnico(c.id)||''}
-    <div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${window.NexoFieldExpediente?.resumo(c.id)||''}${!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
+    <div class="nf-acoes-atendimento"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${window.NexoFieldExpediente?.resumo(c.id)||''}${!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
 
@@ -2685,22 +2713,9 @@ function rTar(dt1, dt2) {
       aprovado: '<span class="badge b-aprovado">Aprovado</span>',
       rejeitado: '<span class="badge b-rejeitado">Rejeitado</span>'
     }[ap.status];
-    let misc = '—';
-    if (ex.utp || ex.cci || ex.can) {
-      const parts = [];
-      if (ex.utp) parts.push('UTP ' + ex.utp + 'm');
-      if (ex.cci) parts.push('CCI ' + ex.cci + 'm');
-      if (ex.can) parts.push('Canaleta ' + ex.can + 'm');
-      misc = parts.join(', ');
-    }
-    let qtd = '—';
-    if (ex.utp || ex.cci || ex.can) {
-      const parts = [];
-      if (ex.utp) parts.push(ex.utp);
-      if (ex.cci) parts.push(ex.cci);
-      if (ex.can) parts.push(ex.can);
-      qtd = parts.join(' / ');
-    }
+    const itensMaterial=normalizarMateriaisUtilizados(ex);
+    const misc=itensMaterial.length?itensMaterial.map(m=>`${m.nome} ${m.quantidade} ${m.unidade} × ${moedaMaterial(m.valorUnitario)} = ${moedaMaterial(m.total)}`).join('; '):'—';
+    const qtd=itensMaterial.length?itensMaterial.map(m=>`${m.quantidade} ${m.unidade}`).join(' / '):'—';
     if (ex.total) {
       const v = parseFloat(ex.total.replace('R$ ', '').replace('.', '').replace(',', '.'));
       if (!isNaN(v)) totalGeral += v;
@@ -2796,14 +2811,39 @@ function usarAvulso() {
   calcTotal();
 }
 
-function calcMat() {
-  const utp = parseFloat(el('ex-utp').value) || 0;
-  const cci = parseFloat(el('ex-cci').value) || 0;
-  const can = parseFloat(el('ex-can').value) || 0;
-  const total = (utp * 1.50) + (cci * 1.00) + (can * 3.50);
-  el('ex-tmat').value = 'R$ ' + total.toFixed(2).replace('.', ',');
-  calcTotal();
+function normalizarMateriaisUtilizados(origem={}){
+  const lista=Array.isArray(origem)?origem:(origem.materiais_utilizados||origem.materiais||[]);
+  if(Array.isArray(lista)&&lista.length)return lista.map(item=>{
+    const quantidade=Number(item.quantidade??item.qtd??0)||0;
+    const valorUnitario=Number(item.valorUnitario??item.valor_unitario??item.valor??0)||0;
+    const total=Number(item.total??(quantidade*valorUnitario))||0;
+    return {nome:String(item.nome||item.material||'Material').trim(),unidade:String(item.unidade||'un').trim(),quantidade,valorUnitario,total};
+  }).filter(item=>item.nome&&item.quantidade>0);
+  if(Array.isArray(origem.materiais_utilizados)||Array.isArray(origem.materiais))return [];
+  const antigos=[['Cabo UTP','m',origem.utp??origem.utp_metros,1.5],['Cabo CCI','m',origem.cci??origem.cci_metros,1],['Canaleta','m',origem.can??origem.canaleta_metros,3.5]];
+  return antigos.map(([nome,unidade,qtd,valorUnitario])=>({nome,unidade,quantidade:Number(qtd)||0,valorUnitario,total:(Number(qtd)||0)*valorUnitario})).filter(item=>item.quantidade>0);
 }
+function moedaMaterial(valor){return 'R$ '+(Number(valor)||0).toFixed(2).replace('.',',');}
+function renderMateriaisUtilizados(){
+  const lista=el('ex-materiais-lista');if(!lista)return;
+  lista.innerHTML=EX_MATERIAIS.length?`<div style="overflow-x:auto"><table class="nf-materiais-table"><thead><tr><th>Material</th><th>Unidade</th><th>Quantidade</th><th>Valor unitário</th><th>Total</th><th></th></tr></thead><tbody>${EX_MATERIAIS.map((m,i)=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.unidade)}</td><td>${m.quantidade}</td><td>${moedaMaterial(m.valorUnitario)}</td><td><b>${moedaMaterial(m.total)}</b></td><td><button type="button" class="btn btn-r ex-material-remover" data-index="${i}" aria-label="Remover ${esc(m.nome)}">×</button></td></tr>`).join('')}</tbody></table></div>`:'<div class="empty" style="padding:9px">Nenhum material adicionado.</div>';
+}
+function atualizarTotalMaterialDigitado(){
+  const quantidade=Number(el('ex-material-qtd')?.value)||0,unitario=Number(el('ex-material-valor-unit')?.value)||0;
+  const total=el('ex-material-total');if(total)total.value=moedaMaterial(quantidade*unitario);
+}
+function calcMat(){
+  const total=EX_MATERIAIS.reduce((s,m)=>s+(Number(m.total)||0),0);
+  el('ex-tmat').value=moedaMaterial(total);renderMateriaisUtilizados();calcTotal();agendarRascunhoExecucao();
+}
+function adicionarMaterialExecucao(){
+  const nome=el('ex-material-nome').value.trim(),unidade=el('ex-material-unidade').value.trim(),quantidade=Number(el('ex-material-qtd').value),valorUnitario=Number(el('ex-material-valor-unit').value);
+  if(!nome||!unidade||!Number.isFinite(quantidade)||quantidade<=0||!Number.isFinite(valorUnitario)||valorUnitario<0){nfToast('Informe material, unidade, quantidade maior que zero e valor unitário.','erro');return;}
+  EX_MATERIAIS.push({nome,unidade,quantidade,valorUnitario,total:quantidade*valorUnitario});
+  ['ex-material-nome','ex-material-unidade','ex-material-qtd','ex-material-valor-unit'].forEach(id=>el(id).value='');
+  el('ex-material-total').value='';calcMat();el('ex-material-nome').focus();
+}
+function removerMaterialExecucao(indice){if(indice<0||indice>=EX_MATERIAIS.length)return;EX_MATERIAIS.splice(indice,1);calcMat();}
 
 function calcTotal() {
   const vkmTxt = (el('ex-vkm').value || '').replace('R$ ', '').replace(',', '.');
@@ -2892,11 +2932,9 @@ function finalizarMascaraEncerramento() {
   let texto = corrigirIdentificadoresEncerramento(el('ex-relatorio').value,D.ch.find(c=>c.id===EID));
   texto = texto.replace(/^DATA ENCERRAMENTO:.*$/m, `DATA ENCERRAMENTO: ${agora.toLocaleDateString('pt-BR')}`);
   texto = texto.replace(/^HORARIO:.*$/m, `HORARIO: ${agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`);
-  const materiais = [];
-  if (el('ex-utp').value) materiais.push(`Cabo UTP ${el('ex-utp').value}m`);
-  if (el('ex-cci').value) materiais.push(`Cabo CCI ${el('ex-cci').value}m`);
-  if (el('ex-can').value) materiais.push(`Canaleta ${el('ex-can').value}m`);
-  if (/^MATERIAL:\s*$/m.test(texto)) texto = texto.replace(/^MATERIAL:\s*$/m, `MATERIAL: ${materiais.length ? materiais.join(', ') : 'Nenhum'}`);
+  const materiais=EX_MATERIAIS.map(m=>`${m.nome}: ${m.quantidade} ${m.unidade} × ${moedaMaterial(m.valorUnitario)} = ${moedaMaterial(m.total)}`);
+  if(/^MATERIAL:.*$/m.test(texto))texto=texto.replace(/^MATERIAL:.*$/m,`MATERIAL: ${materiais.length?materiais.join(' | '):'Nenhum'}`);
+  else texto+='\nMATERIAL: '+(materiais.length?materiais.join(' | '):'Nenhum');
   el('ex-relatorio').value = texto;
 }
 
@@ -3045,9 +3083,9 @@ async function apagarFotosRascunho(id){
   await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
 }
 function dadosRascunhoExecucao(){
-  const ids=['ex-co','ex-cd','ex-cr','ex-km','ex-vkm','ex-atv','ex-vatv','ex-avulso','ex-utp','ex-cci','ex-can','ex-tmat','ex-causa','ex-solucao','ex-validacao','ex-senha','ex-usuario-validacao','ex-relatorio','ex-obs','ex-total'];
+  const ids=['ex-co','ex-cd','ex-cr','ex-km','ex-vkm','ex-atv','ex-vatv','ex-avulso','ex-material-nome','ex-material-unidade','ex-material-qtd','ex-material-valor-unit','ex-material-total','ex-tmat','ex-causa','ex-solucao','ex-validacao','ex-senha','ex-usuario-validacao','ex-relatorio','ex-obs','ex-total'];
   const campos={};for(const id of ids){const campo=el(id);campos[id]=id==='ex-total'?campo?.textContent||'':campo?.value||'';}
-  campos['ex-cobrar-km']=!!el('ex-cobrar-km')?.checked;
+  campos['ex-materiais-json']=JSON.stringify(EX_MATERIAIS);campos['ex-cobrar-km']=!!el('ex-cobrar-km')?.checked;
   campos['ex-esc-d']=el('ex-esc-d')?.value||'';campos.escd=el('ex-esc-d')?.dataset.id||'';return {chamadoId:EID,campos,atualizadoEm:new Date().toISOString()};
 }
 function salvarRascunhoExecucao(){
@@ -3056,7 +3094,7 @@ function salvarRascunhoExecucao(){
 function agendarRascunhoExecucao(){clearTimeout(EX_DRAFT_TIMER);EX_DRAFT_TIMER=setTimeout(salvarRascunhoExecucao,150);}
 async function restaurarRascunhoExecucao(c){
   let draft=null;try{draft=JSON.parse(localStorage.getItem(chaveRascunhoExecucao(c.id))||'null');}catch(_e){}
-  if(draft?.campos){for(const [id,valor] of Object.entries(draft.campos)){const campo=el(id);if(!campo)continue;if(id==='ex-total')campo.textContent=valor;else if(id==='ex-cobrar-km')campo.checked=valor===true;else campo.value=valor;}el('ex-esc-d').dataset.id=draft.campos.escd||'';el('ex-avulso-box').classList.toggle('hidden',!(el('ex-atv').value||'').endsWith('|0'));preencherCamposEncerramento();}
+  if(draft?.campos){for(const [id,valor] of Object.entries(draft.campos)){const campo=el(id);if(!campo)continue;if(id==='ex-materiais-json'){try{EX_MATERIAIS=normalizarMateriaisUtilizados(JSON.parse(valor||'[]'));}catch(_e){EX_MATERIAIS=[];}renderMateriaisUtilizados();}else if(id==='ex-total')campo.textContent=valor;else if(id==='ex-cobrar-km')campo.checked=valor===true;else campo.value=valor;}el('ex-esc-d').dataset.id=draft.campos.escd||'';el('ex-avulso-box').classList.toggle('hidden',!(el('ex-atv').value||'').endsWith('|0'));preencherCamposEncerramento();}
   try{EX_FOTOS_NOVAS=await lerFotosRascunho(c.id);}catch(err){console.warn('Fotos do rascunho não puderam ser recuperadas',err);EX_FOTOS_NOVAS=[];}atualizarPreviewFotos();
 }
 async function limparRascunhoExecucao(id){
@@ -3117,7 +3155,7 @@ async function enviarFotosChamadoEmail(id,botao){
       const {data,error}=await SB.storage.from('fotos-atividades').download(f.caminho);if(error)throw error;
       arquivos.push(new File([data],f.nome_original||`foto-${indice+1}.jpg`,{type:f.tipo_mime||data.type||'image/jpeg'}));
     }
-    await prepararEmailAssistido({prefixo:'fotos',assunto:`NexoField — Registros fotográficos do chamado ${c.pr}`,corpo:`Seguem os registros fotográficos do chamado ${c.pr}.\nSite: ${c.si||'Não informado'}\nTécnico: ${nt(c.te)||'Não informado'}`,arquivos});
+    await prepararEmailAssistido({prefixo:'fotos',assunto:`MÉTODO Telecom — Registros fotográficos do chamado ${c.pr}`,corpo:`Seguem os registros fotográficos do chamado ${c.pr}.\nSite: ${c.si||'Não informado'}\nTécnico: ${nt(c.te)||'Não informado'}`,arquivos});
   }finally{if(botao)botao.disabled=false;}
 }
 function renderFotosAdmin(){
@@ -3170,8 +3208,8 @@ async function opEx(id) {
   el('ex-atv').value = anterior.atv || ''; el('ex-vatv').value = anterior.vatv || '';
   el('ex-avulso').value = anterior.avulso || '';
   el('ex-avulso-box').classList.toggle('hidden', !(anterior.atv && anterior.atv.endsWith('|0')));
-  el('ex-utp').value = anterior.utp || ''; el('ex-cci').value = anterior.cci || ''; el('ex-can').value = anterior.can || '';
-  el('ex-tmat').value = anterior.tmat || ''; el('ex-obs').value = anterior.obs || '';
+  ['ex-material-nome','ex-material-unidade','ex-material-qtd','ex-material-valor-unit'].forEach(id=>el(id).value='');EX_MATERIAIS=normalizarMateriaisUtilizados(anterior);renderMateriaisUtilizados();
+  el('ex-tmat').value=anterior.tmat||moedaMaterial(EX_MATERIAIS.reduce((s,m)=>s+m.total,0));el('ex-obs').value=anterior.obs||'';
   el('ex-relatorio').value = corrigirIdentificadoresEncerramento(anterior.relatorio || mascaraEncerramento(c),c);
   preencherCamposEncerramento();
   el('ex-total').textContent = anterior.total || 'R$ 0,00';
@@ -3180,7 +3218,7 @@ async function opEx(id) {
   el('m-ex').classList.add('a');
   localStorage.setItem(chaveExecucaoAtiva(),String(id));
   await restaurarRascunhoExecucao(c);
-  atualizarCobrancaKm();
+  atualizarTotalMaterialDigitado();calcMat();atualizarCobrancaKm();
 
   el('ex-validacao-status').textContent='Ao enviar, o serviço seguirá diretamente para aprovação do administrador.';
   el('ex-validacao-status').style.borderLeft='';
@@ -3189,7 +3227,7 @@ async function opEx(id) {
 
   if (TI) clearInterval(TI);
   TI = setInterval(() => {
-    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
     const elm = el('ex-tm');
     if (elm) { elm.textContent = t.t; elm.className = 'timer ' + t.c; }
   }, 1000);
@@ -3222,8 +3260,8 @@ async function cfEx() {
     km: el('ex-km').value, vkm: el('ex-vkm').value, cobrarKm:!!el('ex-cobrar-km').checked,
     atv: el('ex-atv').value, vatv: el('ex-vatv').value,
     avulso: el('ex-avulso').value,
-    utp: el('ex-utp').value, cci: el('ex-cci').value, can: el('ex-can').value,
-    tmat: el('ex-tmat').value, obs: el('ex-obs').value,
+    utp: anterior.ex?.utp||'',cci: anterior.ex?.cci||'',can: anterior.ex?.can||'',materiais:EX_MATERIAIS.map(m=>({...m})),
+    tmat:el('ex-tmat').value,obs:el('ex-obs').value,
     relatorio: el('ex-relatorio').value,
     total: 'R$ ' + total.toFixed(2).replace('.', ',')
   };
@@ -3293,14 +3331,15 @@ function nomeAbaExcel(nome, usadas) {
 
 function linhaPagamento(c) {
   const ex = c.ex || {};
-  const materiais = [ex.utp && 'UTP ' + ex.utp + 'm', ex.cci && 'CCI ' + ex.cci + 'm', ex.can && 'Canaleta ' + ex.can + 'm'].filter(Boolean);
-  const quantidades = [ex.utp, ex.cci, ex.can].filter(Boolean);
+  const materiais = normalizarMateriaisUtilizados(ex);
+  const descricaoMateriais = materiais.map(material=>`${material.nome} ${material.quantidade} ${material.unidade} × R$ ${material.valorUnitario.toFixed(2).replace('.',',')} = R$ ${material.total.toFixed(2).replace('.',',')}`);
+  const quantidades = materiais.map(material=>`${material.quantidade} ${material.unidade}`);
   const status = c.ap && c.ap.status ? c.ap.status.toUpperCase() : 'PENDENTE';
   const observacao = [ex.relatorio || ex.obs, c.ap?.status==='aprovado'?'APROVADO EM: '+formatarDataBrasil(c.ap.data):null, ex.valorCorrigido!=null?'VALOR CORRIGIDO: '+(ex.pagamentoMotivo||''):null, 'PAGAMENTO: ' + status].filter(Boolean).join(' | ');
   return [
     valorExcel(c.pr), valorExcel(c.si), valorExcel(ex.co), valorExcel(ex.cd), valorExcel(ex.cr),
     formatarDataBrasil(dataEncerramentoChamado(c)),
-    valorExcel(ex.atv ? ex.atv.split('|')[0] : ''), materiais.join(', '), quantidades.join(' / '),
+    valorExcel(ex.atv ? ex.atv.split('|')[0] : ''), descricaoMateriais.join('; '), quantidades.join(' / '),
     numeroExcel(ex.km), numeroExcel(ex.vkm), '', numeroExcel(ex.tmat), numeroExcel(ex.vatv), numeroExcel(ex.total), valorExcel(observacao)
   ];
 }
@@ -3422,21 +3461,9 @@ function expCSV() {
     const tmat = ex.tmat ? ex.tmat.replace('R$ ', '').replace(',', '.') : '';
     const vatv = ex.vatv || '';
     const total = ex.total ? ex.total.replace('R$ ', '').replace(',', '.') : '';
-    const utp = ex.utp || '';
-    const cci = ex.cci || '';
-    const can = ex.can || '';
-    let misc = '';
-    if (utp) misc += 'UTP ' + utp + 'm ';
-    if (cci) misc += 'CCI ' + cci + 'm ';
-    if (can) misc += 'Canaleta ' + can + 'm';
-    let qtd = '';
-    if (utp || cci || can) {
-      const parts = [];
-      if (utp) parts.push(utp);
-      if (cci) parts.push(cci);
-      if (can) parts.push(can);
-      qtd = parts.join(' / ');
-    }
+    const materiais=normalizarMateriaisUtilizados(ex);
+    const misc=materiais.map(m=>`${m.nome} ${m.quantidade} ${m.unidade} x R$ ${m.valorUnitario.toFixed(2)} = R$ ${m.total.toFixed(2)}`).join('; ');
+    const qtd=materiais.map(m=>`${m.quantidade} ${m.unidade}`).join(' / ');
     csv += '"' + (c.pr || '') + '";' + '"' + (c.si || '') + '";' + '"' + (ex.co || '') + '";' + '"' + (ex.cd || '') + '";' + '"' + (ex.cr || '') + '";' + '"' + dtexec + '";' + '"' + atvNome + '";' + '"' + misc.trim() + '";' + '"' + qtd + '";' + '"' + km + '";' + '"' + vkm + '";' + '"";' + '"' + tmat + '";' + '"' + vatv + '";' + '"' + total + '";' + '"' + (ex.relatorio || ex.obs || '') + '"\n';
   });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
@@ -3456,7 +3483,7 @@ function startLoop() {
       const chamados=new Map(D.ch.map(c=>[String(c.id),c]));
       document.querySelectorAll('[data-prazo-id]').forEach(node=>{
         const c=chamados.get(node.dataset.prazoId);if(!c)return;
-        const t=tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'');
+        const t=tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
         node.textContent=t.t;node.className='timer '+t.c;
       });
     }
@@ -3626,9 +3653,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // Execução - selects e inputs
   el('ex-atv').addEventListener('change', calcAtv);
   el('ex-avulso').addEventListener('input', usarAvulso);
-  el('ex-utp').addEventListener('input', calcMat);
-  el('ex-cci').addEventListener('input', calcMat);
-  el('ex-can').addEventListener('input', calcMat);
+  ['ex-material-qtd','ex-material-valor-unit'].forEach(id=>el(id).addEventListener('input',atualizarTotalMaterialDigitado));
+  el('ex-material-adicionar').addEventListener('click',adicionarMaterialExecucao);
+  el('ex-material-nome').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();adicionarMaterialExecucao();}});
+  el('ex-materiais-lista').addEventListener('click',event=>{const b=event.target.closest('.ex-material-remover');if(b)removerMaterialExecucao(Number(b.dataset.index));});
   el('ex-fotos').addEventListener('change',async e=>{await adicionarFotosExecucao(e.target.files);e.target.value='';});
   el('ex-galeria').addEventListener('change',async e=>{await adicionarFotosExecucao(e.target.files);e.target.value='';});
   el('m-ex').addEventListener('input',agendarRascunhoExecucao);
@@ -4121,7 +4149,7 @@ async function sbLoadAll(){
       exclusaoPortal:exclusaoPortal?{nome:exclusaoPortal.excluido_por_nome,email:exclusaoPortal.excluido_por_email,data:exclusaoPortal.excluido_em,statusAnterior:exclusaoPortal.status_anterior}:null
     };
     legacy._trLoadedCount=legacy.tr.length;
-    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',cobrarKm:ex.deslocamento_cobrado===true,km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
+    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',cobrarKm:ex.deslocamento_cobrado===true,km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),materiais:normalizarMateriaisUtilizados(ex),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
     return legacy;
   });
@@ -4249,7 +4277,7 @@ function sbDadosExecucao(c,extras={}){
     chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex?.co||null,cidade_destino:c.ex?.cd||null,cidade_retorno:c.ex?.cr||null,
     origem_escola_id:c.ex?.esco||null,destino_escola_id:c.ex?.escd||null,retorno_escola_id:c.ex?.escr||null,
     deslocamento_cobrado:c.ex?.cobrarKm===true,km_total:sbNum(c.ex?.km),valor_km:sbNum(c.ex?.vkm),atividade:c.ex?.atv||null,valor_atividade:sbNum(c.ex?.vatv),valor_avulso:sbNum(c.ex?.avulso),
-    utp_metros:sbNum(c.ex?.utp),cci_metros:sbNum(c.ex?.cci),canaleta_metros:sbNum(c.ex?.can),valor_materiais:sbNum(c.ex?.tmat),observacao:c.ex?.obs||null,
+    utp_metros:sbNum(c.ex?.utp),cci_metros:sbNum(c.ex?.cci),canaleta_metros:sbNum(c.ex?.can),materiais_utilizados:normalizarMateriaisUtilizados(c.ex||{}),valor_materiais:sbNum(c.ex?.tmat),observacao:c.ex?.obs||null,
     relatorio_encerramento:c.ex?.relatorio||null,valor_total:sbNum(c.ex?.total),atualizado_em:new Date().toISOString(),...extras
   };
 }
@@ -4295,7 +4323,7 @@ async function sbSyncTecnico(){
     if(error) throw new Error('Chamado: '+error.message);
   }
   for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario && x.ex)){
-    const row={chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()};
+    const row={chamado_id:c.id,tecnico_id:SB_PROFILE.id,cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),materiais_utilizados:normalizarMateriaisUtilizados(c.ex),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()};
     const {error}=await SB.from('execucoes').upsert(row,{onConflict:'chamado_id'});
     if(error) throw new Error('Execução: '+error.message);
   }
@@ -4349,7 +4377,7 @@ async function sbSyncAll(){
     const exRows=[]; const apRows=[];
     for(const c of D.ch){
       if(!sbUUID(c.id)) continue;
-      if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
+      if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),materiais_utilizados:normalizarMateriaisUtilizados(c.ex),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
       if(c.ap) apRows.push({chamado_id:c.id,status:c.ap.status||'pendente',observacao:c.ap.obs||null,administrador_id:SB_PROFILE.tipo==='admin'?SB_PROFILE.id:null,reenviado:!!c.ap.reenviado,atualizado_em:sbIso(c.ap.data)||new Date().toISOString()});
       const start=Number(c._trLoadedCount||0); const novos=(c.tr||[]).slice(start);
       for(const tr of novos){ const {error}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:sbIdByUser(tr.de),para_tecnico_id:sbIdByUser(tr.para),motivo:tr.m||null,realizado_por:tr.adminId||SB_PROFILE.id,criado_em:sbIso(tr.d)||new Date().toISOString()}); if(error) throw error; }

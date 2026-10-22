@@ -7,7 +7,7 @@
  async function refresh(){
   if(!el('nf-push-ativar')||typeof SB_PROFILE==='undefined'||SB_PROFILE?.tipo!=='tecnico')return;
   if(currentUser===SB_PROFILE.id)return;currentUser=SB_PROFILE.id;
-  if(!supported()){status('Este navegador não permite alertas em segundo plano. No iPhone, adicione o NexoField à Tela de Início.');return;}
+  if(!supported()){status('Este navegador não permite alertas em segundo plano. No iPhone, adicione o MÉTODO Telecom à Tela de Início.');return;}
   try{const reg=await registration(),sub=await reg.pushManager.getSubscription();
    const {data,error}=sub?await SB.from('tecnico_push_subscriptions').select('endpoint').eq('endpoint',sub.endpoint).eq('tecnico_id',currentUser).maybeSingle():{data:null};
    if(error)throw error;state(!!data);
@@ -15,7 +15,7 @@
  }
  function state(active){el('nf-push-ativar').style.display=active?'none':'';el('nf-push-testar').style.display=active?'':'none';el('nf-push-desativar').style.display=active?'':'none';el('nf-push-testar').hidden=!active;el('nf-push-desativar').hidden=!active;status(active?'Alertas ativados neste celular. O som segue as configurações de notificações do aparelho.':'Ative para receber novos chamados mesmo com a página fechada.');}
  async function enable(){
-  if(!supported())throw new Error('Use Chrome no Android. No iPhone, adicione o NexoField à Tela de Início e abra pelo ícone.');
+  if(!supported())throw new Error('Use Chrome no Android. No iPhone, adicione o MÉTODO Telecom à Tela de Início e abra pelo ícone.');
   if(typeof SB_PROFILE==='undefined'||SB_PROFILE?.tipo!=='tecnico')throw new Error('Entre com seu perfil técnico.');
   const permission=await Notification.requestPermission();if(permission!=='granted')throw new Error('Permita as notificações nas configurações do navegador para ativar os alertas.');
   const {data:key,error}=await SB.rpc('nf_push_public_key');if(error||!key)throw new Error('Não foi possível ativar os alertas. Tente novamente.');

@@ -4,7 +4,7 @@ self.addEventListener('push',event=>event.waitUntil((async()=>{
  let data;try{data=event.data?.json()||{};}catch{data={};}
  const tag=data.eventId?'nf-chamado-'+data.eventId:'nf-teste-'+Date.now();
  // O mesmo evento entregue novamente substitui o aviso sem tocar novamente.
- await self.registration.showNotification(data.title||'Novo chamado NexoField',{
+ await self.registration.showNotification(data.title||'Novo chamado MÉTODO Telecom',{
   body:data.body||'Você recebeu uma nova atividade.',tag,renotify:false,silent:false,
   icon:'/push-icon.svg',badge:'/push-icon.svg',data:{url:data.url||'/'},
  });
