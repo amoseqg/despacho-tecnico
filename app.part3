@@ -1269,14 +1269,14 @@ function rLog(){
 function rTmat(){
  const ps=el('tm-protocolo'),ms=el('tm-material'),box=el('tm-lista');if(!ps||!ms||!box)return;
  const protocoloSelecionado=ps.value||'',materialSelecionado=ms.value||'';
- const meus=D.ch.filter(c=>c.te===S.u); ps.innerHTML='<option value="">Selecione...</option>'+meus.map(c=>`<option value="${c.id}">${escM(c.pr)} — ${escM(c.si)}</option>`).join('');
+ const meus=D.ch.filter(c=>c.te===S.u&&c.st==='andamento'); ps.innerHTML='<option value="">Selecione...</option>'+meus.map(c=>`<option value="${escM(c.id)}">${escM(c.pr)} — ${escM(c.si)}</option>`).join('');
  ms.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${m.id}">${escM(m.nome)} (${m.unidade}) — estoque ${m.estoque||0}</option>`).join('');
  if(meus.some(c=>String(c.id)===String(protocoloSelecionado))) ps.value=protocoloSelecionado;
  if(D.mat.some(m=>String(m.id)===String(materialSelecionado))) ms.value=materialSelecionado;
  const list=D.mr.filter(r=>r.tecnico===S.u).slice().reverse();
  box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Itens:</b> ${r.qtdSolicitada} ${m?m.unidade:''} &nbsp; <b>Separado:</b> ${r.qtdSeparada||0}</div>${logDetalhes(r)}${aceitar?`<div style="margin-top:8px"><button class="btn btn-g btn-tech-aceitar-material" data-id="${r.id}">✅ Confirmar recebimento</button></div>`:''}</div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
 }
-function solicitarMaterial(){const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid),m=materialById(mid);if(!cid||!mid||!q||q<1){alert('Preencha protocolo, material e quantidade');return;}if(D.mr.some(r=>r.chamadoId===cid&&r.materialId===mid&&['solicitado','direcionado','separado'].includes(r.status))){alert('Já existe uma solicitação pendente deste material para este chamado.');return;}D.mr.push({id:'MR-'+Date.now(),chamadoId:cid,tecnico:S.u,materialId:mid,qtdSolicitada:q,qtdSeparada:0,qtdEntregue:0,status:'solicitado',obs,data:ag(),protocolo:c?c.pr:'',infoChamado:c?`${c.si} — ${c.de}`:''});sv();el('tm-material').value='';el('busca-material-tecnico').value='';el('tm-qtd').value='';el('tm-obs').value='';rTmat();alert('Solicitação enviada ao administrador.');}
+function solicitarMaterial(){const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid&&x.te===S.u&&x.st==='andamento'),m=materialById(mid);if(!cid||!mid||!q||q<1){alert('Preencha protocolo, material e quantidade');return;}if(!c){alert('Selecione um chamado que esteja em atendimento.');rTmat();return;}if(D.mr.some(r=>r.chamadoId===cid&&r.materialId===mid&&['solicitado','direcionado','separado'].includes(r.status))){alert('Já existe uma solicitação pendente deste material para este chamado.');return;}D.mr.push({id:'MR-'+Date.now(),chamadoId:cid,tecnico:S.u,materialId:mid,qtdSolicitada:q,qtdSeparada:0,qtdEntregue:0,status:'solicitado',obs,data:ag(),protocolo:c.pr||'',infoChamado:`${c.si} — ${c.de}`});sv();el('tm-material').value='';el('busca-material-tecnico').value='';el('tm-qtd').value='';el('tm-obs').value='';rTmat();alert('Solicitação enviada ao administrador.');}
 
 // ========== CADASTROS ==========
 function limparCEP(v){return String(v||'').replace(/\D/g,'').slice(0,8);}
@@ -2340,7 +2340,10 @@ function opPl(u) {
   if (RL_DT2_ATUAL) {
     chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= RL_DT2_ATUAL && !!dataEncerramentoChamado(c));
   }
+  const protocolosExibidos=new Set();
+  chamados=chamados.filter(c=>{const protocolo=String(c.pr||'').trim().toLocaleLowerCase('pt-BR')||`id:${c.id}`;if(protocolosExibidos.has(protocolo))return false;protocolosExibidos.add(protocolo);return true;});
   if (chamados.length === 0) return;
+  const filtroProtocolo=el('pl-filtro-protocolo');if(filtroProtocolo)filtroProtocolo.value='';
 
   el('pl-tit').textContent = '📋 Planilha — ' + nome;
   el('pl-in').innerHTML = `<b>${nome}</b> — ${regiao === 'capital' ? '🏙️ Capital (6h)' : '🌾 Interior (8h)'}`;
@@ -2358,10 +2361,11 @@ function opPl(u) {
     const itensMaterial=normalizarMateriaisUtilizados(ex);
     const misc=itensMaterial.length?itensMaterial.map(m=>`${m.nome} ${m.quantidade} ${m.unidade} × ${moedaMaterial(m.valorUnitario)} = ${moedaMaterial(m.total)}`).join('; '):'—';
     const qtd=itensMaterial.length?itensMaterial.map(m=>`${m.quantidade} ${m.unidade}`).join(' / '):'—';
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(ex.relatorio || ex.obs)}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
+    return `<tr data-protocolo="${escM(c.pr||'')}"><td>${esc(c.pr||'—')}</td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
   el('pl-tb-body').innerHTML = rows;
+  filtrarProtocoloPlanilha();
   el('pl-acoes-cab').classList.toggle('hidden',S?.t!=='adm');
 
   const pendentes = chamados.filter(c => !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente')).length;
@@ -2393,6 +2397,27 @@ function opPl(u) {
     tabela.onscroll=()=>{if(barra.scrollLeft!==tabela.scrollLeft)barra.scrollLeft=tabela.scrollLeft;};
     barra.onscroll=()=>{if(tabela.scrollLeft!==barra.scrollLeft)tabela.scrollLeft=barra.scrollLeft;};
   });
+}
+
+
+function filtrarProtocoloPlanilha(){
+  const corpo=el('pl-tb-body'),termo=String(el('pl-filtro-protocolo')?.value||'').trim().toLocaleLowerCase('pt-BR');
+  if(!corpo)return;
+  const linhas=[...corpo.querySelectorAll('tr[data-protocolo]')];let visiveis=0;
+  linhas.forEach(linha=>{const mostra=!termo||String(linha.dataset.protocolo||'').toLocaleLowerCase('pt-BR').includes(termo);linha.hidden=!mostra;if(mostra)visiveis++;});
+  let vazio=corpo.querySelector('#pl-filtro-vazio');
+  if(!vazio){vazio=document.createElement('tr');vazio.id='pl-filtro-vazio';vazio.innerHTML='<td colspan="18" class="empty">Nenhum protocolo corresponde à busca.</td>';corpo.append(vazio);}
+  vazio.hidden=!termo||visiveis>0;
+}
+function removerBlocosDuplicados(texto){
+  const linhas=String(texto||'').replace(/\r\n?/g,'\n').trim().split('\n');
+  for(let tamanho=Math.floor(linhas.length/2);tamanho>0;tamanho--){
+    for(let inicio=0;inicio+2*tamanho<=linhas.length;){
+      let iguais=true;for(let i=0;i<tamanho;i++)if(linhas[inicio+i]!==linhas[inicio+tamanho+i]){iguais=false;break;}
+      if(iguais)linhas.splice(inicio+tamanho,tamanho);else inicio++;
+    }
+  }
+  return linhas.join('\n').trim();
 }
 
 let APT = null;
