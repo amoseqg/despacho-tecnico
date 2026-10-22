@@ -2,8 +2,8 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#0b172a">
-<title>NexoField</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#0d3440">
+<title>MÉTODO Telecom | Operações de Campo</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -158,17 +158,17 @@ window.selecionarMaterialEstoquePorId = selecionarMaterialEstoquePorId;
 </script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-:root{--p:#0f172a;--a:#3b82f6;--g:#22c55e;--y:#f59e0b;--r:#ef4444;--gr:#64748b;--l:#f8fafc;--b:#e2e8f0}
+:root{--p:#12313b;--a:#328d8e;--g:#268674;--y:#d6a443;--r:#c94f4f;--gr:#64748b;--l:#f4f8f7;--b:#d8e5e3;--metodo:#328d8e;--metodo-escuro:#12313b;--metodo-claro:#e5f2f0}
 body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-height:100vh}
 .btn{padding:8px 14px;border:none;border-radius:8px;font-size:.8rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:.2s}
-.btn-p{background:var(--a);color:#fff}.btn-p:hover{background:#2563eb}
+.btn-p{background:var(--metodo);color:#fff}.btn-p:hover{background:#277879}
 .btn-s{background:#fff;color:var(--gr);border:1px solid var(--b)}.btn-s:hover{background:var(--l)}
 .btn-g{background:var(--g);color:#fff}.btn-g:hover{background:#16a34a}
 .btn-r{background:var(--r);color:#fff}.btn-r:hover{background:#dc2626}
 .btn-y{background:var(--y);color:#fff}.btn-y:hover{background:#d97706}
 .card{background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.05);border:1px solid var(--b);margin-bottom:10px}
 .input{width:100%;padding:8px 10px;border:1px solid var(--b);border-radius:8px;font-size:.8rem;outline:none;transition:.2s}
-.input:focus{border-color:var(--a);box-shadow:0 0 0 2px rgba(59,130,246,.1)}
+.input:focus{border-color:var(--metodo);box-shadow:0 0 0 2px rgba(50,141,142,.14)}
 .label{display:block;font-size:.65rem;font-weight:600;color:var(--p);margin-bottom:3px;text-transform:uppercase;letter-spacing:.5px}
 .badge{padding:3px 8px;border-radius:20px;font-size:.6rem;font-weight:600;text-transform:uppercase;letter-spacing:.3px}
 .b-pendente{background:#fef3c7;color:#92400e}
@@ -179,7 +179,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 .b-interior{background:#d1fae5;color:#065f46}
 .nav{display:flex;gap:3px;padding:10px 12px;background:#fff;border-bottom:1px solid var(--b);overflow-x:auto;position:sticky;top:0;z-index:50;-webkit-overflow-scrolling:touch}
 .nav button{padding:6px 10px;border:none;background:transparent;color:var(--gr);font-size:.7rem;font-weight:500;border-radius:6px;cursor:pointer;white-space:nowrap;transition:.2s}
-.nav button.a{background:var(--p);color:#fff}
+.nav button.a{background:var(--metodo-escuro);color:#fff}
 .nav button:hover:not(.a){background:var(--l)}
 .header{background:var(--p);color:#fff;padding:12px 16px}
 .header h1{font-size:1rem;display:flex;align-items:center;gap:6px}
@@ -261,7 +261,7 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 .b-rejeitado{background:#fee2e2;color:#991b1b}
 .b-pag-pendente{background:#fef3c7;color:#92400e}
 
-/* Identidade NexoField mantida diretamente no código-fonte. */
+/* Identidade MÉTODO Telecom aplicada ao sistema. */
 .nf-logo{width:30px;height:30px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#2563eb,#60a5fa);color:#fff;font-weight:800;font-size:.72rem;letter-spacing:-.03em;box-shadow:0 6px 16px rgba(37,99,235,.28);vertical-align:middle}
 .header h1 .nf-brand-name{font-weight:800;letter-spacing:-.02em}
 #t0 .nf-login-brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:7px}
@@ -288,12 +288,12 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 /* Entrada e autenticação */
 .login-screen{position:relative;isolation:isolate;overflow:hidden;min-height:100dvh;
-  background:linear-gradient(145deg,#081426 0%,#10284b 58%,#17457c 100%);padding:clamp(20px,5vw,64px)}
+  background:linear-gradient(145deg,#12313b 0%,#328d8e 58%,#246f71 100%);padding:clamp(20px,5vw,64px)}
 .login-screen:before,.login-screen:after{content:"";position:absolute;z-index:-1;border-radius:999px;filter:blur(2px)}
-.login-screen:before{width:460px;height:460px;right:-150px;top:-170px;background:rgba(56,189,248,.12)}
-.login-screen:after{width:380px;height:380px;left:-160px;bottom:-190px;background:rgba(37,99,235,.18)}
+.login-screen:before{width:460px;height:460px;right:-150px;top:-170px;background:rgba(214,164,67,.12)}
+.login-screen:after{width:380px;height:380px;left:-160px;bottom:-190px;background:rgba(190,232,226,.16)}
 .nf-login-brand{margin-bottom:10px!important}.nf-login-brand .nf-logo{
-  background:linear-gradient(135deg,#3b82f6,#06b6d4)!important;box-shadow:0 14px 35px rgba(14,165,233,.3)!important
+  background:linear-gradient(135deg,#328d8e,#54aaa5)!important;box-shadow:0 14px 35px rgba(18,49,59,.3)!important
 }
 #t0 .nf-login-brand .nf-brand-name{font-size:clamp(1.7rem,4vw,2.3rem);letter-spacing:-.055em}
 #t0 .nf-login-brand+ p{font-size:.82rem!important;letter-spacing:.03em;color:#a9bed8!important}
@@ -301,11 +301,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .area-card{position:relative;overflow:hidden;min-height:176px;padding:26px 22px;border:1px solid rgba(255,255,255,.7);
   border-radius:20px;background:linear-gradient(160deg,rgba(255,255,255,.98),rgba(244,248,253,.96));
   box-shadow:0 16px 45px rgba(2,12,27,.18);display:flex;flex-direction:column;align-items:center;justify-content:center}
-.area-card:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#2563eb,#06b6d4);
+.area-card:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#328d8e,#d6a443);
   transform:scaleX(0);transform-origin:left;transition:transform .25s ease}
-.area-card:hover,.area-card:focus-visible{border-color:#7db2ff;transform:translateY(-6px);box-shadow:0 24px 60px rgba(2,12,27,.28)}
+.area-card:hover,.area-card:focus-visible{border-color:#a5d8d2;transform:translateY(-6px);box-shadow:0 24px 60px rgba(2,12,27,.28)}
 .area-card:hover:before,.area-card:focus-visible:before{transform:scaleX(1)}
-.area-card .icon{width:52px;height:52px;margin:0 0 13px;border-radius:16px;background:#eaf2ff;display:grid;place-items:center;font-size:1.7rem}
+.area-card .icon{width:52px;height:52px;margin:0 0 13px;border-radius:16px;background:#e5f2f0;display:grid;place-items:center;font-size:1.7rem}
 .area-card h3{font-size:1rem;letter-spacing:-.015em}.area-card p{max-width:230px;line-height:1.45;color:var(--nf-muted)}
 .login-box{max-width:420px;padding:30px;border:1px solid rgba(255,255,255,.75);border-radius:22px;box-shadow:var(--nf-shadow-lg)}
 .login-box h2{font-size:1.3rem;letter-spacing:-.025em}.login-box p{margin-top:5px;margin-bottom:22px}
@@ -473,6 +473,25 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 .pl-scroll-inferior{overflow-x:scroll;overflow-y:hidden;height:22px;flex-shrink:0;margin:0 20px;scrollbar-color:#64748b #e2e8f0}
 .pl-scroll-inferior>div{height:1px}
 
+
+.nf-metodo-logo{display:block;width:min(260px,70vw);height:auto;margin:0 auto;border-radius:8px;box-shadow:0 8px 28px rgba(4,27,32,.2)}
+.nf-header-logo{display:block;width:130px;height:auto;max-height:44px;object-fit:contain;border-radius:4px}
+.nf-chat-trigger{position:relative;background:var(--metodo-escuro);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:7px 11px;font-weight:700;cursor:pointer}
+.nf-chat-trigger:hover{background:#20545a}
+.nf-chat-badge{display:inline-flex;min-width:19px;height:19px;align-items:center;justify-content:center;margin-left:4px;padding:0 5px;border-radius:99px;background:#d6a443;color:#17353a;font-size:.68rem;font-weight:800;box-shadow:0 0 0 2px #fff}
+.nf-chat-badge[hidden]{display:none}
+.nf-acoes-atendimento{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:12px;margin-top:10px;border-top:1px solid var(--b)}
+.nf-acoes-atendimento .btn{min-height:38px;padding:8px 12px;font-size:.75rem;border-radius:9px;box-shadow:0 2px 5px rgba(18,49,59,.08)}
+.nf-acoes-atendimento .btn-p{background:var(--metodo);color:#fff}
+.nf-acoes-atendimento .btn-y{background:#d6a443;color:#12313b}
+.nf-exec-materials{display:grid;grid-template-columns:minmax(150px,2fr) minmax(100px,1fr) repeat(3,minmax(110px,1fr)) auto;gap:8px;align-items:end}
+.nf-exec-materials .form-group{margin-bottom:0}
+.nf-materiais-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:.75rem}
+.nf-materiais-table th,.nf-materiais-table td{padding:8px 10px;border-bottom:1px solid var(--b);text-align:left}
+.nf-materiais-table th{background:var(--metodo-claro);color:var(--metodo-escuro);font-weight:700}
+.nf-materiais-table td:last-child,.nf-materiais-table th:last-child{text-align:right}
+.nf-material-add{min-height:39px;width:42px;justify-content:center;background:var(--metodo);color:#fff;font-size:1.1rem}
+@media(max-width:700px){.nf-exec-materials{grid-template-columns:1fr 1fr}.nf-exec-materials .nf-material-add{width:100%}.nf-header-logo{width:112px}}
 </style>
 <base target="_blank">
 <base target="_blank">
@@ -486,7 +505,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
   <div class="login-screen">
     <div style="width:100%;max-width:700px">
       <div style="text-align:center;margin-bottom:24px">
-        <div class="nf-login-brand"><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></div>
+        <div class="nf-login-brand"><img class="nf-metodo-logo" src="/metodo-telecom-logo.png" alt="Método Telecom"></div>
         <p style="color:#94a3b8;font-size:.75rem">Gestão Inteligente de Operações de Campo</p>
       </div>
       <div class="grid-3">
@@ -531,8 +550,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 
 <!-- ADMIN -->
 <div id="pa" class="hidden">
-  <div class="user-bar"><span>🛡️ <b>Admin</b> — <span id="an"></span></span><div style="display:flex;gap:5px"><button type="button" onclick="nfAbrirChat()">💬 Chat</button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-adm">Sair</button></div></div>
-  <div class="header"><h1><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></h1><div class="sub">Painel Administrativo</div></div>
+  <div class="user-bar"><span>🛡️ <b>Admin</b> — <span id="an"></span></span><div style="display:flex;gap:5px"><button type="button" id="nf-chat-admin-trigger" class="nf-chat-trigger" onclick="nfAbrirChat()">💬 Chat <span class="nf-chat-badge" id="nf-chat-admin-badge" hidden></span></button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-adm">Sair</button></div></div>
+  <div class="header"><h1><img class="nf-header-logo" src="/metodo-telecom-logo.png" alt="Método Telecom"></h1><div class="sub">Painel Administrativo</div></div>
   <div class="nav" id="nv">
     <button class="a" data-tab="db">📊 Dashboard</button>
     <button data-tab="tc">👷 Técnicos</button>
@@ -552,8 +571,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <section class="nf-dashboard-hero nf-dashboard-admin" aria-label="Visão administrativa">
       <div><span>Central de operações</span><strong>Gestão em tempo real</strong><small>Chamados, equipes, prazos e indicadores em um só lugar.</small></div>
     </section>
-    <div id="v-vi" class="hidden"><div class="card"><h3>Relatórios de vistorias</h3><div class="grid-2" style="gap:8px"><div class="form-group"><label class="label" for="email-vistoria-remetente">Remetente corporativo</label><input class="input nf-email-remetente" id="email-vistoria-remetente" type="email" placeholder="administrador@metodotelecom.com.br"></div><div class="form-group"><label class="label" for="email-vistoria-destinatario">Destinatário</label><input class="input" id="email-vistoria-destinatario" type="email" placeholder="destinatario@empresa.com"></div></div><p class="info">O remetente precisa estar configurado no programa de e-mail deste aparelho. O NexoField preparará a mensagem e o anexo.</p><label class="label" for="busca-vistorias-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-vistorias-admin" type="search"><div id="vistorias-admin"></div></div></div>
-    <div id="v-ft" class="hidden"><div class="card"><h3>Registros fotográficos dos chamados encerrados</h3><div class="grid-2" style="gap:8px"><div class="form-group"><label class="label" for="email-fotos-remetente">Remetente corporativo</label><input class="input nf-email-remetente" id="email-fotos-remetente" type="email" placeholder="administrador@metodotelecom.com.br"></div><div class="form-group"><label class="label" for="email-fotos-destinatario">Destinatário</label><input class="input" id="email-fotos-destinatario" type="email" placeholder="destinatario@empresa.com"></div></div><p class="info">O remetente precisa estar configurado no programa de e-mail deste aparelho. O NexoField preparará a mensagem e as fotos.</p><label class="label" for="busca-fotos-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-fotos-admin" type="search" placeholder="Digite para localizar as fotos"><div id="fotos-admin"></div></div></div>
+    <div id="v-vi" class="hidden"><div class="card"><h3>Relatórios de vistorias</h3><div class="grid-2" style="gap:8px"><div class="form-group"><label class="label" for="email-vistoria-remetente">Remetente corporativo</label><input class="input nf-email-remetente" id="email-vistoria-remetente" type="email" placeholder="administrador@metodotelecom.com.br"></div><div class="form-group"><label class="label" for="email-vistoria-destinatario">Destinatário</label><input class="input" id="email-vistoria-destinatario" type="email" placeholder="destinatario@empresa.com"></div></div><p class="info">O remetente precisa estar configurado no programa de e-mail deste aparelho. O MÉTODO Telecom preparará a mensagem e o anexo.</p><label class="label" for="busca-vistorias-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-vistorias-admin" type="search"><div id="vistorias-admin"></div></div></div>
+    <div id="v-ft" class="hidden"><div class="card"><h3>Registros fotográficos dos chamados encerrados</h3><div class="grid-2" style="gap:8px"><div class="form-group"><label class="label" for="email-fotos-remetente">Remetente corporativo</label><input class="input nf-email-remetente" id="email-fotos-remetente" type="email" placeholder="administrador@metodotelecom.com.br"></div><div class="form-group"><label class="label" for="email-fotos-destinatario">Destinatário</label><input class="input" id="email-fotos-destinatario" type="email" placeholder="destinatario@empresa.com"></div></div><p class="info">O remetente precisa estar configurado no programa de e-mail deste aparelho. O MÉTODO Telecom preparará a mensagem e as fotos.</p><label class="label" for="busca-fotos-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-fotos-admin" type="search" placeholder="Digite para localizar as fotos"><div id="fotos-admin"></div></div></div>
     <div id="v-aq" class="hidden"><div class="card"><h3>Chamados excluídos da lista</h3><p>Os chamados, históricos e valores continuam salvos. Digite no campo abaixo para consultar.</p><label class="label" for="busca-arquivados-admin">Buscar por chamado, site ou técnico</label><input class="input" id="busca-arquivados-admin" type="search" placeholder="Digite para localizar um chamado excluído"><div style="margin:8px 0"><button type="button" class="btn btn-p" id="btn-exportar-arquivados">📥 Exportar chamados excluídos</button></div><div id="lista-arquivados"></div></div></div>
     <div id="v-pn" class="hidden"><div class="card"><h3>Solicitações de pendência</h3><p class="info">O administrador pode pendenciar por horário de atendimento, programar a liberação e excluir chamados da lista, mantendo o histórico. As solicitações técnicas continuam sendo decididas pelo operador.</p><div id="nf-lista-expediente"></div><div id="lista-pendencias-admin"><div class="empty">Carregando solicitações...</div></div></div></div>
     <div id="v-lab" class="hidden">
@@ -623,7 +642,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
           <div style="font-size:.64rem;color:var(--gr)">Obrigatório para técnicos do Interior e Fernando de Noronha.</div>
         </div>
         <div class="form-group"><label class="label">Skills do Técnico (selecione uma ou mais)</label>
-          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem"><label><input type="checkbox" id="t-multi" value="multi"> Multi-skill</label><label><input type="checkbox" name="t-sk" value="voz"> Voz</label><label><input type="checkbox" name="t-sk" value="dados"> Dados</label><label><input type="checkbox" name="t-sk" value="infra"> Infra</label></div>
+          <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem"><label><input type="checkbox" id="t-multi" value="multi"> Multi-skill</label><label><input type="checkbox" name="t-sk" value="voz"> Voz</label><label><input type="checkbox" name="t-sk" value="dados"> Dados</label><label><input type="checkbox" name="t-sk" value="infra"> Infra</label><label><input type="checkbox" name="t-sk" value="vistoria"> Vistoria</label></div>
         </div>
         <div class="form-group" id="t-areas-box"><label class="label">Áreas de atendimento</label>
           <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.78rem"><label><input type="checkbox" name="t-ar" value="norte"> Norte</label><label><input type="checkbox" name="t-ar" value="leste"> Leste</label><label><input type="checkbox" name="t-ar" value="sul"> Sul</label><label><input type="checkbox" name="t-ar" value="oeste"> Oeste</label><label><input type="checkbox" name="t-ar" value="interior"> Interior</label><label><input type="checkbox" name="t-ar" value="noronha"> Fernando de Noronha</label></div>
@@ -679,7 +698,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         </div>
         <div class="grid-2">
           <div class="form-group"><label class="label" for="os-servico-regiao">Região *</label><select id="os-servico-regiao" class="select"><option value="capital">Capital</option><option value="interior">Interior</option><option value="noronha">Fernando de Noronha</option></select></div>
-          <div class="form-group"><label class="label" for="os-servico-skill">Skill necessária *</label><select id="os-servico-skill" class="select"><option value="">Selecione...</option><option value="voz">Voz</option><option value="dados">Dados</option><option value="infra">Infra</option></select></div>
+          <div class="form-group"><label class="label" for="os-servico-skill">Skill necessária *</label><select id="os-servico-skill" class="select"><option value="">Selecione...</option><option value="voz">Voz</option><option value="dados">Dados</option><option value="infra">Infra</option><option value="vistoria">Vistoria</option></select></div>
         </div>
         <div class="grid-2">
           <div class="form-group" id="os-servico-area-box"><label class="label" for="os-servico-area">Área de atendimento na Capital *</label><select id="os-servico-area" class="select"><option value="">Selecione...</option><option value="norte">Área Norte</option><option value="leste">Área Leste</option><option value="sul">Área Sul</option><option value="oeste">Área Oeste</option></select></div>
@@ -737,7 +756,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
           <div class="form-group"><label class="label">Técnicos indicados pela planilha</label><input type="text" id="c-tecnicos-planilha" class="input" data-manual-site="1" readonly></div>
         </div>
         <div class="grid-2">
-          <div class="form-group"><label class="label">Skill necessária</label><select id="c-sk" class="select"><option value="">Selecione...</option><option value="voz">Voz</option><option value="dados">Dados</option><option value="infra">Infra</option></select></div>
+          <div class="form-group"><label class="label">Skill necessária</label><select id="c-sk" class="select"><option value="">Selecione...</option><option value="voz">Voz</option><option value="dados">Dados</option><option value="infra">Infra</option><option value="vistoria">Vistoria</option></select></div>
           <div class="form-group" id="c-area-box"><label class="label">Área de atendimento na Capital</label><select id="c-area" class="select"><option value="">Selecione...</option><option value="norte">Área Norte</option><option value="leste">Área Leste</option><option value="sul">Área Sul</option><option value="oeste">Área Oeste</option></select></div>
         </div>
         <div class="form-group"><label class="label">Técnico que atende a região</label><select id="c-tecnico" class="select"><option value="">Selecione primeiro a skill e a área...</option></select><div id="c-tecnico-status" style="font-size:.65rem;margin-top:4px;color:var(--gr)"></div></div>
@@ -893,8 +912,8 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 
 <!-- TÉCNICO -->
 <div id="pt" class="hidden">
-  <div class="user-bar"><span>👷 <b>Técnico</b> — <span id="tn"></span> <span id="tr"></span></span><div style="display:flex;gap:5px"><button type="button" onclick="nfAbrirChat()">💬 Chat</button><button type="button" id="nf-push-atalho">🔔 Alertas</button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-tec">Sair</button></div></div>
-  <div class="header"><h1><span class="nf-logo">NF</span><span class="nf-brand-name">NexoField</span></h1><div class="sub">Área do Técnico</div></div>
+  <div class="user-bar"><span>👷 <b>Técnico</b> — <span id="tn"></span> <span id="tr"></span></span><div style="display:flex;gap:5px"><button type="button" id="nf-chat-tecnico-trigger" class="nf-chat-trigger" onclick="nfAbrirChat()">💬 Chat <span class="nf-chat-badge" id="nf-chat-tecnico-badge" hidden></span></button><button type="button" id="nf-push-atalho">🔔 Alertas</button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-tec">Sair</button></div></div>
+  <div class="header"><h1><img class="nf-header-logo" src="/metodo-telecom-logo.png" alt="Método Telecom"></h1><div class="sub">Área do Técnico</div></div>
   <div class="nav" id="nv2">
     <button class="a" data-tab="db">📊 Dashboard</button>
     <button data-tab="dp">📥 Despachados</button>
@@ -909,7 +928,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     <section class="nf-dashboard-hero nf-dashboard-tech" aria-label="Operação técnica">
       <div><span>Operação de campo</span><strong>Seu trabalho, mais conectado</strong><small>Rotas, atendimentos, escolas, materiais e evidências organizados.</small></div>
     </section>
-    <div id="t-lab" class="hidden"><div class="card" style="margin-bottom:12px"><h3 style="font-size:.88rem;color:var(--p);margin-bottom:6px">🧪 Meu teste autenticado</h3><p style="font-size:.7rem;color:var(--gr)">Sua sessão real já foi validada no acesso ao NexoField. O fluxo abaixo usa somente chamados, materiais, relatórios, fotos, protocolo e SDM fictícios.</p><button type="button" class="btn btn-p" id="tlab-iniciar" style="margin-top:8px">▶ Iniciar meu teste isolado</button><div id="tlab-status" style="font-size:.68rem;color:var(--gr);margin-top:8px">Pronto para testar.</div></div><div id="tlab-card"></div></div>
+    <div id="t-lab" class="hidden"><div class="card" style="margin-bottom:12px"><h3 style="font-size:.88rem;color:var(--p);margin-bottom:6px">🧪 Meu teste autenticado</h3><p style="font-size:.7rem;color:var(--gr)">Sua sessão real já foi validada no acesso ao MÉTODO Telecom. O fluxo abaixo usa somente chamados, materiais, relatórios, fotos, protocolo e SDM fictícios.</p><button type="button" class="btn btn-p" id="tlab-iniciar" style="margin-top:8px">▶ Iniciar meu teste isolado</button><div id="tlab-status" style="font-size:.68rem;color:var(--gr);margin-top:8px">Pronto para testar.</div></div><div id="tlab-card"></div></div>
 
     <div id="t-db">
       <div class="grid-3" style="margin-bottom:14px">
@@ -1194,6 +1213,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
             <option value="Incidente voz interior|150.00">Incidente voz interior - R$ 150,00</option>
             <option value="Incidente de dados interior|150.00">Incidente de dados interior - R$ 150,00</option>
             <option value="Instalação|150.00">Instalação - R$ 150,00</option>
+            <option value="Mudança de endereço|200.00">Mudança de endereço - R$ 200,00</option>
             <option value="Alteração|150.00">Alteração - R$ 150,00</option>
             <option value="Vistoria|150.00">Vistoria - R$ 150,00</option>
             <option value="Serviços maiores|0">Serviços maiores (informar valor abaixo)</option>
@@ -1202,13 +1222,17 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <div class="form-group"><label class="label">Valor do Serviço (R$)</label><input type="number" step="0.01" id="ex-vatv" class="input" readonly></div>
       </div>
       <div class="form-group hidden" id="ex-avulso-box"><label class="label">Valor do Serviço Maior (R$)</label><input type="number" step="0.01" id="ex-avulso" class="input"></div>
-      <div style="font-size:.6rem;color:var(--gr);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📦 Materiais Utilizados</div>
-      <div class="grid-3">
-        <div class="form-group"><label class="label">Cabo UTP (R$ 1,50/m)</label><input type="number" step="0.1" id="ex-utp" class="input" placeholder="Metros"></div>
-        <div class="form-group"><label class="label">Cabo CCI (R$ 1,00/m)</label><input type="number" step="0.1" id="ex-cci" class="input" placeholder="Metros"></div>
-        <div class="form-group"><label class="label">Canaleta (R$ 3,50/m)</label><input type="number" step="0.1" id="ex-can" class="input" placeholder="Metros"></div>
+      <div style="font-size:.68rem;color:var(--metodo-escuro);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📦 Materiais Utilizados</div>
+      <div class="nf-exec-materials" id="ex-material-form">
+        <div class="form-group"><label class="label" for="ex-material-nome">Material</label><input type="text" id="ex-material-nome" class="input" maxlength="160" placeholder="Nome do material"></div>
+        <div class="form-group"><label class="label" for="ex-material-unidade">Unidade</label><input type="text" id="ex-material-unidade" class="input" maxlength="24" placeholder="m, un, cx"></div>
+        <div class="form-group"><label class="label" for="ex-material-qtd">Quantidade</label><input type="number" min="0" step="0.01" id="ex-material-qtd" class="input" placeholder="0"></div>
+        <div class="form-group"><label class="label" for="ex-material-valor-unit">Valor unitário (R$)</label><input type="number" min="0" step="0.01" id="ex-material-valor-unit" class="input" placeholder="0,00"></div>
+        <div class="form-group"><label class="label" for="ex-material-total">Total calculado (R$)</label><input type="text" id="ex-material-total" class="input" readonly placeholder="R$ 0,00"></div>
+        <button type="button" class="btn nf-material-add" id="ex-material-adicionar" aria-label="Adicionar material" title="Adicionar material">＋</button>
       </div>
-      <div class="form-group"><label class="label">Total Materiais</label><input type="text" id="ex-tmat" class="input" readonly style="font-weight:700"></div>
+      <div id="ex-materiais-lista" aria-live="polite"></div>
+      <div class="form-group" style="margin-top:10px"><label class="label" for="ex-tmat">Total dos materiais</label><input type="text" id="ex-tmat" class="input" readonly style="font-weight:700;color:var(--metodo-escuro)"></div>
       <div style="font-size:.6rem;color:var(--gr);margin:10px 0 8px;text-transform:uppercase;letter-spacing:.5px">📋 Relatório de Encerramento</div>
       <p>Preencha a causa e a solução. Depois, envie a máscara ao operador para validação.</p>
       <div class="form-group"><label class="label" for="ex-causa">Causa raiz *</label><select id="ex-causa" class="input" required onchange="sincronizarCamposEncerramento()"><option value="">Selecione...</option><option>Infracliente</option><option>Elétrica cliente</option><option>Elétrica concessionária</option><option>Mau uso</option><option>Vistoria</option></select></div>
