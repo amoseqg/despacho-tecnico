@@ -163,6 +163,8 @@ const modalLogistica=parte3.match(/function abrirGestaoSolicitacaoMaterial\(id\)
 const salvarTramite=parte3.match(/async function salvarGestaoSolicitacaoMaterial\(dialog,id\)\{[\s\S]*?\n\}/)?.[0]||'';
 assert.ok(modalLogistica,'A janela de gestão logística deve existir.');
 for(const campo of ['ml-gestao-estoque','ml-gestao-separada','ml-gestao-transito-qtd','ml-gestao-entregue','ml-gestao-prazo','ml-gestao-codigo'])assert.ok(modalLogistica.includes(campo),`Campo de trâmite ausente: ${campo}`);
+for(const status of ['Solicitado','Direcionado','Separado','Em transporte','Entregue ao técnico'])assert.ok(modalLogistica.includes(status),`Status do material ausente no campo da Logística: ${status}`);
+assert.match(modalLogistica,/value="solicitado" disabled[\s\S]*?value="direcionado" disabled[\s\S]*?value="separado"[\s\S]*?value="em_transito"[\s\S]*?value="aguardando_aceite"/,'O campo de status deve seguir a ordem do trâmite e reservar a confirmação final ao técnico.');
 assert.match(parte3,/function podeOperarLogistica\(\)\{[^\n]*\['admin','logistica'\]/,'A gestão deve permitir perfis de Administrador e Logística.');
 assert.match(parte3,/if\(!event\.target\.closest\('button,a,input,select,textarea'\)\)abrirGestaoSolicitacaoMaterial/,'Clicar no cartão deve abrir a gestão sem interceptar botões internos.');
 assert.match(parte3,/async function atualizarEstoqueMaterial\([\s\S]*?SB\.rpc\('ajustar_estoque_logistico'/,'A conferência física do estoque deve ser registrada pelo RPC auditado.');
