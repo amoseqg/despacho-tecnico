@@ -2140,7 +2140,7 @@ async function nfChatAtualizarBadge(){
       if(instante>nfChatLerMarco(m.tecnico_id))naoLidas.set(m.tecnico_id,(naoLidas.get(m.tecnico_id)||0)+1);
     }
     const total=perfil.tipo==='tecnico'?(naoLidas.get(perfil.id)||0):[...naoLidas.values()].reduce((a,b)=>a+b,0);
-    const alvo=perfil.tipo==='tecnico'?tecnicoBadge:perfil.tipo==='logistica'?logisticaBadge:adminBadge;
+    const alvo=perfil.tipo==='tecnico'?tecnicoBadge:S?.t==='log'?logisticaBadge:adminBadge;
     if(alvo){alvo.textContent=total>99?'99+':String(total);alvo.hidden=total===0;alvo.setAttribute('aria-label',`${total} mensagem(ns) nova(s)`);}
     const select=NF_CHAT_DIALOG?.querySelector('#nf-chat-tecnico'),aviso=NF_CHAT_DIALOG?.querySelector('#nf-chat-thread-unread');
     if(select&&aviso){const quantidade=naoLidas.get(select.value)||0;aviso.textContent=quantidade?`${quantidade} mensagem(ns) nova(s) nesta conversa.`:'Nenhuma mensagem nova nesta conversa.';aviso.style.color=quantidade?'#8a671b':'#64748b';}
@@ -2149,7 +2149,7 @@ async function nfChatAtualizarBadge(){
 
 function nfAbrirChat(){
   if(!SB_PROFILE || !S) { nfToast('Entre no portal para acessar o chat.','erro'); return; }
-  const administrador=['admin','logistica'].includes(SB_PROFILE.tipo) && S.t===(SB_PROFILE.tipo==='logistica'?'log':'adm');
+  const administrador=(SB_PROFILE.tipo==='admin'&&['adm','log'].includes(S.t))||(SB_PROFILE.tipo==='logistica'&&S.t==='log');
   const tecnico=SB_PROFILE.tipo==='tecnico' && S.t==='tec';
   if(!administrador && !tecnico) { nfToast('O chat está disponível para administradores, técnicos e Logística.','erro'); return; }
   if(NF_CHAT_DIALOG?.open) NF_CHAT_DIALOG.close();

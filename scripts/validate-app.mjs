@@ -66,8 +66,9 @@ assert.match(parte1a,/id=\"ex-material-nome\"[\s\S]*?id=\"ex-material-unidade\"[
 assert.match(parte3,/setInterval\(\(\)=>\{if\(SB_PROFILE\)void nfChatAtualizarBadge\(\);\},15000\)/,'O contador de mensagens novas deve atualizar periodicamente.');
 for(const id of ['nf-chat-admin-badge','nf-chat-tecnico-badge','nf-chat-logistica-badge'])assert.match(parte1a,new RegExp(`id="${id}"`),`Indicador de mensagens ausente: ${id}`);
 assert.match(parte3,/\['admin','tecnico','logistica'\]\.includes\(perfil\.tipo\)/,'O contador deve atender aos três perfis destinatários.');
-assert.match(parte3,/perfil\.tipo==='logistica'\?logisticaBadge/,'A Logística deve receber o contador no seu próprio botão.');
-assert.match(parte3,/\['admin','logistica'\]\.includes\(SB_PROFILE\.tipo\)/,'A Logística deve acessar a caixa de conversas da equipe.');
+assert.match(parte3,/perfil\.tipo==='tecnico'\?tecnicoBadge:S\?\.t==='log'\?logisticaBadge:adminBadge/,'O contador deve aparecer no cabeçalho da área ativa para qualquer perfil administrativo.');
+assert.match(parte3,/SB_PROFILE\.tipo==='admin'&&\['adm','log'\]\.includes\(S\.t\)/,'Todos os administradores devem acessar o chat nas áreas Administrador e Logística.');
+assert.match(parte3,/SB_PROFILE\.tipo==='logistica'&&S\.t==='log'/,'O perfil Logística deve continuar acessando a caixa de conversas da equipe.');
 const politicaChatLogistica=fs.readFileSync('database/mensagens-chat-acesso-logistica.sql','utf8');
 assert.match(politicaChatLogistica,/mensagens_chat_select_participantes[\s\S]*?p\.tipo = 'logistica'[\s\S]*?mensagens_chat_insert_remetente[\s\S]*?p\.tipo = 'logistica'/,'O banco deve permitir que perfis logísticos ativos leiam e enviem mensagens na caixa compartilhada.');
 const chatChaveInicio=parte3.match(/function nfChatChaveInicio\(\)\{[\s\S]*?\n\}/)?.[0]||'';
@@ -81,9 +82,9 @@ const mensagensNaoLidas=[
  {tecnico_id:'tec-2',remetente_id:'tec-2',criado_em:'2026-10-22T11:03:00.000Z'},
  {tecnico_id:'tec-2',remetente_id:'admin-1',criado_em:'2026-10-22T11:04:00.000Z'}
 ];
-for(const [tipo,id,esperado,badgeId] of [['admin','admin-1',3,'nf-chat-admin-badge'],['logistica','log-1',5,'nf-chat-logistica-badge'],['tecnico','tec-1',2,'nf-chat-tecnico-badge']]){
+for(const [tipo,id,esperado,badgeId,area] of [['admin','admin-1',3,'nf-chat-admin-badge','adm'],['admin','admin-2',4,'nf-chat-admin-badge','adm'],['admin','admin-1',3,'nf-chat-logistica-badge','log'],['logistica','log-1',5,'nf-chat-logistica-badge','log'],['tecnico','tec-1',2,'nf-chat-tecnico-badge','tec']]){
  const badge={hidden:true,textContent:'',setAttribute(){}};
- const contextoChat={SB_PROFILE:{id,tipo},S:{},NF_CHAT_DIALOG:null,
+ const contextoChat={SB_PROFILE:{id,tipo},S:{t:area},NF_CHAT_DIALOG:null,
   localStorage:{getItem:k=>k.includes('metodoChatLido')?String(Date.parse('2026-10-22T10:00:00.000Z')):String(Date.parse('2026-10-22T00:00:00.000Z')),setItem(){}},
   document:{getElementById:k=>k===badgeId?badge:null},
   SB:{from:t=>{assert.equal(t,'mensagens_chat');const q={select(){return q},gte(){return q},order(){return q},limit:async()=>({data:mensagensNaoLidas,error:null})};return q;}},
