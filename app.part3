@@ -1930,9 +1930,11 @@ function rAt() {
   const tb = el('tb-at');
   if(!tb) return;
   const filtroTecnico=String(el('at-filtro-tecnico')?.value||'').trim().toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const filtroProtocolo=String(el('at-filtro-protocolo')?.value||'').trim().toLocaleLowerCase('pt-BR');
   const filtroAcao=String(el('at-filtro-acao')?.value||'');
   const administrador=SB_PROFILE?.tipo==='admin'||S?.t==='adm';
   const normalizarTecnico=valor=>String(valor||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  const normalizarProtocolo=valor=>String(valor||'').toLocaleLowerCase('pt-BR');
   const list = D.ch.filter(chamadoVisivel).filter(c =>
     c.st === 'andamento' ||
     (S?.t === 'adm' && c.st === 'concluida' && !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente'))
@@ -1940,6 +1942,10 @@ function rAt() {
     if(!filtroTecnico) return true;
     const nome=nt(c.te)||D.tc.find(t=>t.u===c.te)?.n||c.te||'';
     return normalizarTecnico(nome).includes(filtroTecnico);
+  }).filter(c=>{
+    if(!filtroProtocolo) return true;
+    const identificadores=[identificacaoOs(c),c.pr,c.sdm,c.osPeConectado,c.osPeconectado,c.os].filter(Boolean).join(' ');
+    return normalizarProtocolo(identificadores).includes(normalizarProtocolo(filtroProtocolo));
   }).filter(c=>{
     if(!filtroAcao) return true;
     const emAtendimento=c.st==='andamento';
