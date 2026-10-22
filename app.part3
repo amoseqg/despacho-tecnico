@@ -1902,11 +1902,30 @@ function rDb() {
 }
 
 function dataEncerramentoChamado(c){return c.cc||c.dtexec||'';}
-function abrirDetalhesTop5Tecnico(tipo,tecnicoId){
- if(!['prazo','reincidencia'].includes(tipo))return;
+function chamadosTop5DoTecnico(tipo,tecnicoId){
+ if(!['prazo','reincidencia'].includes(tipo))return [];
  const dados=dadosIndicadoresTecnicos(),todos=tipo==='prazo'?dados.perdas:dados.reincidencias;
  const campoTecnico=tipo==='prazo'?x=>x.chamado.te:x=>x.anterior.te;
- const itens=registrosTop5(tipo,todos).filter(x=>String(campoTecnico(x)||'nao-informado')===String(tecnicoId));
+ return registrosTop5(tipo,todos).filter(x=>String(campoTecnico(x)||'nao-informado')===String(tecnicoId));
+}
+function exportarChamadosTop5Tecnico(tipo,tecnicoId){
+ const itens=chamadosTop5DoTecnico(tipo,tecnicoId);
+ if(!itens.length){nfToast('Nenhum chamado deste técnico para exportar.');return;}
+ const nomeTecnico=tecnicoId==='nao-informado'?'Técnico não informado':nt(tecnicoId),rows=itens.map(x=>{
+  if(tipo==='prazo'){
+   const c=x.chamado;return {'Técnico':nomeTecnico,'Indicador':'Perda de prazo','Protocolo':c.pr||'','SDM':c.sdm||'','Circuito':c.ci||'','Site / Cliente':c.si||'','Início do atendimento':c.am||'','Encerramento':c.cc||c.dtexec||'','Duração considerada (horas)':(Number(x.duracao||0)/3600000).toFixed(2),'Limite (horas)':5};
+  }
+  const c=x.chamado,a=x.anterior;return {'Técnico do ranking':nomeTecnico,'Indicador':'Reincidência','Novo protocolo':c.pr||'','Protocolo anterior':a.pr||'','Intervalo (dias)':(Number(x.intervalo||0)/86400000).toFixed(1),'Circuito':c.ci||a.ci||'','Site / Cliente':c.si||a.si||'','Técnico do chamado anterior':nt(a.te)||'','Técnico do novo chamado':nt(c.te)||'','Atendimento anterior':a.cc||a.dtexec||'','Abertura da reincidência':c.cr||''};
+ });
+ const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();
+ ws['!cols']=Object.keys(rows[0]).map(k=>({wch:Math.min(Math.max(k.length+4,18),42)}));
+ XLSX.utils.book_append_sheet(wb,ws,tipo==='prazo'?'Perda de prazo':'Reincidências');
+ const seguro=String(nomeTecnico).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-zA-Z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||'tecnico';
+ XLSX.writeFile(wb,`chamados_${tipo}_${seguro}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+function abrirDetalhesTop5Tecnico(tipo,tecnicoId){
+ if(!['prazo','reincidencia'].includes(tipo))return;
+ const itens=chamadosTop5DoTecnico(tipo,tecnicoId);
  const nome=tecnicoId==='nao-informado'?'Técnico não informado':nt(tecnicoId),titulo=tipo==='prazo'?'Chamados com perda de prazo':'Chamados reincidentes';
  const data=v=>v?formatarDataBrasil(v):'—',duracao=ms=>{const minutos=Math.floor(Number(ms||0)/60000);return `${Math.floor(minutos/60)}h ${String(minutos%60).padStart(2,'0')}min`;};
  const conteudo=itens.map(x=>{
@@ -1917,8 +1936,8 @@ function abrirDetalhesTop5Tecnico(tipo,tecnicoId){
   return `<article class="os"><div class="os-h"><span class="os-id">Novo protocolo ${esc(c.pr||'Não informado')}</span><span class="badge b-pendente">Reincidência</span></div><div class="os-r"><b>Protocolo anterior:</b> ${esc(a.pr||'Não informado')} &nbsp; <b>Intervalo:</b> ${esc(dias)} dia(s)</div><div class="os-r"><b>Circuito:</b> ${esc(c.ci||a.ci||'—')} &nbsp; <b>Site / Cliente:</b> ${esc(c.si||a.si||'—')}</div><div class="os-r"><b>Técnico do chamado anterior:</b> ${esc(nt(a.te)||'Não informado')} &nbsp; <b>Técnico do novo chamado:</b> ${esc(nt(c.te)||'Não informado')}</div><div class="os-r"><b>Atendimento anterior:</b> ${data(a.cc||a.dtexec)} &nbsp; <b>Abertura da reincidência:</b> ${data(c.cr)}</div></article>`;
  }).join('')||'<div class="empty">Nenhum chamado deste técnico neste indicador.</div>';
  const dialog=document.createElement('dialog');dialog.style.cssText='width:min(900px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 80px #0005;background:var(--bg,#fff);color:var(--tx,#16324f)';
- dialog.innerHTML=`<header style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px"><div><h3 style="margin:0;color:var(--p)">${esc(titulo)}</h3><div style="margin-top:4px;font-size:.8rem">${esc(nome)} · ${itens.length} registro(s)</div></div><button type="button" class="btn btn-s btn-fechar-top5">Fechar</button></header><div>${conteudo}</div>`;
- document.body.append(dialog);dialog.querySelector('.btn-fechar-top5').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+ dialog.innerHTML=`<header style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div><h3 style="margin:0;color:var(--p)">${esc(titulo)}</h3><div style="margin-top:4px;font-size:.8rem">${esc(nome)} · ${itens.length} registro(s)</div></div><div style="display:flex;gap:8px;align-items:center"><button type="button" class="btn btn-p btn-exportar-top5">⬇️ Exportar chamados</button><button type="button" class="btn btn-s btn-fechar-top5">Fechar</button></div></header><div>${conteudo}</div>`;
+ document.body.append(dialog);dialog.querySelector('.btn-exportar-top5').onclick=()=>exportarChamadosTop5Tecnico(tipo,tecnicoId);dialog.querySelector('.btn-fechar-top5').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
 }
 function dataBrasilISO(valor){
   if(!valor)return '';
