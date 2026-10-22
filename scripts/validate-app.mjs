@@ -21,7 +21,7 @@ const idsObrigatorios = [
   'os-servico-circuito', 'os-servico-circuito-opcoes', 'os-servico-circuito-status',
   'os-servico-descricao-colada', 'os-servico-descricao-status',
   'os-tipo-escolha', 'btn-escolher-os-servico', 'btn-escolher-os-manutencao',
-  'form-os-servico', 'form-os-manutencao'
+  'form-os-servico', 'form-os-manutencao', 'at-filtro-protocolo'
 ];
 for (const id of idsObrigatorios) {
   assert.match(html, new RegExp(`id=["']${id}["']`), `Elemento obrigatório ausente: ${id}`);
@@ -64,6 +64,10 @@ assert.match(parte3,/function slaRegiao\(v,skill=''\) \{ return skill==='vistori
 assert.match(parte1a,/value=\"Mudança de endereço\|200\.00\"/,'Mudança de endereço deve custar R$ 200,00.');
 assert.match(parte1a,/id=\"ex-material-nome\"[\s\S]*?id=\"ex-material-unidade\"[\s\S]*?id=\"ex-material-qtd\"[\s\S]*?id=\"ex-material-valor-unit\"[\s\S]*?id=\"ex-material-total\"/,'O formulário deve coletar material, unidade, quantidade, valor unitário e total.');
 assert.match(parte3,/setInterval\(\(\)=>\{if\(SB_PROFILE\)void nfChatAtualizarBadge\(\);\},15000\)/,'O contador de mensagens novas deve atualizar periodicamente.');
+const filtroAtendimento = parte3.match(/function rAt\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+assert.ok(filtroAtendimento, 'A lista de Atendimento deve existir.');
+assert.match(parte1a, /id="at-filtro-protocolo"[^>]*oninput="rAt\(\)"/, 'A busca de protocolo deve atualizar a lista ao digitar.');
+assert.match(filtroAtendimento, /el\('at-filtro-protocolo'\)[\s\S]*?identificacaoOs\(c\)[\s\S]*?c\.sdm[\s\S]*?includes\(normalizarProtocolo\(filtroProtocolo\)\)/, 'Atendimento deve filtrar por protocolo, SDM e identificadores de OS.');
 const validacaoExcecao=parte3.match(/const tecnicoSelecionado = D\.tc\.find[\s\S]*?const dtexec = el\('c-dtexec'\)\.value;/)?.[0]||'';
 assert.match(validacaoExcecao,/!tecnicoCompativelComChamado && !liberarArea/,'Técnicos fora da skill/cobertura exigem liberação excepcional.');
 const seletorTecnicosServico = parte3.match(/function atualizarTecnicosOsServico\(\) \{[\s\S]*?\n\}/)?.[0];
