@@ -999,7 +999,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
 
 <!-- LOGÍSTICA -->
 <div id="plog" class="hidden">
-  <div class="user-bar"><span>🚚 <b>Logística</b> — <span id="ln"></span></span><div style="display:flex;gap:5px"><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-log">Sair</button></div></div>
+  <div class="user-bar"><span>🚚 <b>Logística</b> — <span id="ln"></span></span><div style="display:flex;gap:5px"><button type="button" id="nf-chat-logistica-trigger" class="nf-chat-trigger" onclick="nfAbrirChat()">💬 Chat <span class="nf-chat-badge" id="nf-chat-logistica-badge" hidden></span></button><button class="btn-minha-senha">Alterar senha</button><button id="btn-sair-log">Sair</button></div></div>
   <div class="header"><h1>📦 Gestão Logística</h1><div class="sub">Separação, expedição, rastreamento e entrega</div></div>
   <div class="content">
     <section class="nf-dashboard-hero nf-dashboard-log" aria-label="Operação logística">
