@@ -1073,7 +1073,7 @@ function consultarCorreiosOficial(id){
   alert('Código '+codigo+' copiado. Cole-o na página oficial dos Correios.');
 }
 function consultarPrevisaoMaterialTecnico(id){
- const r=D.mr.find(x=>String(x.id)===String(id));if(!r||S?.t!=='tec'||!SB_PROFILE||r.tecnico!==SB_PROFILE.id)return;
+ const r=D.mr.find(x=>String(x.id)===String(id));if(!r||S?.t!=='tec'||SB_PROFILE?.tipo!=='tecnico'||r.tecnico!==S.u)return;
  const meta=logMeta(r),m=materialById(r.materialId),previsao=meta.prazo?new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR'):'Ainda não informada pela Logística',codigo=meta.rastreamento||'Ainda não informado pela Logística',dialog=document.createElement('dialog');
  dialog.style.cssText='width:min(520px,calc(100% - 24px));max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:0;box-shadow:0 24px 70px #0005;font-family:system-ui;color:#16324f';
  dialog.innerHTML=`<div><header style="padding:18px 22px;background:#f0fdf4;border-bottom:1px solid #dbe7dd"><h3 style="margin:0 0 4px">📦 Previsão de entrega do material</h3><div style="font-size:13px;color:#526273">${escM(m?.nome||r.materialNome||'Material')} · Protocolo ${escM(r.protocolo||'—')}</div></header><div style="padding:18px 22px"><div class="os-r"><b>Status:</b> ${escM(logStatus(r)[1])}</div><div class="os-r"><b>Previsão de entrega:</b> ${escM(previsao)}</div><div class="os-r"><b>Código de rastreio:</b> ${escM(codigo)}</div>${meta.rastreamento?'<button type="button" class="btn btn-s btn-correios" data-id="'+escM(r.id)+'">🔎 Consultar rastreamento nos Correios</button>':''}</div><footer style="display:flex;justify-content:flex-end;padding:12px 22px;border-top:1px solid #e2e8f0"><button type="button" class="btn btn-p fechar">Fechar</button></footer></div>`;
