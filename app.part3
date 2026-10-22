@@ -1051,22 +1051,33 @@ async function liberarMaterial(id){
   try{await logAtualizarSolicitacao(r,{observacao:logObs(r,{...logMeta(r),etapa:'aguardando_aceite'})});await sbRecarregarDados();alert('Material liberado para aceite do técnico.');}
   catch(e){sbShowError('Não foi possível liberar o material',e);}
 }
-async function enviarMaterial(id){
-  const r=D.mr.find(x=>x.id===id);if(!r)return;
-  const atual=logMeta(r);
-  const rastreamento=prompt('Informe o código de rastreamento do envio:',atual.rastreamento||'');if(!rastreamento?.trim())return;
-  const prazo=prompt('Informe a previsão de entrega (AAAA-MM-DD):',atual.prazo||'');
-  if(!/^\d{4}-\d{2}-\d{2}$/.test(prazo||'')){alert('Informe a previsão no formato AAAA-MM-DD.');return;}
-  try{
-    await logAtualizarSolicitacao(r,{observacao:logObs(r,{...atual,etapa:'em_transito',rastreamento:rastreamento.trim(),prazo,transitoEm:atual.transitoEm||new Date().toISOString()})});
-    await sbRecarregarDados();alert('Expedição e rastreamento confirmados no servidor.');
-  }catch(e){sbShowError('Não foi possível registrar o envio',e);}
+function enviarMaterial(id){
+ const r=D.mr.find(x=>String(x.id)===String(id));if(!r||!podeOperarLogistica())return;
+ const atual=logMeta(r),dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(520px,calc(100% - 24px));max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:0;box-shadow:0 24px 70px #0005;font-family:system-ui;color:#16324f';
+ dialog.innerHTML=`<form id="ml-rastreio-form"><header style="padding:18px 22px;background:#f0fdf4;border-bottom:1px solid #dbe7dd"><h3 style="margin:0 0 4px">🚚 Rastreio e previsão de entrega</h3><div style="font-size:13px;color:#526273">Informe os dados para o técnico acompanhar o material.</div></header><div style="padding:18px 22px"><div class="form-group"><label class="label" for="ml-rastreio-codigo">Código de rastreio</label><input class="input" id="ml-rastreio-codigo" maxlength="120" value="${escM(atual.rastreamento||'')}" placeholder="Ex.: código dos Correios ou da transportadora" required></div><div class="form-group"><label class="label" for="ml-rastreio-prazo">Previsão de entrega</label><input class="input" id="ml-rastreio-prazo" type="date" value="${escM(atual.prazo||'')}" required></div><p id="ml-rastreio-erro" role="alert" style="color:#b91c1c;margin:8px 0 0"></p></div><footer style="display:flex;justify-content:flex-end;gap:8px;padding:12px 22px;border-top:1px solid #e2e8f0"><button type="button" class="btn btn-s cancelar">Cancelar</button><button type="submit" class="btn btn-p salvar">Salvar rastreio e previsão</button></footer></form>`;
+ document.body.append(dialog);dialog.querySelector('.cancelar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ dialog.querySelector('#ml-rastreio-form').addEventListener('submit',async event=>{
+  event.preventDefault();const codigo=dialog.querySelector('#ml-rastreio-codigo').value.trim(),prazo=dialog.querySelector('#ml-rastreio-prazo').value,erro=dialog.querySelector('#ml-rastreio-erro'),botao=dialog.querySelector('.salvar');
+  if(!codigo||!prazo||!/^\d{4}-\d{2}-\d{2}$/.test(prazo)||Number.isNaN(Date.parse(prazo+'T12:00:00'))){erro.textContent='Informe um código de rastreio e uma previsão de entrega válida.';return;}
+  botao.disabled=true;botao.textContent='Salvando...';
+  try{await logAtualizarSolicitacao(r,{observacao:logObs(r,{...atual,etapa:'em_transito',rastreamento:codigo,prazo,quantidadeEmTransito:Number(atual.quantidadeEmTransito||r.qtdSeparada||r.qtdSolicitada),transitoEm:atual.transitoEm||new Date().toISOString()})});await sbRecarregarDados();dialog.close();nfToast('Rastreio e previsão salvos. O técnico já pode consultar a entrega.','sucesso');}
+  catch(e){erro.textContent=e.message||'Não foi possível registrar o rastreio e a previsão.';botao.disabled=false;botao.textContent='Salvar rastreio e previsão';}
+ });
+ dialog.showModal();
 }
 function consultarCorreiosOficial(id){
   const r=D.mr.find(x=>x.id===id),codigo=r&&logMeta(r).rastreamento;if(!codigo){alert('Informe primeiro o código de rastreamento.');return;}
   if(navigator.clipboard)navigator.clipboard.writeText(codigo).catch(()=>{});
   window.open('https://rastreamento.correios.com.br/app/index.php','_blank','noopener');
   alert('Código '+codigo+' copiado. Cole-o na página oficial dos Correios.');
+}
+function consultarPrevisaoMaterialTecnico(id){
+ const r=D.mr.find(x=>String(x.id)===String(id));if(!r||S?.t!=='tec'||!SB_PROFILE||r.tecnico!==SB_PROFILE.id)return;
+ const meta=logMeta(r),m=materialById(r.materialId),previsao=meta.prazo?new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR'):'Ainda não informada pela Logística',codigo=meta.rastreamento||'Ainda não informado pela Logística',dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(520px,calc(100% - 24px));max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:0;box-shadow:0 24px 70px #0005;font-family:system-ui;color:#16324f';
+ dialog.innerHTML=`<div><header style="padding:18px 22px;background:#f0fdf4;border-bottom:1px solid #dbe7dd"><h3 style="margin:0 0 4px">📦 Previsão de entrega do material</h3><div style="font-size:13px;color:#526273">${escM(m?.nome||r.materialNome||'Material')} · Protocolo ${escM(r.protocolo||'—')}</div></header><div style="padding:18px 22px"><div class="os-r"><b>Status:</b> ${escM(logStatus(r)[1])}</div><div class="os-r"><b>Previsão de entrega:</b> ${escM(previsao)}</div><div class="os-r"><b>Código de rastreio:</b> ${escM(codigo)}</div>${meta.rastreamento?'<button type="button" class="btn btn-s btn-correios" data-id="'+escM(r.id)+'">🔎 Consultar rastreamento nos Correios</button>':''}</div><footer style="display:flex;justify-content:flex-end;padding:12px 22px;border-top:1px solid #e2e8f0"><button type="button" class="btn btn-p fechar">Fechar</button></footer></div>`;
+ document.body.append(dialog);dialog.querySelector('.fechar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
 }
 async function aceitarMaterial(id){
   const r=D.mr.find(x=>x.id===id);if(!r||r.tecnico!==S.u||r.status!=='separado')return;
@@ -1355,7 +1366,7 @@ function rTmat(){
  if(meus.some(c=>String(c.id)===String(protocoloSelecionado))) ps.value=protocoloSelecionado;
  if(D.mat.some(m=>String(m.id)===String(materialSelecionado))) ms.value=materialSelecionado;
  const list=D.mr.filter(r=>r.tecnico===S.u).slice().reverse();
- box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Solicitado:</b> ${escM(r.qtdSolicitada||0)} ${escM(m?m.unidade:'')} &nbsp; <b>Separado:</b> ${escM(r.qtdSeparada||0)} &nbsp; <b>Em trâmite:</b> ${escM(meta.quantidadeEmTransito||0)} &nbsp; <b>Entregue:</b> ${escM(r.qtdEntregue||0)}</div>${rastreioTramite(r)}${logDetalhes(r)}${aceitar?`<div style="margin-top:8px"><button class="btn btn-g btn-tech-aceitar-material" data-id="${escM(r.id)}">✅ Confirmar recebimento do material</button></div>`:''}</div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
+ box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Solicitado:</b> ${escM(r.qtdSolicitada||0)} ${escM(m?m.unidade:'')} &nbsp; <b>Separado:</b> ${escM(r.qtdSeparada||0)} &nbsp; <b>Em trâmite:</b> ${escM(meta.quantidadeEmTransito||0)} &nbsp; <b>Entregue:</b> ${escM(r.qtdEntregue||0)}</div><div class="os-r"><b>Previsão de entrega:</b> ${meta.prazo?escM(new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR')):'Ainda não informada pela Logística'}</div>${rastreioTramite(r)}${logDetalhes(r)}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-p btn-tech-consultar-entrega" data-id="${escM(r.id)}">📅 Consultar previsão de entrega</button>${aceitar?`<button class="btn btn-g btn-tech-aceitar-material" data-id="${escM(r.id)}">✅ Confirmar recebimento do material</button>`:''}</div></div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
 }
 function solicitarMaterial(){const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid&&x.te===S.u&&x.st==='andamento'),m=materialById(mid);if(!cid||!mid||!q||q<1){alert('Preencha protocolo, material e quantidade');return;}if(!c){alert('Selecione um chamado que esteja em atendimento.');rTmat();return;}if(D.mr.some(r=>r.chamadoId===cid&&r.materialId===mid&&['solicitado','direcionado','separado'].includes(r.status))){alert('Já existe uma solicitação pendente deste material para este chamado.');return;}D.mr.push({id:'MR-'+Date.now(),chamadoId:cid,tecnico:S.u,materialId:mid,qtdSolicitada:q,qtdSeparada:0,qtdEntregue:0,status:'solicitado',obs,data:ag(),protocolo:c.pr||'',infoChamado:`${c.si} — ${c.de}`});sv();el('tm-material').value='';el('busca-material-tecnico').value='';el('tm-qtd').value='';el('tm-obs').value='';rTmat();alert('Solicitação enviada ao administrador.');}
 
@@ -3844,7 +3855,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
@@ -3871,6 +3882,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-log-enviar')) { enviarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-log-liberar')) { liberarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-tech-aceitar-material')) { aceitarMaterial(t.dataset.id); }
+    if(t.classList.contains('btn-tech-consultar-entrega')) { consultarPrevisaoMaterialTecnico(t.dataset.id); }
     if(t.classList.contains('btn-correios')) { consultarCorreiosOficial(t.dataset.id); }
     if(t.classList.contains('btn-rm-mat')) { removerMaterial(t.dataset.id); }
     if(t.classList.contains('btn-recuperar-material')) { recuperarMaterialEstoque(t.dataset.id); }
