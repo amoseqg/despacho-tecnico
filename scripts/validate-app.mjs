@@ -158,6 +158,23 @@ assert.match(salvarEstoque,/\['adm','log'\]\.includes\(S\?\.t\)/,'Somente Admini
 assert.match(salvarEstoque,/String\(data\?\.id\)!==String\(m\.id\)/,'O material retornado pelo servidor deve ser conferido.');
 assert.match(salvarEstoque,/confirmado!==q/,'O retorno do servidor deve ser comparado com a quantidade solicitada.');
 assert.match(parte3,/function ajusteEstoque\(\)\{return salvarQuantidadeEstoqueConfirmada/,'O Administrador deve usar a gravação confirmada.');
+
+const modalLogistica=parte3.match(/function abrirGestaoSolicitacaoMaterial\(id\)\{[\s\S]*?\n\}/)?.[0]||'';
+const salvarTramite=parte3.match(/async function salvarGestaoSolicitacaoMaterial\(dialog,id\)\{[\s\S]*?\n\}/)?.[0]||'';
+assert.ok(modalLogistica,'A janela de gestão logística deve existir.');
+for(const campo of ['ml-gestao-estoque','ml-gestao-separada','ml-gestao-transito-qtd','ml-gestao-entregue','ml-gestao-prazo','ml-gestao-codigo'])assert.ok(modalLogistica.includes(campo),`Campo de trâmite ausente: ${campo}`);
+assert.match(parte3,/function podeOperarLogistica\(\)\{[^\n]*\['admin','logistica'\]/,'A gestão deve permitir perfis de Administrador e Logística.');
+assert.match(parte3,/if\(!event\.target\.closest\('button,a,input,select,textarea'\)\)abrirGestaoSolicitacaoMaterial/,'Clicar no cartão deve abrir a gestão sem interceptar botões internos.');
+assert.match(parte3,/async function atualizarEstoqueMaterial\([\s\S]*?SB\.rpc\('ajustar_estoque_logistico'/,'A conferência física do estoque deve ser registrada pelo RPC auditado.');
+assert.match(salvarTramite,/\.eq\('estoque',estoqueAntesDaSeparacao\)/,'A separação deve proteger o estoque contra atualizações concorrentes.');
+assert.match(salvarTramite,/etapa==='em_transito'&&\(!prazo\|\|!codigo\)/,'A etapa de transporte exige previsão e rastreio.');
+assert.match(salvarTramite,/const meta=\{\.\.\.logMeta\(r\),etapa,quantidadeEmTransito:etapa==='em_transito'\?separada:0/,'A quantidade em transporte deve refletir a separação.');
+assert.match(salvarTramite,/if\(estoqueDescontado&&estoqueAntesDaSeparacao!==null\)/,'Falhas ao registrar a separação devem tentar reverter o desconto de estoque.');
+assert.match(parte3,/function rastreioTramite\(r\)\{[\s\S]*?meta\.etapa==='em_transito'\|\|!!meta\.transitoEm/,'A timeline deve mostrar o transporte mesmo sem rastreio preenchido.');
+assert.match(funcaoRmat,/aceitar=r\.status==='separado'&&\['aguardando_aceite','em_transito'\]\.includes\(meta\.etapa\)/,'O técnico só pode aceitar material separado e encaminhado.');
+const aceitarMaterialFn=parte3.match(/async function aceitarMaterial\(id\)\{[\s\S]*?\n\}/)?.[0]||'';
+assert.match(aceitarMaterialFn,/quantidadeEntregueTecnico:q/,'O aceite técnico deve registrar a quantidade recebida.');
+console.log('Trâmite logístico: janela, estoque, transporte, rastreio e aceite do técnico validados.');
 assert.match(parte3,/async function ajusteEstoqueLogistica\(\)\{\s*return salvarQuantidadeEstoqueConfirmada/,'A Logística deve usar a gravação confirmada.');
 const estoque=fs.readFileSync('stock-export.js','utf8');
 assert.match(estoque,/function exportarEstoqueLogistico\(\)/,'A exportação do estoque em Excel deve existir.');
