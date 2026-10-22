@@ -879,6 +879,7 @@ async function salvarMaterialLiberadoManual(event){
 
 function escM(v){ return esc(v); }
 function materialById(id){ return D.mat.find(m=>m.id===id); }
+function podeOperarLogistica(){return !!SB_PROFILE&&(['admin','logistica'].includes(SB_PROFILE.tipo)||(SB_PROFILE.areas||[]).includes('logistica'));}
 const LOG_TAG='[[LOGISTICA]]';
 function logMeta(r){
   const s=String(r?.obs||''), i=s.lastIndexOf(LOG_TAG);
@@ -1068,15 +1069,15 @@ function consultarCorreiosOficial(id){
   alert('Código '+codigo+' copiado. Cole-o na página oficial dos Correios.');
 }
 async function aceitarMaterial(id){
-  const r=D.mr.find(x=>x.id===id);if(!r||r.tecnico!==S.u)return;
-  const q=r.qtdSeparada||r.qtdSolicitada;
-  if(!confirm('Confirma que recebeu este material?'))return;
-  try{await logAtualizarSolicitacao(r,{status:'entregue',quantidade_entregue:q,entregue_em:new Date().toISOString(),observacao:logObs(r,{...logMeta(r),etapa:'entregue'})});await sbRecarregarDados();alert('Recebimento confirmado. Status atualizado para entregue.');}
+  const r=D.mr.find(x=>x.id===id);if(!r||r.tecnico!==S.u||r.status!=='separado')return;
+  const meta=logMeta(r),q=Number(meta.quantidadeEmTransito||r.qtdSeparada||r.qtdSolicitada);
+  if(!q||!confirm(`Confirma que recebeu ${q} ${materialById(r.materialId)?.unidade||'unidade(s)'} deste material?`))return;
+  try{await logAtualizarSolicitacao(r,{status:'entregue',quantidade_entregue:q,entregue_em:new Date().toISOString(),observacao:logObs(r,{...meta,etapa:'entregue',quantidadeEntregueTecnico:q,quantidadeEmTransito:0})});await sbRecarregarDados();alert('Recebimento confirmado. Status atualizado para entregue.');}
   catch(e){sbShowError('Não foi possível confirmar o recebimento',e);}
 }
 function rastreioData(v){if(!v)return '—';const d=new Date(v);return Number.isNaN(d.getTime())?escM(v):d.toLocaleString('pt-BR');}
 function rastreioTramite(r){
- const meta=logMeta(r),direcionado=r.status!=='solicitado',separado=['separado','entregue'].includes(r.status),transito=!!meta.rastreamento,entregue=r.status==='entregue';
+ const meta=logMeta(r),direcionado=r.status!=='solicitado',separado=['separado','entregue'].includes(r.status),transito=meta.etapa==='em_transito'||!!meta.transitoEm,entregue=r.status==='entregue';
  const passos=[
   ['Solicitado',true,r.data],['Direcionado',direcionado,r.direcionadoEm],['Separado',separado,r.separadoEm],
   ['Em transporte',transito,meta.transitoEm],['Entregue ao técnico',entregue,r.entregueEm]
@@ -1247,20 +1248,100 @@ async function limparMateriaisEntregues(){
    limpezaEntreguesEmCurso=false;if(btn)btn.disabled=false;await sbRecarregarDados();
  }
 }
+function abrirGestaoSolicitacaoMaterial(id){
+ if(!podeOperarLogistica()){nfToast('Acesse pela área Logística para atualizar esta solicitação.','erro');return;}
+ const r=D.mr.find(x=>String(x.id)===String(id)),m=r&&materialById(r.materialId),c=r&&D.ch.find(x=>x.id===r.chamadoId);
+ if(!r||!m||logMeta(r).manual){nfToast('Esta solicitação não possui um material de estoque associado.','erro');return;}
+ const meta=logMeta(r),jaSeparado=['separado','entregue'].includes(r.status),encerrado=r.status==='entregue';
+ const estoque=Number(m.estoque||0),qSeparada=Number(r.qtdSeparada||0),transitoAtual=Number(meta.quantidadeEmTransito||0);
+ const etapaInicial=meta.etapa==='em_transito'?'em_transito':meta.etapa==='aguardando_aceite'?'aguardando_aceite':(materialInterior(r)?'separado':'aguardando_aceite');
+ const dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(680px,calc(100% - 24px));max-height:92vh;overflow:auto;border:0;border-radius:16px;padding:0;box-shadow:0 24px 70px #0005;font-family:system-ui;color:#16324f';
+ dialog.innerHTML=`<form id="ml-gestao-form"><header style="padding:18px 22px;background:#f0fdf4;border-bottom:1px solid #dbe7dd"><h3 style="margin:0 0 4px">📦 Gerenciar solicitação de material</h3><div style="font-size:13px;color:#526273">${escM(nt(r.tecnico))} · Protocolo ${escM(c?.pr||r.protocolo||'—')}</div></header><div style="padding:18px 22px">
+  <div class="grid-2" style="gap:10px"><div class="form-group"><label class="label">Material solicitado</label><input class="input" value="${escM(m.nome)} (${escM(m.unidade)})" readonly></div><div class="form-group"><label class="label">Quantidade solicitada</label><input class="input" value="${escM(r.qtdSolicitada||0)}" readonly></div></div>
+  <div class="grid-2" style="gap:10px"><div class="form-group"><label class="label" for="ml-gestao-estoque">Quantidade em estoque conferida</label><input class="input" id="ml-gestao-estoque" type="number" min="0" step="0.01" value="${escM(estoque)}" ${jaSeparado?'readonly':''}></div><div class="form-group"><label class="label" for="ml-gestao-separada">Quantidade separada</label><input class="input" id="ml-gestao-separada" type="number" min="0.01" step="0.01" max="${escM(r.qtdSolicitada||0)}" value="${escM(jaSeparado?qSeparada:Math.min(Number(r.qtdSolicitada||0),estoque))}" ${jaSeparado?'readonly':''}></div></div>
+  <div class="grid-2" style="gap:10px"><div class="form-group"><label class="label" for="ml-gestao-transito-qtd">Quantidade em trâmite logístico</label><input class="input" id="ml-gestao-transito-qtd" type="number" min="0" step="0.01" value="${escM(transitoAtual)}" ${encerrado?'readonly':''}></div><div class="form-group"><label class="label" for="ml-gestao-entregue">Quantidade entregue ao técnico</label><input class="input" id="ml-gestao-entregue" type="number" value="${escM(r.qtdEntregue||0)}" readonly><small style="color:#64748b">Este valor é confirmado pelo técnico ao aceitar o recebimento.</small></div></div>
+  <div class="form-group"><label class="label" for="ml-gestao-etapa">Próxima etapa</label><select class="select" id="ml-gestao-etapa" ${encerrado?'disabled':''}><option value="separado" ${etapaInicial==='separado'?'selected':''}>Separado — aguardando encaminhamento</option><option value="aguardando_aceite" ${etapaInicial==='aguardando_aceite'?'selected':''}>Aguardando aceite do técnico</option><option value="em_transito" ${etapaInicial==='em_transito'?'selected':''}>Em trâmite logístico</option></select></div>
+  <div id="ml-gestao-rastreio" class="grid-2" style="gap:10px"><div class="form-group"><label class="label" for="ml-gestao-prazo">Data prevista de entrega</label><input class="input" id="ml-gestao-prazo" type="date" value="${escM(meta.prazo||'')}" ${encerrado?'readonly':''}></div><div class="form-group"><label class="label" for="ml-gestao-codigo">Código de rastreio</label><input class="input" id="ml-gestao-codigo" maxlength="120" value="${escM(meta.rastreamento||'')}" placeholder="Informe o código de rastreio" ${encerrado?'readonly':''}></div></div>
+  <div class="info">Estoque atual: ${escM(estoque)} ${escM(m.unidade)}. A quantidade separada será descontada do estoque. O técnico confirma a entrega na área dele.</div><p id="ml-gestao-erro" role="alert" style="color:#b91c1c;margin:8px 0 0"></p></div>
+  <footer style="display:flex;justify-content:flex-end;gap:8px;padding:12px 22px;border-top:1px solid #e2e8f0"><button type="button" class="btn btn-s cancelar">Fechar</button>${encerrado?'':'<button type="submit" class="btn btn-p salvar">Salvar trâmite</button>'}</footer></form>`;
+ document.body.append(dialog);
+ const etapa=dialog.querySelector('#ml-gestao-etapa'),transito=dialog.querySelector('#ml-gestao-transito-qtd'),separada=dialog.querySelector('#ml-gestao-separada'),rastreio=dialog.querySelector('#ml-gestao-rastreio');
+ const sincronizarEtapa=()=>{const e=etapa.value,mostrar=e==='em_transito';rastreio.classList.toggle('hidden',!mostrar);transito.value=mostrar?(separada.value||'0'):'0';};
+ etapa.addEventListener('change',sincronizarEtapa);separada.addEventListener('input',()=>{if(etapa.value==='em_transito')transito.value=separada.value;});sincronizarEtapa();
+ dialog.querySelector('.cancelar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ dialog.querySelector('#ml-gestao-form').addEventListener('submit',event=>{event.preventDefault();salvarGestaoSolicitacaoMaterial(dialog,r.id).catch(error=>{dialog.querySelector('#ml-gestao-erro').textContent=error.message||'Não foi possível salvar o trâmite.';});});
+ dialog.showModal();
+}
+async function atualizarEstoqueMaterial(m,quantidade,observacao){
+ const {data,error}=await SB.rpc('ajustar_estoque_logistico',{p_material_id:m.id,p_nova_quantidade:quantidade,p_observacao:observacao}).single();
+ if(error)throw error;
+ const confirmado=Number(data?.estoque);if(String(data?.id)!==String(m.id)||!Number.isFinite(confirmado)||confirmado!==quantidade)throw new Error('O servidor não confirmou a quantidade em estoque.');
+ m.estoque=confirmado;return confirmado;
+}
+async function salvarGestaoSolicitacaoMaterial(dialog,id){
+ const r=D.mr.find(x=>String(x.id)===String(id)),m=r&&materialById(r.materialId);if(!r||!m)throw new Error('A solicitação ou o material não foi localizado.');
+ if(!podeOperarLogistica())throw new Error('Seu perfil não pode atualizar o trâmite logístico.');
+ const erro=dialog.querySelector('#ml-gestao-erro'),botao=dialog.querySelector('.salvar');
+ const etapa=dialog.querySelector('#ml-gestao-etapa').value,estoqueInformado=Number(dialog.querySelector('#ml-gestao-estoque').value),separada=Number(dialog.querySelector('#ml-gestao-separada').value),emTransito=Number(dialog.querySelector('#ml-gestao-transito-qtd').value),prazo=dialog.querySelector('#ml-gestao-prazo').value,codigo=dialog.querySelector('#ml-gestao-codigo').value.trim();
+ const jaSeparado=['separado','entregue'].includes(r.status),solicitada=Number(r.qtdSolicitada||0);
+ if(!Number.isFinite(estoqueInformado)||estoqueInformado<0)throw new Error('Informe uma quantidade de estoque válida.');
+ if(!Number.isFinite(separada)||separada<=0||separada>solicitada)throw new Error('A quantidade separada precisa ser maior que zero e não pode exceder a quantidade solicitada.');
+ if(jaSeparado&&separada!==Number(r.qtdSeparada||0))throw new Error('A quantidade separada já foi registrada e não pode ser descontada novamente.');
+ if(etapa==='em_transito'&&(!prazo||!codigo))throw new Error('Informe a data prevista e o código de rastreio para colocar o material em trâmite logístico.');
+ if(etapa==='em_transito'&&emTransito!==separada)throw new Error('A quantidade em trâmite deve corresponder à quantidade separada.');
+ if(etapa!=='em_transito'&&emTransito!==0)throw new Error('Informe quantidade em trâmite somente na etapa de transporte.');
+ if(!jaSeparado&&estoqueInformado<separada)throw new Error(`Estoque insuficiente: informado ${estoqueInformado} ${m.unidade}; separação solicitada ${separada}.`);
+ erro.textContent='';if(botao){botao.disabled=true;botao.textContent='Salvando no Supabase...';}
+ let estoqueAntesDaSeparacao=null,estoqueDescontado=false;
+ try{
+   if(!jaSeparado){
+     if(r.status==='solicitado'){
+       const confirmado=await sbDirecionarMaterial(r);r.status='direcionado';r.direcionadoEm=confirmado.direcionado_em;r.direcionadoPor=S.n;r.responsavel=S.n;
+     }
+     if(r.status!=='direcionado')throw new Error('A solicitação mudou de etapa. Atualize a lista e tente novamente.');
+     if(estoqueInformado!==Number(m.estoque||0))await atualizarEstoqueMaterial(m,estoqueInformado,'Contagem física informada ao separar uma solicitação.');
+     estoqueAntesDaSeparacao=Number(m.estoque||0);
+     const novoEstoque=estoqueAntesDaSeparacao-separada;
+     const {data:estoqueConfirmado,error:erroEstoque}=await SB.from('materiais').update({estoque:novoEstoque,atualizado_em:new Date().toISOString()}).eq('id',m.id).eq('estoque',estoqueAntesDaSeparacao).select('id,estoque').maybeSingle();
+     if(erroEstoque)throw erroEstoque;if(!estoqueConfirmado)throw new Error('O estoque foi alterado por outra operação. Atualize e confira a quantidade antes de separar.');
+     m.estoque=Number(estoqueConfirmado.estoque);estoqueDescontado=true;
+   }
+   const meta={...logMeta(r),etapa,quantidadeEmTransito:etapa==='em_transito'?separada:0,quantidadeSeparada:separada,estoqueConferido:estoqueInformado};
+   if(etapa==='em_transito'){meta.rastreamento=codigo;meta.prazo=prazo;meta.transitoEm=meta.transitoEm||new Date().toISOString();}
+   else{delete meta.rastreamento;delete meta.prazo;delete meta.transitoEm;}
+   const campos=jaSeparado
+    ?{observacao:logObs(r,meta),atualizado_em:new Date().toISOString()}
+    :{status:'separado',quantidade_separada:separada,separado_em:new Date().toISOString(),responsavel_id:SB_PROFILE.id,observacao:logObs(r,meta),atualizado_em:new Date().toISOString()};
+   let query=SB.from('solicitacoes_material').update(campos).eq('id',r.id);
+   if(!jaSeparado)query=query.eq('status','direcionado');
+   const {data,error}=await query.select('*').maybeSingle();
+   if(error)throw error;if(!data)throw new Error('A solicitação mudou durante a atualização. Nenhuma separação foi confirmada; atualize e confira o estoque.');
+   await sbRecarregarDados();dialog.close();nfToast('Trâmite do material salvo. O técnico pode acompanhar as etapas e confirmar o recebimento.','sucesso');
+ }catch(error){
+   if(estoqueDescontado&&estoqueAntesDaSeparacao!==null){
+     try{await atualizarEstoqueMaterial(m,estoqueAntesDaSeparacao,'Reversão automática: a solicitação de separação não foi confirmada.');}catch(rollback){console.error('Falha ao restaurar o estoque após erro de separação:',rollback);}
+   }
+   await sbRecarregarDados();throw error;
+ }finally{if(botao&&dialog.open){botao.disabled=false;botao.textContent='Salvar trâmite';}}
+}
+
 function rLog(){
  const box=el('lg-list');if(!box)return;
  const list=D.mr.filter(materialVisivelNaLista).slice().reverse();
  box.innerHTML=list.length?list.map(r=>{
    const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),interior=materialInterior(r),tec=tecnicoMaterial(r),destino=enderecoEntregaTec(tec);
-   let acao='';
-   if(r.status==='direcionado')acao=`<button class="btn btn-g btn-mat-separar" data-id="${r.id}">📦 Registrar separação</button>`;
-   else if(r.status==='separado'&&meta.etapa==='separado')acao=interior?`<button class="btn btn-p btn-log-enviar" data-id="${r.id}">🚚 Informar envio e rastreio</button>`:`<button class="btn btn-p btn-log-liberar" data-id="${r.id}">🤝 Liberar para aceite</button>`;
-   return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
+   const gerenciavel=!!m&&!meta.manual&&!materialOcultoDaLista(r)&&r.status!=='cancelado'&&r.status!=='entregue';
+   const acao=gerenciavel?`<button type="button" class="btn btn-p btn-ml-processar" data-id="${escM(r.id)}">📋 Gerenciar solicitação</button>`:'';
+   const clicavel=gerenciavel?`role="button" tabindex="0" onclick="if(!event.target.closest('button,a,input,select,textarea'))abrirGestaoSolicitacaoMaterial('${escM(r.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirGestaoSolicitacaoMaterial('${escM(r.id)}')}" style="cursor:pointer" title="Clique para separar e atualizar o trâmite do material"`:'';
+   const transito=Number(meta.quantidadeEmTransito||0),entregue=Number(r.qtdEntregue||0);
+   return `<div class="os" ${clicavel}><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
     <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--b)">
       <div class="os-r"><b>Protocolo:</b> ${escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'))} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
-      <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Itens separados:</b> ${r.qtdSeparada||0}</div>
+      <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Estoque atual:</b> ${escM(m?m.estoque||0:'—')}</div>
+      <div class="os-r"><b>Quantidade solicitada:</b> ${escM(r.qtdSolicitada||0)} &nbsp; <b>Separada:</b> ${escM(r.qtdSeparada||0)} &nbsp; <b>Em trâmite:</b> ${escM(transito)} &nbsp; <b>Entregue ao técnico:</b> ${escM(entregue)}</div>
       ${interior?`<div class="os-r"><b>Entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Endereço não cadastrado')}${destino.contato?' — Contato: '+escM(destino.contato):''}</div>`:''}
-      ${logDetalhes(r)}<div style="margin-top:8px">${materialOcultoDaLista(r)?'':acao} ${botaoArquivoMaterial(r)}</div>
+      ${rastreioTramite(r)}${logDetalhes(r)}<div style="margin-top:8px">${materialOcultoDaLista(r)?'':acao} ${botaoArquivoMaterial(r)}</div>
     </div></div>`;
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
  rRastreioMateriais('lg-rastreio-lista');
@@ -1274,7 +1355,7 @@ function rTmat(){
  if(meus.some(c=>String(c.id)===String(protocoloSelecionado))) ps.value=protocoloSelecionado;
  if(D.mat.some(m=>String(m.id)===String(materialSelecionado))) ms.value=materialSelecionado;
  const list=D.mr.filter(r=>r.tecnico===S.u).slice().reverse();
- box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Itens:</b> ${r.qtdSolicitada} ${m?m.unidade:''} &nbsp; <b>Separado:</b> ${r.qtdSeparada||0}</div>${logDetalhes(r)}${aceitar?`<div style="margin-top:8px"><button class="btn btn-g btn-tech-aceitar-material" data-id="${r.id}">✅ Confirmar recebimento</button></div>`:''}</div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
+ box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Solicitado:</b> ${escM(r.qtdSolicitada||0)} ${escM(m?m.unidade:'')} &nbsp; <b>Separado:</b> ${escM(r.qtdSeparada||0)} &nbsp; <b>Em trâmite:</b> ${escM(meta.quantidadeEmTransito||0)} &nbsp; <b>Entregue:</b> ${escM(r.qtdEntregue||0)}</div>${rastreioTramite(r)}${logDetalhes(r)}${aceitar?`<div style="margin-top:8px"><button class="btn btn-g btn-tech-aceitar-material" data-id="${escM(r.id)}">✅ Confirmar recebimento do material</button></div>`:''}</div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
 }
 function solicitarMaterial(){const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid&&x.te===S.u&&x.st==='andamento'),m=materialById(mid);if(!cid||!mid||!q||q<1){alert('Preencha protocolo, material e quantidade');return;}if(!c){alert('Selecione um chamado que esteja em atendimento.');rTmat();return;}if(D.mr.some(r=>r.chamadoId===cid&&r.materialId===mid&&['solicitado','direcionado','separado'].includes(r.status))){alert('Já existe uma solicitação pendente deste material para este chamado.');return;}D.mr.push({id:'MR-'+Date.now(),chamadoId:cid,tecnico:S.u,materialId:mid,qtdSolicitada:q,qtdSeparada:0,qtdEntregue:0,status:'solicitado',obs,data:ag(),protocolo:c.pr||'',infoChamado:`${c.si} — ${c.de}`});sv();el('tm-material').value='';el('busca-material-tecnico').value='';el('tm-qtd').value='';el('tm-obs').value='';rTmat();alert('Solicitação enviada ao administrador.');}
 
@@ -3763,7 +3844,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
@@ -3783,6 +3864,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-rm-tec')) { rmTc(t.dataset.u); }
     if(t.classList.contains('btn-endereco-tec')) { editarEnderecoTecnico(t.dataset.u); }
     if(t.classList.contains('btn-rm-adm')) { rmAd(t.dataset.u); }
+    if(t.classList.contains('btn-ml-processar')) { abrirGestaoSolicitacaoMaterial(t.dataset.id); }
     if(t.classList.contains('btn-mat-direcionar')) { direcionarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-mat-separar')) { separarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-mat-entregar')) { entregarMaterial(t.dataset.id); }
@@ -4266,7 +4348,7 @@ function sbChamadoRow(c){
 }
 
 async function sbDirecionarMaterial(solicitacao){
-  if(!SB_PROFILE || SB_PROFILE.tipo!=='admin') throw new Error('Somente administradores podem direcionar materiais.');
+  if(!podeOperarLogistica()) throw new Error('Somente a área Logística pode direcionar materiais.');
   if(!sbUUID(solicitacao.id)) throw new Error('A solicitação ainda não possui identificação válida no servidor.');
   const agora=new Date().toISOString();
   const {data,error}=await SB.from('solicitacoes_material').update({
