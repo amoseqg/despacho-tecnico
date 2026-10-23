@@ -2224,8 +2224,8 @@ async function criarChamadoSuporteTecnico(chamadoId,tecnicoUser,atividade,dialog
       solicitanteNome:null,
       solicitanteEmail:null,
       validacaoOperador:null,
-      informacoesAdicionais:[chamado.informacoesAdicionais,marcador,`Apoio solicitado por ${admin.nome} em ${agora}.`,`Técnico principal: ${nt(chamado.te)}.`,`Atividade de suporte: ${atividade}`].filter(Boolean).join('\\n'),
-      de:[`SUPORTE TÉCNICO — OS vinculada: ${identificacaoOs(chamado)}`,`Técnico principal: ${nt(chamado.te)}`,`Atividade de suporte: ${atividade}`,'','Descrição do chamado original:',descricaoOriginal||'Não informada.'].join('\\n'),
+      informacoesAdicionais:[chamado.informacoesAdicionais,marcador,`Apoio solicitado por ${admin.nome} em ${agora}.`,`Técnico principal: ${nt(chamado.te)}.`,`Atividade de suporte: ${atividade}`].filter(Boolean).join(String.fromCharCode(10)),
+      de:[`SUPORTE TÉCNICO — OS vinculada: ${identificacaoOs(chamado)}`,`Técnico principal: ${nt(chamado.te)}`,`Atividade de suporte: ${atividade}`,'','Descrição do chamado original:',descricaoOriginal||'Não informada.'].join(String.fromCharCode(10)),
       cr:agora
     };
     const linha=sbChamadoRow(chamadoSuporte);
