@@ -5054,7 +5054,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.12"></script>
+<script src="/release-info.js?v=2.5.29"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
