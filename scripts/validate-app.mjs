@@ -374,7 +374,7 @@ erroGravacao=true;await ctx.arquivarMaterialIndividual(registro.id);assert.equal
 ctx.S={t:'tec'};const antes=gravacoes;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(gravacoes,antes);
 ctx.S={t:'log'};erroGravacao=false;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(ctx.materialOcultoDaLista(registro),true);
 const suporteInicio=parte3.indexOf('async function criarChamadoSuporteTecnico(');
-const suporteFim=parte3.indexOf('\\n}',suporteInicio);
+const suporteFim=parte3.indexOf('\n}',suporteInicio);
 const fluxoSuporte=suporteInicio>=0&&suporteFim>suporteInicio?parte3.slice(suporteInicio,suporteFim):'';
 assert.ok(parte1a.includes('<option value="suporte">Suporte técnico</option>'),'O filtro de ações deve oferecer suporte técnico.');
 assert.ok(parte3.includes("if(filtroAcao==='suporte') return administrador&&emAtendimento;"),'A ação de suporte deve filtrar chamados em atendimento para administradores.');
