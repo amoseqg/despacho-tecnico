@@ -3315,7 +3315,23 @@ async function enviarFotosChamadoEmail(id,botao){
       const {data,error}=await SB.storage.from('fotos-atividades').download(f.caminho);if(error)throw error;
       arquivos.push(new File([data],f.nome_original||`foto-${indice+1}.jpg`,{type:f.tipo_mime||data.type||'image/jpeg'}));
     }
-    await prepararEmailAssistido({prefixo:'fotos',assunto:`MÉTODO Telecom — Registros fotográficos do chamado ${c.pr}`,corpo:`Seguem os registros fotográficos do chamado ${c.pr}.\nSite: ${c.si||'Não informado'}\nTécnico: ${nt(c.te)||'Não informado'}`,arquivos});
+    const ex=c.ex||{};
+    const atividade=String(ex.atv||'').split('|')[0].trim();
+    const materiais=Array.isArray(ex.materiais)&&ex.materiais.length?ex.materiais.map(m=>`${m.nome||'Material'} — ${m.quantidade||0} ${m.unidade||'UN'}`).join('\n'):'Nenhum material informado.';
+    const relatorio=String(ex.relatorio||ex.obs||'').trim()||'Não informado.';
+    const encerrado=c.cc?new Date(c.cc).toLocaleString('pt-BR'):'Não informado.';
+    const corpo=[
+      `Protocolo: ${c.pr||'Não informado'}`,
+      `Cliente: ${c.si||'Não informado'}`,
+      `SDM: ${c.sdm||'Não informado'}`,
+      `Circuito: ${c.ci||'Não informado'}`,
+      `Técnico: ${nt(c.te)||'Não informado'}`,
+      `Encerrado em: ${encerrado}`,
+      `Atividade realizada: ${atividade||'Não informada'}`,
+      `Relatório do atendimento:\n${relatorio}`,
+      `Materiais utilizados:\n${materiais}`
+    ].join('\n\n');
+    await prepararEmailAssistido({prefixo:'fotos',assunto:`${c.pr||'Chamado'} — ${c.si||'Cliente não informado'}`,corpo,arquivos});
   }finally{if(botao)botao.disabled=false;}
 }
 function renderFotosAdmin(){
