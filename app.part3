@@ -655,14 +655,19 @@ function baixarAnexoEmail(arquivo) {
   setTimeout(() => URL.revokeObjectURL(url), 30000);
 }
 
-async function prepararEmailAssistido({prefixo, assunto, corpo, arquivos=[]}) {
+async function prepararEmailAssistido({prefixo, assunto, corpo, arquivos=[], outlookWindow=null}) {
   if (SB_PROFILE?.tipo !== 'admin') throw new Error('Somente administradores podem preparar este envio.');
   const {remetente, destinatario} = dadosEmailSecao(prefixo);
+  const janela = outlookWindow || window.open('about:blank', '_blank');
   arquivos.forEach(baixarAnexoEmail);
   const texto = `${corpo}\n\nRemetente corporativo informado: ${remetente}`;
-  const url = `mailto:${encodeURIComponent(destinatario)}?subject=${encodeURIComponent(assunto)}&body=${encodeURIComponent(texto)}`;
-  window.location.href = url;
-  if (arquivos.length) setTimeout(() => alert(`Anexo preparado com sucesso!\n\n${arquivos.length} arquivo(s) foi(ram) salvo(s) na pasta Downloads. Agora, no programa de e-mail, confirme a conta ${remetente}, anexe o(s) arquivo(s) baixado(s) e conclua o envio.`), 500);
+  const url = new URL('https://outlook.office.com/mail/deeplink/compose');
+  url.searchParams.set('to', destinatario);
+  url.searchParams.set('subject', assunto);
+  url.searchParams.set('body', texto);
+  if (janela && !janela.closed) janela.location.href = url.toString();
+  else window.location.href = url.toString();
+  if (arquivos.length) nfToast(`${arquivos.length} foto(s) baixada(s). No Outlook, anexe os arquivos da pasta Downloads antes de enviar.`, 'sucesso');
 }
 
 async function enviarChamadosRealizadosEmail() {
@@ -3308,8 +3313,10 @@ async function enviarFotosChamadoEmail(id,botao){
   const c=D.ch.find(x=>String(x.id)===String(id)),fotos=SB_FOTOS_MAP.get(id)||[];
   if(!c||!fotos.length)throw new Error('Este chamado não possui registros fotográficos.');
   if(botao)botao.disabled=true;
+  let outlookWindow=null;
   try{
     dadosEmailSecao('fotos');
+    outlookWindow=window.open('about:blank','_blank');
     const arquivos=[];
     for(const [indice,f] of fotos.entries()){
       const {data,error}=await SB.storage.from('fotos-atividades').download(f.caminho);if(error)throw error;
@@ -3331,8 +3338,9 @@ async function enviarFotosChamadoEmail(id,botao){
       `Relatório do atendimento:\n${relatorio}`,
       `Materiais utilizados:\n${materiais}`
     ].join('\n\n');
-    await prepararEmailAssistido({prefixo:'fotos',assunto:`${c.pr||'Chamado'} — ${c.si||'Cliente não informado'}`,corpo,arquivos});
-  }finally{if(botao)botao.disabled=false;}
+    await prepararEmailAssistido({prefixo:'fotos',assunto:`${c.pr||'Chamado'} — ${c.si||'Cliente não informado'}`,corpo,arquivos,outlookWindow});
+  }catch(err){if(outlookWindow&&!outlookWindow.closed)outlookWindow.close();throw err;}
+  finally{if(botao)botao.disabled=false;}
 }
 function renderFotosAdmin(){
   const box=el('fotos-admin');if(!box||SB_PROFILE?.tipo!=='admin')return;
