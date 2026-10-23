@@ -2119,6 +2119,7 @@ function rAt() {
     const aguardandoAprovacao=c.st==='concluida';
     if(filtroAcao==='aprovar') return aguardandoAprovacao;
     if(filtroAcao==='redirecionar'||filtroAcao==='rastreamento') return emAtendimento;
+    if(filtroAcao==='suporte') return administrador&&emAtendimento;
     if(filtroAcao==='encerrar') return emAtendimento&&!c.solicitanteId;
     if(filtroAcao==='pendenciar') return administrador&&emAtendimento&&!c.pendenciaAtiva;
     if(filtroAcao==='pendencia_ativa') return administrador&&emAtendimento&&!!c.pendenciaAtiva;
@@ -2138,7 +2139,7 @@ function rAt() {
       : (window.NexoFieldExpediente?.botao(c)||'');
     const acao=aguardandoEncerramento
       ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
-      : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
+      : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${administrador?`<button class="btn btn-p btn-suporte-tec" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">🤝 Suporte técnico</button>`:''}${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
     return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
   }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando encerramento</td></tr>';
   tb.onclick=event=>{
@@ -2147,6 +2148,111 @@ function rAt() {
     if(linha) void abrirInformacaoChamado(linha.dataset.atChamadoId);
   };
 }
+function abrirDialogoSuporteTecnico(id){
+  if(SB_PROFILE?.tipo!=='admin'&&S?.t!=='adm')return;
+  const chamado=D.ch.find(c=>String(c.id)===String(id));
+  if(!chamado||chamado.st!=='andamento'){nfToast('O chamado precisa estar em atendimento para receber suporte.','aviso');return;}
+  const tecnicos=D.tc.filter(t=>t.u!==chamado.te&&t._id).slice().sort((a,b)=>a.n.localeCompare(b.n,'pt-BR'));
+  if(!tecnicos.length){nfToast('Não há outro técnico ativo disponível para prestar suporte.','aviso');return;}
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(620px,calc(100% - 28px));max-height:88vh;border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';
+  const opcoes=tecnicos.map(t=>`<option value="${escAttr(t.u)}">${esc(t.n)} — ${nomeRegiao(t.r)} — ${skillsTec(t).map(nomeSkill).join('/')}${t.r==='capital'?' — '+areasTec(t).map(nomeArea).join('/'):''}</option>`).join('');
+  dialog.innerHTML=`<form id="suporte-tec-form" style="padding:20px;font-family:system-ui;display:grid;gap:12px">
+    <div><h3 style="margin:0 0 5px;color:#16324f">🤝 Solicitar suporte técnico</h3>
+      <div style="color:#526273;font-size:13px">OS ${esc(identificacaoOs(chamado))} · ${esc(chamado.si||'Cliente não informado')}</div>
+      <div style="color:#526273;font-size:13px">Chamado principal: ${esc(nt(chamado.te))}. Ele continuará com esse técnico.</div>
+    </div>
+    <div style="padding:10px;background:#f5f7fa;border-radius:8px;font-size:13px;color:#344054">Será criada uma cópia vinculada a esta OS, com os dados do chamado e uma identificação de suporte. O técnico escolhido receberá a cópia como chamado pendente no perfil dele.</div>
+    <div><label class="label" for="suporte-tec-destino">Técnico que prestará o suporte</label><select class="select" id="suporte-tec-destino" required><option value="">Selecione...</option>${opcoes}</select></div>
+    <div><label class="label" for="suporte-tec-atividade">Atividade de suporte solicitada</label><textarea class="input" id="suporte-tec-atividade" maxlength="2000" rows="4" required placeholder="Descreva o apoio que o segundo técnico deverá realizar"></textarea></div>
+    <div id="suporte-tec-erro" role="alert" style="color:#b42318;font-size:13px;min-height:18px"></div>
+    <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn btn-s" id="suporte-tec-cancelar">Cancelar</button><button type="submit" class="btn btn-p" id="suporte-tec-enviar">Enviar chamado de suporte</button></div>
+  </form>`;
+  const form=dialog.querySelector('#suporte-tec-form');
+  dialog.querySelector('#suporte-tec-cancelar').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>dialog.remove());
+  form.addEventListener('submit',event=>{
+    event.preventDefault();
+    const tecnico=dialog.querySelector('#suporte-tec-destino').value;
+    const atividade=dialog.querySelector('#suporte-tec-atividade').value.trim();
+    void criarChamadoSuporteTecnico(chamado.id,tecnico,atividade,dialog);
+  });
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
+async function criarChamadoSuporteTecnico(chamadoId,tecnicoUser,atividade,dialog){
+  const botao=dialog.querySelector('#suporte-tec-enviar'),erroCampo=dialog.querySelector('#suporte-tec-erro');
+  if(!atividade){erroCampo.textContent='Descreva a atividade que o técnico de suporte deverá realizar.';return;}
+  const chamado=D.ch.find(c=>String(c.id)===String(chamadoId));
+  const tecnico=D.tc.find(t=>t.u===tecnicoUser);
+  if(!chamado||!tecnico?._id){erroCampo.textContent='Atualize a tela e selecione um técnico ativo.';return;}
+  if(chamado.te===tecnicoUser){erroCampo.textContent='O técnico de suporte deve ser diferente do técnico responsável pelo chamado principal.';return;}
+  const adminLogado=SB_PROFILE?.tipo==='admin'||S?.t==='adm';
+  if(!adminLogado){erroCampo.textContent='Somente um administrador pode solicitar suporte técnico.';return;}
+  const tecnicoId=sbIdByUser(tecnicoUser);
+  if(!tecnicoId){erroCampo.textContent='Não foi possível identificar o técnico no servidor.';return;}
+  const marcador=`[SUPORTE_TECNICO_ORIGEM:${chamado.id}]`;
+  const textoBotao=botao.textContent;
+  botao.disabled=true;botao.textContent='Enviando para o técnico...';erroCampo.textContent='';
+  try{
+    const admin=await sbExigirSessaoAdmin(),agora=new Date().toISOString();
+    const {data:origem,error:erroOrigem}=await SB.from('chamados').select('id,status,tecnico_id').eq('id',chamado.id).maybeSingle();
+    if(erroOrigem)throw erroOrigem;
+    if(!origem||origem.status!=='andamento'||origem.tecnico_id!==sbIdByUser(chamado.te))throw new Error('O chamado original mudou de responsável ou deixou de estar em atendimento. Atualize a tela e tente novamente.');
+    const {data:ativos,error:erroBusca}=await SB.from('chamados').select('id,protocolo').eq('tecnico_id',tecnicoId).in('status',['pendente','andamento']).ilike('informacoes_adicionais','%'+marcador+'%').limit(1);
+    if(erroBusca)throw erroBusca;
+    if(ativos?.length){erroCampo.textContent='Este técnico já possui um chamado de suporte ativo para esta OS ('+(ativos[0].protocolo||identificacaoOs(chamado))+').';return;}
+    const descricaoOriginal=String(chamado.de||'').trim();
+    const chamadoSuporte={
+      ...chamado,
+      id:null,
+      te:tecnicoUser,
+      st:'pendente',
+      mr:'',
+      ae:null,
+      am:null,
+      cc:null,
+      ex:null,
+      ap:null,
+      tr:[],
+      dt:null,
+      pendenciaAtiva:false,
+      pendenciaDesde:null,
+      prazoPausadoSegundos:0,
+      solicitanteId:null,
+      solicitanteNome:null,
+      solicitanteEmail:null,
+      validacaoOperador:null,
+      informacoesAdicionais:[chamado.informacoesAdicionais,marcador,`Apoio solicitado por ${admin.nome} em ${agora}.`,`Técnico principal: ${nt(chamado.te)}.`,`Atividade de suporte: ${atividade}`].filter(Boolean).join(String.fromCharCode(10)),
+      de:[`SUPORTE TÉCNICO — OS vinculada: ${identificacaoOs(chamado)}`,`Técnico principal: ${nt(chamado.te)}`,`Atividade de suporte: ${atividade}`,'','Descrição do chamado original:',descricaoOriginal||'Não informada.'].join(String.fromCharCode(10)),
+      cr:agora
+    };
+    const linha=sbChamadoRow(chamadoSuporte);
+    linha.criado_por=admin.id;
+    const {data,error}=await SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em').single();
+    if(error)throw error;
+    if(!data?.id||data.status!=='pendente'||data.tecnico_id!==tecnicoId)throw new Error('O servidor não confirmou o chamado de suporte para o técnico selecionado.');
+    chamadoSuporte.id=data.id;
+    chamadoSuporte.te=sbUserById(data.tecnico_id)||tecnicoUser;
+    chamadoSuporte.st=data.status;
+    chamadoSuporte.cr=data.criado_em||agora;
+    D.ch.push(chamadoSuporte);
+    SB_LOADED_CH.add(data.id);
+    lsSet('dd',D);
+    dialog.close();
+    sbRenderizarTelas();sbProgramarRecarregamento();
+    sbSetConnectionBadge('Chamado de suporte confirmado no Supabase',true);
+    nfToast('OS de suporte enviada para '+nt(tecnicoUser)+'. O chamado principal permaneceu com '+nt(chamado.te)+'.','sucesso');
+  }catch(error){
+    erroCampo.textContent=error?.message||'Não foi possível criar o chamado de suporte.';
+    sbShowError('Não foi possível enviar o chamado de suporte',error);
+    await sbRecarregarDados();
+  }finally{
+    if(dialog.isConnected){botao.disabled=false;botao.textContent=textoBotao;}
+  }
+}
+
 function abrirInformacaoChamado(id){
   if(SB_PROFILE?.tipo!=='admin' && S?.t!=='adm') return;
   const chamado=D.ch.find(c=>String(c.id)===String(id));
@@ -3978,13 +4084,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados') || e.target;
+    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-tec-chamados')) { const tecnicoId=String(t.dataset.tecnico||''); if(CHAMADOS_TECNICOS_ABERTOS.has(tecnicoId)) CHAMADOS_TECNICOS_ABERTOS.delete(tecnicoId); else CHAMADOS_TECNICOS_ABERTOS.add(tecnicoId); rCh(); return; }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
+    if(t.classList.contains('btn-suporte-tec')) { abrirDialogoSuporteTecnico(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
     if(t.classList.contains('btn-redir')) { opRedirecionar(t.dataset.id); }
     if(t.classList.contains('btn-encerrar-admin')) { encerrarChamadoAdmin(t.dataset.id); }
@@ -5086,7 +5193,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.30"></script>
+<script src="/release-info.js?v=2.5.31"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>

@@ -373,4 +373,14 @@ await ctx.arquivarMaterialIndividual(registro.id);assert.equal(ctx.materialOcult
 erroGravacao=true;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(ctx.materialOcultoDaLista(registro),false);
 ctx.S={t:'tec'};const antes=gravacoes;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(gravacoes,antes);
 ctx.S={t:'log'};erroGravacao=false;await ctx.arquivarMaterialIndividual(registro.id);assert.equal(ctx.materialOcultoDaLista(registro),true);
+const suporteInicio=parte3.indexOf('async function criarChamadoSuporteTecnico(');
+const suporteFim=parte3.indexOf('\n}',suporteInicio);
+const fluxoSuporte=suporteInicio>=0&&suporteFim>suporteInicio?parte3.slice(suporteInicio,suporteFim):'';
+assert.ok(parte1a.includes('<option value="suporte">Suporte técnico</option>'),'O filtro de ações deve oferecer suporte técnico.');
+assert.ok(parte3.includes("if(filtroAcao==='suporte') return administrador&&emAtendimento;"),'A ação de suporte deve filtrar chamados em atendimento para administradores.');
+assert.ok(parte3.includes('btn-suporte-tec'),'A ação de suporte deve estar disponível no atendimento.');
+assert.ok(fluxoSuporte.includes(".insert(linha).select('id,status,tecnico_id,criado_em')"),'O suporte deve criar um registro independente no servidor.');
+assert.ok(fluxoSuporte.includes("data.status!=='pendente'||data.tecnico_id!==tecnicoId"),'O envio deve confirmar atribuição e status pendente no servidor.');
+assert.ok(fluxoSuporte.includes('SUPORTE_TECNICO_ORIGEM:'),'A cópia deve manter o vínculo com a OS original.');
+assert.ok(fluxoSuporte.includes('Atividade de suporte:'),'A cópia deve apresentar o escopo de suporte ao técnico destinatário.');
 console.log('Exclusão individual: administrador/logística, histórico após recarga, restauração, exportação, conflito e restrição de técnico validados.');
