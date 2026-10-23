@@ -2669,29 +2669,31 @@ async function cfDp() {
     }
     dt = { q, m, d: ag() };
   }
-  const botao=el('btn-cf-dp'),textoBotao=botao?.textContent,tecnicoAnterior=c.te,modo=DPMODE;
+  const botao=el('btn-cf-dp'),textoBotao=botao?.textContent,tecnicoAnterior=c.te,tecnicoAnteriorId=sbIdByUser(c.te),modo=DPMODE;
   try{
     if(botao){botao.disabled=true;botao.textContent='Confirmando no servidor...';}
     const admin=await sbExigirSessaoAdmin();
     const agora=new Date().toISOString();
-    const {data,error}=await SB.from('chamados').update({
+    let atribuicao=SB.from('chamados').update({
       tecnico_id:tecnico._id,status:'pendente',motivo_recusa:null,
       aceito_em:null,iniciado_em:null,atualizado_em:agora,
       liberacao_area:!!dt,liberacao_area_admin:dt?admin.id:null,liberacao_area_em:dt?agora:null
-    }).eq('id',c.id).select('id,status,tecnico_id,atualizado_em').single();
+    }).eq('id',c.id);
+    atribuicao=tecnicoAnteriorId?atribuicao.eq('tecnico_id',tecnicoAnteriorId):atribuicao.is('tecnico_id',null);
+    const {data,error}=await atribuicao.select('id,status,tecnico_id,atualizado_em').single();
     if(error)throw error;
     if(!data?.id||data.status!=='pendente'||data.tecnico_id!==tecnico._id)throw new Error('O servidor não confirmou a atribuição ao técnico selecionado.');
     if(modo==='redirecionar'){
       const anteriorId=sbIdByUser(tecnicoAnterior);
-      const {error:historicoErro}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:anteriorId,para_tecnico_id:tecnico._id,motivo:'Redirecionado pelo administrador '+admin.nome,realizado_por:admin.id,criado_em:agora});
+      const {error:historicoErro}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:tecnicoAnteriorId,para_tecnico_id:tecnico._id,motivo:'Redirecionado pelo administrador '+admin.nome,realizado_por:admin.id,criado_em:agora});
       if(historicoErro)console.warn('Chamado redirecionado; histórico adicional não gravado:',historicoErro);
     }
+    c.te=sbUserById(data.tecnico_id);c.st=data.status;c.mr='';c.ae=null;c.am=null;c.cc=null;
+    c.dt=dt?{tipo:'liberacao-area',admin:admin.nome,d:agora,area:c.area,regiaoOperacional:c.regiaoOperacional}:null;
     el('m-dp').classList.remove('a');
-    await sbRecarregarDados();
-    const confirmado=D.ch.find(x=>x.id===c.id);
-    if(!confirmado||confirmado.st!=='pendente'||confirmado.te!==tu)throw new Error('O despacho foi gravado, mas não voltou corretamente na conferência da tela. Atualize a página.');
+    sbRenderizarTelas();sbProgramarRecarregamento();
     sbSetConnectionBadge('Despacho confirmado no Supabase',true);
-    alert(modo==='redirecionar'?`Chamado redirecionado para ${tecnico.n} e confirmado no servidor!`:`Chamado despachado para ${tecnico.n} e confirmado no servidor!`);
+    alert((modo==='redirecionar'?'Chamado redirecionado':'Chamado despachado')+' para '+tecnico.n+' e confirmado no servidor!');
   }catch(err){
     sbShowError(modo==='redirecionar'?'Não foi possível redirecionar o chamado':'Não foi possível despachar o chamado',err);
     await sbRecarregarDados();
@@ -2734,20 +2736,28 @@ function opTr(id) {
   el('m-tr').classList.add('a');
 }
 
-function cfTr() {
-  const tu = el('t-te').value;
-  const m = el('t-m').value.trim();
-  if (!tu) { alert('Selecione um técnico'); return; }
-  const c = D.ch.find(x => x.id === CID);
-  if(!c) return;
-  c.tr.push({ de: c.te, para: tu, m, d: ag() });
-  c.te = tu; c.st = 'pendente'; c.mr = '';
-  sv();
-  el('m-tr').classList.remove('a');
-  rCh();
-  alert('Chamado transferido com sucesso!');
+async function cfTr() {
+  const tu=el('t-te').value,m=el('t-m').value.trim();
+  if(!tu){alert('Selecione um técnico');return;}
+  const c=D.ch.find(x=>x.id===CID);if(!c)return;
+  const destinoId=sbIdByUser(tu);if(!destinoId){alert('Não foi possível identificar o técnico selecionado no servidor.');return;}
+  const botao=el('btn-cf-tr'),texto=botao?.textContent,tecnicoAnterior=c.te,origemId=sbIdByUser(c.te);
+  try{
+    if(botao){botao.disabled=true;botao.textContent='Confirmando no servidor...';}
+    const admin=await sbExigirSessaoAdmin(),agora=new Date().toISOString();
+    let query=SB.from('chamados').update({tecnico_id:destinoId,status:'pendente',motivo_recusa:null,aceito_em:null,iniciado_em:null,atualizado_em:agora}).eq('id',c.id);
+    query=origemId?query.eq('tecnico_id',origemId):query.is('tecnico_id',null);
+    const {data,error}=await query.select('id,status,tecnico_id').single();
+    if(error)throw error;
+    if(!data?.id||data.status!=='pendente'||data.tecnico_id!==destinoId)throw new Error('O servidor não confirmou a transferência para o técnico selecionado.');
+    const {error:historicoErro}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:origemId,para_tecnico_id:destinoId,motivo:m||null,realizado_por:admin.id,criado_em:agora});
+    if(historicoErro)console.warn('Transferência confirmada; histórico adicional não gravado:',historicoErro);
+    c.tr.push({de:tecnicoAnterior,para:tu,m,d:agora});c.te=sbUserById(data.tecnico_id);c.st=data.status;c.mr='';c.ae=null;c.am=null;c.cc=null;
+    el('m-tr').classList.remove('a');sbRenderizarTelas();sbProgramarRecarregamento();
+    sbSetConnectionBadge('Transferência confirmada no Supabase',true);alert('Chamado transferido para '+nt(tu)+' e confirmado no servidor.');
+  }catch(err){sbShowError('Não foi possível transferir o chamado',err);await sbRecarregarDados();}
+  finally{if(botao){botao.disabled=false;botao.textContent=texto||'🔄 Transferir';}}
 }
-
 async function rmTc(u) {
   if (!confirm('Remover técnico?')) return;
   if (!SB_PROFILE || SB_PROFILE.tipo !== 'admin') {
@@ -4564,7 +4574,12 @@ async function sbSyncAll(){
     }
     if(SB_PROFILE.tipo==='admin'){
       const chRows=D.ch.filter(x=>sbUUID(x.id)).map(c=>({id:c.id,...sbChamadoRow(c)}));
-      if(chRows.length){ const {error}=await SB.from('chamados').upsert(chRows,{onConflict:'id'}); if(error) throw error; }
+      if(chRows.length){
+        // Não propaga técnico de uma cópia antiga da aba.
+        const syncRows=chRows.map(row=>{const {tecnico_id,...seguro}=row;return seguro;});
+        const {error}=await SB.from('chamados').upsert(syncRows,{onConflict:'id'});
+        if(error) throw error;
+      }
     }else{
       for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario)){
         const {error}=await SB.from('chamados').update({
