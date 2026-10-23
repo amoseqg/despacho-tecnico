@@ -50,6 +50,7 @@ SITES_PEII.forEach(site => {
 function normalizarCircuito(v) { return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 function numeroCircuito(v) { return (String(v || '').match(/\d+/g) || []).join(''); }
 function esc(v) { const d = document.createElement('div'); d.textContent = String(v == null ? '' : v); return d.innerHTML; }
+function escAttr(v) { return esc(v).replace(/\"/g, '&quot;').replace(/'/g, '&#39;'); }
 function valorInfo(v) { return v ? esc(v).replace(/\n/g, '<br>') : 'Não informado'; }
 function definirModoManualChamado(ativo) {
   MODO_MANUAL_CHAMADO = !!ativo;
@@ -1855,6 +1856,8 @@ function barrasRanking(ranking,cor,tipo=''){
   return ranking.map((x,i)=>{const nome=tipo?`<button type="button" class="btn-top5-tecnico" data-top5-tipo="${tipo}" data-top5-tecnico="${esc(x.usuario)}" aria-label="Ver chamados de ${esc(x.nome)}" style="padding:0;border:0;background:none;color:var(--p);font:inherit;font-weight:700;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${i+1}. ${esc(x.nome)}</button>`:`<b>${i+1}. ${esc(x.nome)}</b>`;return `<div style="margin:9px 0"><div style="display:flex;justify-content:space-between;font-size:.72rem">${nome}<span>${x.qtd}</span></div><div style="height:9px;background:#e5e7eb;border-radius:999px;overflow:hidden;margin-top:4px"><div style="height:100%;width:${Math.max(8,x.qtd/max*100)}%;background:${cor};border-radius:999px"></div></div></div>`;}).join('');
 }
 
+const CHAMADOS_TECNICOS_ABERTOS = new Set();
+
 function rCh() {
   const ab = D.ch.filter(chamadoVisivel).filter(c => c.st === 'aberto');
   const di = D.ch.filter(chamadoVisivel).filter(c => c.st === 'pendente');
@@ -1873,10 +1876,39 @@ function rCh() {
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-dp" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🚚 Despachar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em aberto</h3></div>';
 
-  if(elDi) elDi.innerHTML = di.length ? di.map(c => `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando técnico</span></div>
-    ${dadosSite(c)}<div class="os-r"><b>Quem abriu:</b> ${c.abertura || '—'}</div><div class="os-r"><b>Região operacional:</b> ${c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior'))} — SLA ${slaRegiao(c.re,skillChamado(c))}</div><div class="os-r"><b>Skill:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div><div class="os-r"><b>Técnico:</b> ${nt(c.te)}${c.dt && c.dt.tipo === 'liberacao-area' ? ' <span class="badge b-recusado">Liberação excepcional</span>' : ''}</div>
-    ${infoReincidencia(c).html}
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
+  const gruposPorTecnico = new Map();
+  di.forEach(c => {
+    const tecnicoId = String(c.te || '');
+    if(!gruposPorTecnico.has(tecnicoId)) gruposPorTecnico.set(tecnicoId, []);
+    gruposPorTecnico.get(tecnicoId).push(c);
+  });
+  const gruposOrdenados = Array.from(gruposPorTecnico.entries()).sort((a,b) => {
+    const nomeA = a[0] ? nt(a[0]) : 'Técnico não informado';
+    const nomeB = b[0] ? nt(b[0]) : 'Técnico não informado';
+    return nomeA.localeCompare(nomeB,'pt-BR');
+  });
+  if(elDi) elDi.innerHTML = gruposOrdenados.length ? gruposOrdenados.map(([tecnicoId,chamados]) => {
+    const nomeTecnico = tecnicoId ? nt(tecnicoId) : 'Técnico não informado';
+    const expandido = CHAMADOS_TECNICOS_ABERTOS.has(tecnicoId);
+    const listaChamados = chamados.map(c => `<div class="os" style="margin-top:8px">
+      <div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando o técnico</span></div>
+      ${dadosSite(c)}
+      <div class="os-r"><b>Quem abriu:</b> ${esc(c.abertura || '—')}</div>
+      <div class="os-r"><b>Região operacional:</b> ${esc(c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior')))} — SLA ${slaRegiao(c.re,skillChamado(c))}</div>
+      <div class="os-r"><b>Skill:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
+      ${c.dt && c.dt.tipo === 'liberacao-area' ? '<div class="os-r"><span class="badge b-recusado">Liberação excepcional</span></div>' : ''}
+      ${infoReincidencia(c).html}
+      <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div>
+    </div>`).join('');
+    return `<div class="os" style="margin-bottom:10px">
+      <div class="os-h" style="justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <button type="button" class="btn-tec-chamados" data-tecnico="${escAttr(tecnicoId)}" aria-expanded="${expandido}" style="padding:0;border:0;background:transparent;color:var(--p);font:inherit;font-weight:700;text-align:left;cursor:pointer">👷 ${esc(nomeTecnico)} <span aria-hidden="true">${expandido?'▾':'▸'}</span></button>
+        <span class="badge b-pendente">Aguardando o técnico</span>
+      </div>
+      <div class="os-r"><b>Chamados com o técnico:</b> ${chamados.length} chamado${chamados.length===1?'':'s'}</div>
+      <div class="os-tec-chamados${expandido?'':' hidden'}" aria-label="Chamados de ${escAttr(nomeTecnico)}">${listaChamados}</div>
+    </div>`;
+  }).join('') : '<div class="empty"><h3>Nenhum chamado direcionado</h3></div>';
 
   if(elRe) elRe.innerHTML = re.length ? re.map(c => {
     const dtexec = c.dtexec ? formatarDataBrasil(c.dtexec) : 'Não definida';
@@ -1888,7 +1920,6 @@ function rCh() {
     <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado recusado</h3></div>';
 }
-
 function rDb() {
   atualizarCicloPainel();
   const ids={'s-p':'pendente','s-a':'andamento','s-c':'concluida','s-r':'recusado','s-prazo':'dentro-prazo','s-perda':'perda-prazo','s-reincidencia':'reincidencia'};
@@ -3947,11 +3978,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
+    if(t.classList.contains('btn-tec-chamados')) { const tecnicoId=String(t.dataset.tecnico||''); if(CHAMADOS_TECNICOS_ABERTOS.has(tecnicoId)) CHAMADOS_TECNICOS_ABERTOS.delete(tecnicoId); else CHAMADOS_TECNICOS_ABERTOS.add(tecnicoId); rCh(); return; }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-tr')) { opTr(t.dataset.id); }
     if(t.classList.contains('btn-redir')) { opRedirecionar(t.dataset.id); }
@@ -5054,7 +5086,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.29"></script>
+<script src="/release-info.js?v=2.5.30"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
