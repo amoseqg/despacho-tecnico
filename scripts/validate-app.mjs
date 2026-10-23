@@ -60,7 +60,7 @@ const redirecionar=parte3.match(/function opRedirecionar\(id\) \{[\s\S]*?\n\}/)?
 assert.ok(redirecionar,'A opção de redirecionamento deve existir.');
 assert.match(redirecionar,/D\.tc\.filter\(t => t\.u !== c\.te\)/,'O redirecionamento deve listar todos os técnicos ativos, exceto o técnico atual.');
 assert.doesNotMatch(redirecionar,/tecnicoCompativel/,'A lista de redirecionamento não pode ocultar técnicos por skill ou região.');
-assert.match(parte3,/function slaRegiao\(v,skill=''\) \{ return skill==='vistoria'\?'24h'/,'A skill Vistoria deve receber SLA de 24 horas.');
+assert.match(parte3,/function slaRegiao\(v,skill=''\) \{ return skill==='vistoria'\?'48h'/,'A skill Vistoria deve receber SLA de 48 horas.');
 assert.match(parte1a,/value=\"Mudança de endereço\|200\.00\"/,'Mudança de endereço deve custar R$ 200,00.');
 assert.match(parte1a,/id=\"ex-material-nome\"[\s\S]*?id=\"ex-material-unidade\"[\s\S]*?id=\"ex-material-qtd\"[\s\S]*?id=\"ex-material-valor-unit\"[\s\S]*?id=\"ex-material-total\"/,'O formulário deve coletar material, unidade, quantidade, valor unitário e total.');
 assert.match(parte3,/setInterval\(\(\)=>\{if\(SB_PROFILE\)void nfChatAtualizarBadge\(\);\},15000\)/,'O contador de mensagens novas deve atualizar periodicamente.');
