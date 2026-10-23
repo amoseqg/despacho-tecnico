@@ -450,7 +450,8 @@ function selecionados(nome) { return Array.from(document.querySelectorAll(`input
 function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra', vistoria: 'Vistoria' })[v] || 'Não definida'; }
 function nomeArea(v) { return ({ norte: 'Norte', leste: 'Leste', sul: 'Sul', oeste: 'Oeste', interior: 'Interior', noronha: 'Fernando de Noronha' })[v] || 'Não definida'; }
 function nomeRegiao(v) { return ({ capital: '🏙️ Capital', interior: '🌾 Interior', noronha: '🏝️ Fernando de Noronha' })[v] || 'Região não definida'; }
-function slaRegiao(v,skill='') { return skill==='vistoria'?'24h':(v === 'interior' ? '8h' : '6h'); }
+function slaRegiao(v,skill='') { return skill==='vistoria'?'48h':(v === 'interior' ? '8h' : '6h'); }
+function atualizarRotulosSlaRegiao(){const campo=el('c-re');if(!campo)return;const skill=el('c-sk')?.value||'';const nomes={capital:'🏙️ Capital',interior:'🌾 Interior',noronha:'🏝️ Fernando de Noronha'};Array.from(campo.options).forEach(op=>{if(op.value)op.textContent=`${nomes[op.value]||op.value} — SLA ${slaRegiao(op.value,skill).replace(/h$/,' horas')}`;});}
 function skillChamado(c){return c?.atividadeServico==='vistoria'?'vistoria':(c?.skill||'');}
 function skillsTec(t) { return t.sk && t.sk.length ? t.sk : ['voz','dados','infra']; }
 const ENDERECO_TAG='__ENTREGA__:';
@@ -571,11 +572,12 @@ function atualizarCamposRegiao() {
   const capitalChamado = el('c-re').value === 'capital';
   el('c-area-box').classList.toggle('hidden', !capitalChamado);
   if (!capitalChamado) el('c-area').value = '';
+  atualizarRotulosSlaRegiao();
   atualizarTecnicosChamado();
 }
 
 function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='', skill='') {
-  const sla=skill==='vistoria'?{v:12*3600,a:18*3600,r:24*3600}:(SLA[reg]||SLA.capital);
+  const sla=skill==='vistoria'?{v:24*3600,a:36*3600,r:48*3600}:(SLA[reg]||SLA.capital);
   const inicio=new Date(iso).getTime(),agora=Date.now();
   const pendencia=new Date(pendenciaDesde).getTime();
   const pausaAtiva=pendenciaDesde&&Number.isFinite(pendencia)?Math.max(0,Math.floor((agora-pendencia)/1000)):0;
@@ -1579,7 +1581,7 @@ async function addCh() {
     el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
     el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
     el('c-de').value = ''; el('c-dtexec').value = '';
-    el('c-sk').value = ''; el('c-area').value = '';
+    el('c-sk').value = ''; el('c-area').value = ''; atualizarRotulosSlaRegiao();
     el('c-tecnico').innerHTML = '<option value="">Selecione primeiro a skill e a área...</option>'; el('c-liberar-area').checked = false;
     el('c-status').textContent = 'Cole a descrição para localizar automaticamente o circuito e carregar os dados do site.';
     el('c-status').style.color = 'var(--gr)';
@@ -3342,13 +3344,32 @@ async function enviarFotosChamadoEmail(id,botao){
   }catch(err){if(outlookWindow&&!outlookWindow.closed)outlookWindow.close();throw err;}
   finally{if(botao)botao.disabled=false;}
 }
+function abrirDetalheChamadoFoto(id){
+  const c=D.ch.find(x=>String(x.id)===String(id));if(!c)return;
+  let m=el('m-detalhe-foto-chamado');
+  if(!m){
+    m=document.createElement('div');m.id='m-detalhe-foto-chamado';m.className='modal';
+    m.innerHTML='<div class="modal-box" style="max-width:780px"><div class="modal-hd"><h3>📋 Detalhes do chamado</h3><button type="button" class="close" id="cls-detalhe-foto-chamado">×</button></div><div class="modal-bd" id="detalhe-foto-chamado-conteudo"></div></div>';
+    document.body.appendChild(m);
+    el('cls-detalhe-foto-chamado').onclick=()=>m.classList.remove('a');
+    m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('a');});
+  }
+  const regiao=c.re==='capital'?nomeArea(c.area):(c.re==='interior'?'Interior':(c.re==='noronha'?'Fernando de Noronha':'Não definida'));
+  el('detalhe-foto-chamado-conteudo').innerHTML=`<div class="os-h"><strong>${esc(identificacaoOs(c))} — ${esc(c.si||'Cliente não informado')}</strong></div>
+    ${dadosSite(c)}${dadosAberturaPortal(c)}
+    <div class="os-r"><b>Região:</b> ${esc(regiao)} — SLA ${esc(slaRegiao(c.re,skillChamado(c)))}</div>
+    <div class="os-r"><b>Skill necessária:</b> ${esc(nomeSkill(skillChamado(c)))}</div>
+    <div class="info" style="margin-top:10px"><b>Descrição do chamado</b><div style="margin-top:6px;white-space:pre-wrap">${valorInfo(c.de||'Não informada')}</div></div>
+    <div class="os-r" style="margin-top:8px"><b>Técnico:</b> ${esc(nt(c.te)||'—')} • <b>Encerrado:</b> ${c.cc?esc(new Date(c.cc).toLocaleString('pt-BR')):'—'}</div>`;
+  m.classList.add('a');
+}
 function renderFotosAdmin(){
   const box=el('fotos-admin');if(!box||SB_PROFILE?.tipo!=='admin')return;
   const busca=normalizarRotuloDescricao(el('busca-fotos-admin')?.value||'').toLowerCase();
   const lista=D.ch.filter(c=>c.st==='concluida'&&(SB_FOTOS_MAP.get(c.id)||[]).length)
     .filter(c=>!busca||normalizarRotuloDescricao(`${c.pr} ${c.si} ${nt(c.te)}`).toLowerCase().includes(busca))
     .sort((a,b)=>new Date(b.cc||0)-new Date(a.cc||0));
-  box.innerHTML=lista.map(c=>`<div class="os"><div class="os-h"><strong>${esc(c.pr)} — ${esc(c.si||'')}</strong><span class="badge b-concluida">${(SB_FOTOS_MAP.get(c.id)||[]).length} foto(s)</span></div><div class="os-r"><b>Técnico:</b> ${esc(nt(c.te)||'—')} • <b>Encerrado:</b> ${c.cc?new Date(c.cc).toLocaleString('pt-BR'):'—'}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-fotos" data-id="${esc(c.id)}">📷 Ver registros fotográficos</button><button class="btn btn-s btn-email-fotos" data-id="${esc(c.id)}">✉️ Enviar por e-mail</button></div></div>`).join('')||'<div class="empty">Nenhum registro fotográfico encontrado.</div>';
+  box.innerHTML=lista.map(c=>`<div class="os"><div class="os-h"><button type="button" class="btn-foto-detalhe" data-id="${esc(c.id)}" style="border:0;background:transparent;padding:0;color:var(--t);font:inherit;font-weight:700;text-align:left;cursor:pointer;text-decoration:underline;text-underline-offset:2px">${esc(c.pr)} — ${esc(c.si||'')}</button><span class="badge b-concluida">${(SB_FOTOS_MAP.get(c.id)||[]).length} foto(s)</span></div><div class="os-r"><b>Técnico:</b> ${esc(nt(c.te)||'—')} • <b>Encerrado:</b> ${c.cc?new Date(c.cc).toLocaleString('pt-BR'):'—'}</div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn btn-p btn-fotos" data-id="${esc(c.id)}">📷 Ver registros fotográficos</button><button class="btn btn-s btn-email-fotos" data-id="${esc(c.id)}">✉️ Enviar por e-mail</button></div></div>`).join('')||'<div class="empty">Nenhum registro fotográfico encontrado.</div>';
 }
 async function opEx(id) {
   EID = id;
@@ -3801,7 +3822,7 @@ document.addEventListener('DOMContentLoaded', function() {
     el('t-multi').checked = Array.from(document.querySelectorAll('input[name="t-sk"]')).every(i => i.checked);
   }));
   el('c-re').addEventListener('change', atualizarCamposRegiao);
-  el('c-sk').addEventListener('change', atualizarTecnicosChamado);
+  el('c-sk').addEventListener('change',()=>{atualizarRotulosSlaRegiao();atualizarTecnicosChamado();});
   el('c-area').addEventListener('change', atualizarTecnicosChamado);
   el('c-liberar-area').addEventListener('change', atualizarTecnicosChamado);
   atualizarCamposRegiao();
@@ -3916,7 +3937,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat') || e.target;
+    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
@@ -3930,6 +3951,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-rc')) { opRc(t.dataset.id); }
     if(t.classList.contains('btn-ex')) { opEx(t.dataset.id); }
     if(t.classList.contains('btn-ajustar')) { reabrirAjuste(t.dataset.id); }
+    if(t.classList.contains('btn-foto-detalhe')) { abrirDetalheChamadoFoto(t.dataset.id); }
     if(t.classList.contains('btn-fotos')) { abrirFotosChamado(t.dataset.id).catch(err=>sbShowError('Não foi possível abrir as fotos',err)); }
     if(t.classList.contains('btn-email-fotos')) { enviarFotosChamadoEmail(t.dataset.id,t).catch(err=>sbShowError('Não foi possível preparar o e-mail',err)); }
     if(t.classList.contains('btn-reset-senha')) { enviarRedefinicaoSenhaAdmin(t.dataset.u, t.dataset.email); }
