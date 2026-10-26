@@ -1370,27 +1370,79 @@ function rLog(){
 function normalizarChaveEstoque(valor){return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');}
 function calcularEstoqueTecnicos(){
  const mapa=new Map(),chave=(tecnico,material)=>String(tecnico)+'|'+String(material);
+ const obter=(tecnico,m)=>{const k=chave(tecnico,m.id);if(!mapa.has(k))mapa.set(k,{tecnico,materialId:m.id,material:m.nome,unidade:m.unidade,entregue:0,consumoExecucao:0,aplicacaoPendente:0,aplicacaoAprovada:0});return mapa.get(k);};
  for(const r of D.mr||[]){
   if(r.status!=='entregue'||!(Number(r.qtdEntregue)>0)||!r.tecnico)continue;
-  const m=materialById(r.materialId);if(!m)continue;
-  const k=chave(r.tecnico,m.id),row=mapa.get(k)||{tecnico:r.tecnico,material:m.nome,unidade:m.unidade,entregue:0,consumido:0};
-  row.entregue+=Number(r.qtdEntregue)||0;mapa.set(k,row);
+  const m=materialById(r.materialId);if(m)obter(r.tecnico,m).entregue+=Number(r.qtdEntregue)||0;
  }
+ const usosAtivos=new Set((D.aplicacoesMateriais||[]).filter(a=>['aguardando_aprovacao','aprovado'].includes(a.status)).map(a=>[a.tecnico,a.chamadoId,a.materialId].join('|')));
  for(const c of D.ch||[])for(const item of normalizarMateriaisUtilizados(c.ex||{})){
   const nk=normalizarChaveEstoque(item.nome),uk=normalizarChaveEstoque(item.unidade);
   const m=(D.mat||[]).find(x=>normalizarChaveEstoque(x.nome)===nk&&normalizarChaveEstoque(x.unidade)===uk);
-  if(!m||!c.te)continue;
-  const k=chave(c.te,m.id),row=mapa.get(k)||{tecnico:c.te,material:m.nome,unidade:m.unidade,entregue:0,consumido:0};
-  row.consumido+=Number(item.quantidade)||0;mapa.set(k,row);
+  if(!m||!c.te||usosAtivos.has([c.te,c.id,m.id].join('|')))continue;
+  obter(c.te,m).consumoExecucao+=Number(item.quantidade)||0;
  }
- return [...mapa.values()].map(row=>({...row,saldo:Math.max(0,row.entregue-row.consumido)}))
+ for(const uso of D.aplicacoesMateriais||[]){
+  if(!['aguardando_aprovacao','aprovado'].includes(uso.status))continue;
+  const m=materialById(uso.materialId);if(!m||!uso.tecnico)continue;
+  const row=obter(uso.tecnico,m);
+  if(uso.status==='aguardando_aprovacao')row.aplicacaoPendente+=Number(uso.quantidade)||0;
+  else row.aplicacaoAprovada+=Number(uso.quantidade)||0;
+ }
+ return [...mapa.values()].map(row=>({...row,saldo:Math.max(0,row.entregue-row.consumoExecucao-row.aplicacaoPendente-row.aplicacaoAprovada)}))
   .sort((a,b)=>nt(a.tecnico).localeCompare(nt(b.tecnico),'pt-BR')||a.material.localeCompare(b.material,'pt-BR'));
 }
 function renderEstoqueTecnicos(containerId,tecnicoUsuario='',buscaId=''){
  const box=el(containerId);if(!box)return;
  const busca=normalizarChaveEstoque(buscaId?el(buscaId)?.value:'');
  const rows=calcularEstoqueTecnicos().filter(row=>(!tecnicoUsuario||row.tecnico===tecnicoUsuario)&&(!busca||normalizarChaveEstoque(nt(row.tecnico)+' '+row.material).includes(busca)));
- box.innerHTML=rows.length?'<div style="overflow-x:auto"><table class="table"><thead><tr>'+(tecnicoUsuario?'':'<th>Técnico</th>')+'<th>Material</th><th>Unidade</th><th>Entregue</th><th>Consumo registrado</th><th>Saldo estimado</th></tr></thead><tbody>'+rows.map(row=>'<tr>'+(tecnicoUsuario?'':'<td>'+escM(nt(row.tecnico))+'</td>')+'<td>'+escM(row.material)+'</td><td>'+escM(row.unidade)+'</td><td>'+escM(row.entregue)+'</td><td>'+escM(row.consumido)+'</td><td><b>'+escM(row.saldo)+'</b></td></tr>').join('')+'</tbody></table></div><div class="info">Saldo estimado: entregas confirmadas menos materiais registrados nas execuções. Diferenças de nome ou unidade no registro de consumo podem deixar itens sem abatimento.</div>':'<div class="empty"><h3>Nenhum saldo de material registrado</h3><p>O estoque aparece após a confirmação de entregas de materiais aos técnicos.</p></div>';
+ box.innerHTML=rows.length?'<div style="overflow-x:auto"><table class="table"><thead><tr>'+(tecnicoUsuario?'':'<th>Técnico</th>')+'<th>Material</th><th>Unidade</th><th>Entregue</th><th>Consumo em serviços</th><th>Aplicação pendente</th><th>Aplicação aprovada</th><th>Saldo disponível</th>'+(tecnicoUsuario?'<th>Ação</th>':'')+'</tr></thead><tbody>'+rows.map(row=>'<tr>'+(tecnicoUsuario?'':'<td>'+escM(nt(row.tecnico))+'</td>')+'<td>'+escM(row.material)+'</td><td>'+escM(row.unidade)+'</td><td>'+escM(row.entregue)+'</td><td>'+escM(row.consumoExecucao)+'</td><td>'+escM(row.aplicacaoPendente)+'</td><td>'+escM(row.aplicacaoAprovada)+'</td><td><b>'+escM(row.saldo)+'</b></td>'+(tecnicoUsuario?'<td><button type="button" class="btn btn-y btn-aplicar-material" data-material-id="'+escM(row.materialId)+'" data-saldo="'+escM(row.saldo)+'" '+(row.saldo>0?'':'disabled')+'>Registrar aplicação</button></td>':'')+'</tr>').join('')+'</tbody></table></div><div class="info">Aplicações enviadas à Logística reduzem o saldo disponível enquanto aguardam aprovação. Aplicações rejeitadas deixam de ser abatidas.</div>':'<div class="empty"><h3>Nenhum saldo de material registrado</h3><p>O estoque aparece após a confirmação de entregas de materiais aos técnicos.</p></div>';
+}
+function abrirRegistroAplicacaoMaterial(materialId){
+ if(S?.t!=='tec'||!SB_PROFILE?.id)return;
+ const m=materialById(materialId);if(!m)return;
+ const row=calcularEstoqueTecnicos().find(x=>x.tecnico===S.u&&String(x.materialId)===String(materialId)),saldo=Number(row?.saldo||0);
+ if(saldo<=0){nfToast('Não há saldo disponível deste material.','erro');return;}
+ const servicos=D.ch.filter(c=>c.te===S.u&&['andamento','concluida'].includes(c.st));
+ if(!servicos.length){nfToast('Não há serviços seus disponíveis para vincular esta aplicação.','erro');return;}
+ const dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(620px,calc(100% - 24px));max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:0;box-shadow:0 24px 70px #0005;color:#16324f';
+ dialog.innerHTML='<form id="aplicacao-material-form" style="padding:20px"><h3 style="margin:0 0 8px">📦 Registrar aplicação de material</h3><p class="info">'+escM(m.nome)+' — saldo disponível: <b>'+escM(saldo)+' '+escM(m.unidade)+'</b>. O registro sairá do saldo enquanto aguarda aprovação logística.</p><div class="form-group"><label class="label" for="aplicacao-material-servico">Serviço em que foi aplicado</label><select id="aplicacao-material-servico" class="select" required><option value="">Selecione o serviço...</option>'+servicos.map(c=>'<option value="'+escM(c.id)+'">'+escM(c.pr||'Sem protocolo')+' — '+escM(c.si||'Cliente não informado')+' — '+escM(c.ex?.atv||c.atividadeServico||nomeSkill(skillChamado(c)))+'</option>').join('')+'</select></div><div class="grid-2"><div class="form-group"><label class="label" for="aplicacao-material-qtd">Quantidade aplicada ('+escM(m.unidade)+')</label><input id="aplicacao-material-qtd" class="input" type="number" min="0.01" max="'+escM(saldo)+'" step="any" required></div><div class="form-group"><label class="label" for="aplicacao-material-local">Onde foi aplicado</label><input id="aplicacao-material-local" class="input" maxlength="2000" placeholder="Ex.: rack, aparelho, setor ou ambiente" required></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-s cancelar">Cancelar</button><button type="submit" class="btn btn-p salvar">Enviar para aprovação</button></div><p class="erro" role="alert" style="color:#b91c1c"></p></form>';
+ document.body.append(dialog);dialog.querySelector('.cancelar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ dialog.querySelector('#aplicacao-material-form').addEventListener('submit',async ev=>{
+  ev.preventDefault();const qtd=Number(dialog.querySelector('#aplicacao-material-qtd').value),chamadoId=dialog.querySelector('#aplicacao-material-servico').value,local=dialog.querySelector('#aplicacao-material-local').value.trim(),btn=dialog.querySelector('.salvar');
+  if(!chamadoId||!Number.isFinite(qtd)||qtd<=0||qtd>saldo||local.length<3){dialog.querySelector('.erro').textContent='Informe serviço, quantidade válida dentro do saldo e local de aplicação.';return;}
+  const servico=servicos.find(c=>String(c.id)===String(chamadoId));if(!servico){dialog.querySelector('.erro').textContent='Atualize a tela e selecione um serviço válido.';return;}
+  try{
+   btn.disabled=true;btn.textContent='Enviando...';
+   const {error}=await SB.from('aplicacoes_materiais_tecnicos').insert({tecnico_id:SB_PROFILE.id,material_id:m.id,chamado_id:servico.id,quantidade:qtd,local_aplicacao:local,servico_nome:servico.ex?.atv||servico.atividadeServico||nomeSkill(skillChamado(servico)),status:'aguardando_aprovacao'}).select('id').single();
+   if(error)throw error;dialog.close();await sbRecarregarDados();nfToast('Aplicação enviada à Logística. A quantidade foi retirada do saldo disponível.','sucesso');
+  }catch(err){dialog.querySelector('.erro').textContent=err?.message||'Não foi possível enviar a aplicação.';btn.disabled=false;btn.textContent='Enviar para aprovação';}
+ });
+ dialog.showModal();
+}
+function renderAplicacoesMaterialTecnico(containerId){
+ const box=el(containerId);if(!box)return;
+ const list=(D.aplicacoesMateriais||[]).filter(a=>a.tecnico===S?.u).slice().reverse();
+ box.innerHTML=list.length?'<div style="margin-top:12px"><h4>Aplicações registradas</h4>'+list.map(a=>'<article class="os"><div class="os-h"><b>'+escM(a.materialNome||materialById(a.materialId)?.nome||'Material')+' — '+escM(a.quantidade)+' '+escM(a.unidade||'')+'</b><span class="badge '+(a.status==='aprovado'?'b-concluida':a.status==='reprovado'?'b-recusado':'b-pendente')+'">'+(a.status==='aprovado'?'Aprovada':a.status==='reprovado'?'Reprovada':'Aguardando aprovação')+'</span></div><div class="os-r"><b>Serviço:</b> '+escM(a.protocolo||'—')+' — '+escM(a.site||'')+' ('+escM(a.servicoNome||'')+')</div><div class="os-r"><b>Aplicado em:</b> '+escM(a.localAplicacao)+'</div>'+(a.status==='reprovado'?'<div class="info"><b>Retorno da Logística:</b> '+escM(a.motivoReprovacao||'Motivo não informado')+'</div>':'')+'</article>').join('')+'</div>':'<div class="info" style="margin-top:12px">Ainda não há aplicações de materiais registradas.</div>';
+}
+function renderAprovacoesAplicacoesMaterial(containerId){
+ const box=el(containerId);if(!box)return;
+ const list=(D.aplicacoesMateriais||[]).filter(a=>a.status==='aguardando_aprovacao').slice().reverse();
+ box.innerHTML=list.length?list.map(a=>'<article class="os"><div class="os-h"><b>📦 '+escM(a.materialNome||materialById(a.materialId)?.nome||'Material')+' — '+escM(a.quantidade)+' '+escM(a.unidade||'')+'</b><span class="badge b-pendente">Aguardando aprovação</span></div><div class="os-r"><b>Técnico:</b> '+escM(nt(a.tecnico))+' &nbsp; <b>Protocolo:</b> '+escM(a.protocolo||'—')+' &nbsp; <b>Serviço:</b> '+escM(a.servicoNome||'')+'</div><div class="os-r"><b>Onde foi aplicado:</b> '+escM(a.localAplicacao)+'</div><div class="os-r"><b>Enviado em:</b> '+escM(a.solicitadoEm?new Date(a.solicitadoEm).toLocaleString('pt-BR'):'—')+'</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-g btn-aplicacao-aprovar" data-id="'+escM(a.id)+'">✅ Aprovar encerramento</button><button type="button" class="btn btn-r btn-aplicacao-reprovar" data-id="'+escM(a.id)+'">❌ Reprovar</button></div></article>').join(''):'<div class="empty">Nenhuma aplicação aguardando aprovação.</div>';
+}
+async function decidirAplicacaoMaterial(id,decisao){
+ const uso=(D.aplicacoesMateriais||[]).find(a=>String(a.id)===String(id));if(!uso||uso.status!=='aguardando_aprovacao')return;
+ if(!['adm','log'].includes(S?.t)){nfToast('Somente Administração ou Logística pode analisar aplicações.','erro');return;}
+ let motivo='';
+ if(decisao==='reprovar'){motivo=String(prompt('Informe o motivo da reprovação da aplicação:')||'').trim();if(motivo.length<3){if(motivo)alert('O motivo precisa ter pelo menos 3 caracteres.');return;}if(motivo.length>2000){alert('O motivo pode ter até 2.000 caracteres.');return;}}
+ try{
+  const btn=document.querySelector('.btn-aplicacao-'+(decisao==='aprovar'?'aprovar':'reprovar')+'[data-id="'+CSS.escape(String(id))+'"]');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  const {data,error}=await SB.from('aplicacoes_materiais_tecnicos').update({status:decisao==='aprovar'?'aprovado':'reprovado',motivo_reprovacao:decisao==='aprovar'?null:motivo,decidido_por:SB_PROFILE.id,decidido_em:new Date().toISOString()}).eq('id',id).eq('status','aguardando_aprovacao').select('id').single();
+  if(error)throw error;if(!data)throw new Error('Esta aplicação já foi analisada por outro usuário.');
+  await sbRecarregarDados();nfToast(decisao==='aprovar'?'Aplicação aprovada e encerrada.':'Aplicação reprovada; o saldo disponível do técnico foi restaurado.','sucesso');
+ }catch(err){sbShowError('Não foi possível decidir a aplicação do material',err);await sbRecarregarDados();}
 }
 function rTmat(){
  const ps=el('tm-protocolo'),ms=el('tm-material'),av=el('tm-avulso-material'),box=el('tm-lista');if(!ps||!ms||!box)return;
