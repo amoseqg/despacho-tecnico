@@ -1409,6 +1409,45 @@ function rTmat(){
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
  renderEstoqueTecnicos('t-materiais-estoque',S.u);
 }
+function solicitarMaterial(){
+ const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid&&x.te===S.u&&x.st==='andamento');
+ if(!cid||!mid||!q||q<1){alert('Preencha protocolo, material e quantidade');return;}
+ if(!c){alert('Selecione um chamado que esteja em atendimento.');rTmat();return;}
+ if(D.mr.some(r=>r.chamadoId===cid&&r.materialId===mid&&['solicitado','direcionado','separado'].includes(r.status))){alert('Já existe uma solicitação pendente deste material para este chamado.');return;}
+ D.mr.push({id:'MR-'+Date.now(),chamadoId:cid,tecnico:S.u,materialId:mid,qtdSolicitada:q,qtdSeparada:0,qtdEntregue:0,status:'solicitado',obs,data:ag(),protocolo:c.pr||'',infoChamado:c.si+' — '+c.de});
+ sv();el('tm-material').value='';el('busca-material-tecnico').value='';el('tm-qtd').value='';el('tm-obs').value='';rTmat();alert('Solicitação enviada ao administrador.');
+}
+async function solicitarMaterialAvulso(){
+ const mid=el('tm-avulso-material')?.value,q=Number(el('tm-avulso-qtd')?.value),motivo=String(el('tm-avulso-motivo')?.value||'').trim(),btn=el('btn-tm-avulso-solicitar');
+ if(!SB_PROFILE?.id||S?.t!=='tec'){alert('Entre na área do técnico para enviar a solicitação.');return;}
+ if(!mid||!Number.isFinite(q)||q<1||motivo.length<3){alert('Informe o material, uma quantidade válida e o motivo da solicitação.');return;}
+ if(motivo.length>2000){alert('O motivo deve ter até 2.000 caracteres.');return;}
+ if(!materialById(mid)){alert('O material selecionado não está mais disponível.');return;}
+ try{
+  if(btn){btn.disabled=true;btn.textContent='Enviando...';}
+  const {error}=await SB.from('solicitacoes_material').insert({chamado_id:null,tecnico_id:SB_PROFILE.id,material_id:mid,quantidade_solicitada:q,quantidade_separada:0,quantidade_entregue:0,status:'solicitado',observacao:null,avulso:true,motivo_solicitacao:motivo,status_aprovacao:'aguardando'}).select('id').single();
+  if(error)throw error;
+  el('tm-avulso-qtd').value='';el('tm-avulso-motivo').value='';
+  await sbRecarregarDados();alert('Solicitação enviada para aprovação da Logística.');
+ }catch(err){sbShowError('Não foi possível enviar a solicitação avulsa',err);}
+ finally{if(btn){btn.disabled=false;btn.textContent='📤 Enviar para aprovação';}}
+}
+async function decidirMaterialAvulso(id,decisao){
+ const r=D.mr.find(item=>String(item.id)===String(id));if(!r||!r.avulso||r.statusAprovacao!=='aguardando')return;
+ if(!['adm','log'].includes(S?.t)){alert('Somente Administração ou Logística pode analisar esta solicitação.');return;}
+ let motivo='';
+ if(decisao==='reprovar'){
+  motivo=String(prompt('Informe o motivo da reprovação. Esta mensagem será enviada ao técnico:')||'').trim();
+  if(motivo.length<3){if(motivo)alert('O motivo deve ter pelo menos 3 caracteres.');return;}
+  if(motivo.length>2000){alert('O motivo deve ter até 2.000 caracteres.');return;}
+ }
+ const update=decisao==='aprovar'?{status_aprovacao:'aprovado',aprovado_por:SB_PROFILE?.id,aprovado_em:new Date().toISOString()}:{status_aprovacao:'reprovado',motivo_reprovacao:motivo,status:'cancelado',responsavel_id:SB_PROFILE?.id};
+ try{
+  const {data,error}=await SB.from('solicitacoes_material').update({...update,atualizado_em:new Date().toISOString()}).eq('id',id).eq('avulso',true).eq('status_aprovacao','aguardando').select('id').single();
+  if(error)throw error;if(!data)throw new Error('A solicitação já foi analisada por outro usuário.');
+  await sbRecarregarDados();alert(decisao==='aprovar'?'Solicitação aprovada. Ela seguirá para o trâmite de liberação logística.':'Solicitação reprovada. O técnico verá o motivo ao acessar seus materiais.');
+ }catch(err){sbShowError('Não foi possível registrar a decisão da solicitação',err);await sbRecarregarDados();}
+}
 // ========== CADASTROS ==========
 function limparCEP(v){return String(v||'').replace(/\D/g,'').slice(0,8);}
 function formatarCEP(v){const s=limparCEP(v);return s.length>5?s.slice(0,5)+'-'+s.slice(5):s;}
@@ -4008,6 +4047,9 @@ document.addEventListener('DOMContentLoaded', function() {
   el('btn-limpar-entregues')?.addEventListener('click',limparMateriaisEntregues);
   document.querySelectorAll('.btn-exp-materiais-liberados').forEach(btn=>btn.addEventListener('click',exportarMateriaisLiberados));
   const btnSolic=el('btn-tm-solicitar'); if(btnSolic) btnSolic.addEventListener('click',solicitarMaterial);
+  el('btn-tm-avulso-solicitar')?.addEventListener('click',solicitarMaterialAvulso);
+  el('ml-busca-estoque-tecnico')?.addEventListener('input',()=>renderEstoqueTecnicos('ml-materiais-tecnicos-estoque','','ml-busca-estoque-tecnico'));
+  el('lg-busca-estoque-tecnico')?.addEventListener('input',()=>renderEstoqueTecnicos('lg-materiais-tecnicos-estoque','','lg-busca-estoque-tecnico'));
   let circuitoDescricaoTimer=null;
   el('c-descricao-colada').addEventListener('input',function(){
     clearTimeout(circuitoDescricaoTimer);
@@ -4146,7 +4188,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
+    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
@@ -4170,6 +4212,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-endereco-tec')) { editarEnderecoTecnico(t.dataset.u); }
     if(t.classList.contains('btn-rm-adm')) { rmAd(t.dataset.u); }
     if(t.classList.contains('btn-ml-processar')) { abrirGestaoSolicitacaoMaterial(t.dataset.id); }
+    if(t.classList.contains('btn-avulso-aprovar')) { decidirMaterialAvulso(t.dataset.id,'aprovar'); }
+    if(t.classList.contains('btn-avulso-reprovar')) { decidirMaterialAvulso(t.dataset.id,'reprovar'); }
     if(t.classList.contains('btn-mat-direcionar')) { direcionarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-mat-separar')) { separarMaterial(t.dataset.id); }
     if(t.classList.contains('btn-mat-entregar')) { entregarMaterial(t.dataset.id); }
