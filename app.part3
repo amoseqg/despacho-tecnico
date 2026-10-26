@@ -1519,9 +1519,7 @@ async function addOsServico() {
 async function addCh() {
   const pr = el('c-pr').value.trim();
   const sdm = el('c-sdm').value.trim();
-  const site = MODO_MANUAL_CHAMADO
-    ? (String(el('c-ci-manual')?.value||'').trim() ? {manual:true} : null)
-    : buscarCircuito();
+  const site = buscarCircuito();
   const abertura = el('c-abertura').value;
   const si = el('c-si').value.trim();
   const ci = MODO_MANUAL_CHAMADO ? String(el('c-ci-manual')?.value||'').trim() : el('c-ci').value.trim();
@@ -3972,6 +3970,7 @@ document.addEventListener('DOMContentLoaded', function() {
   el('c-descricao-colada').addEventListener('change',buscarCircuitoNaDescricao);
   el('c-manual-toggle')?.addEventListener('click',()=>definirModoManualChamado(!MODO_MANUAL_CHAMADO));
   el('c-ci-manual')?.addEventListener('input',function(){el('c-ci').value=this.value.trim();});
+  el('c-ci-manual')?.addEventListener('change',buscarCircuito);
   document.querySelectorAll('[data-manual-site="1"]').forEach(campo=>campo.addEventListener('input',()=>{if(campo.id==='c-tecnicos-planilha')atualizarTecnicosChamado();}));
   ['c-pr','c-sdm'].forEach(id=>el(id).addEventListener('input',function(){
     this.dataset.preenchimento='manual';
