@@ -731,6 +731,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         </div>
         <div class="grid-2">
           <div class="form-group"><label class="label">Quem abriu o chamado</label><select id="c-abertura" class="select"><option value="">Selecione...</option><option value="Vectra">Vectra</option><option value="Método">Método</option><option value="Umtelecom">Umtelecom</option></select></div>
+          <div class="form-group hidden" id="c-ramal-box"><label class="label" for="c-ramal">Número do ramal (Voz — Vectra/Método)</label><input type="text" id="c-ramal" class="input" inputmode="numeric" autocomplete="off" placeholder="Informe o ramal do atendimento"></div>
         </div>
         <div class="grid-2">
           <div class="form-group"><label class="label">Site / Cliente</label><input type="text" id="c-si" class="input" data-manual-site="1" readonly></div>
@@ -833,6 +834,10 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <div class="info">Saldo estimado a partir das entregas confirmadas menos o consumo registrado nas execuções.</div>
         <div class="form-group"><label class="label" for="ml-busca-estoque-tecnico">Localizar técnico ou material</label><input type="search" id="ml-busca-estoque-tecnico" class="input" placeholder="Digite o nome do técnico ou material"></div>
         <div id="ml-materiais-tecnicos-estoque"></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">✅ Aprovação de materiais aplicados pelos técnicos</h3>
+        <div id="ml-aplicacoes-materiais-tecnicos"></div>
       </div>
       <div class="card" style="margin-bottom:12px">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">🚚 Rastreamento de Materiais do Interior</h3>
@@ -995,6 +1000,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="card">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📦 Materiais em estoque do técnico</h3>
         <div id="t-materiais-estoque"></div>
+        <div id="t-aplicacoes-materiais"></div>
       </div>
     </div>
     <div id="t-ar" class="hidden">
@@ -1047,6 +1053,10 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <div class="info">Saldo estimado a partir das entregas confirmadas menos o consumo registrado nas execuções.</div>
       <div class="form-group"><label class="label" for="lg-busca-estoque-tecnico">Localizar técnico ou material</label><input type="search" id="lg-busca-estoque-tecnico" class="input" placeholder="Digite o nome do técnico ou material"></div>
       <div id="lg-materiais-tecnicos-estoque"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">✅ Aprovação de materiais aplicados pelos técnicos</h3>
+      <div id="lg-aplicacoes-materiais-tecnicos"></div>
     </div>
     <div class="card" style="margin-top:12px">
       <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">📦 Estoque Logístico</h3>
