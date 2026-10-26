@@ -969,6 +969,7 @@ function rMl(){
  }).join(''):'<div class="empty"><h3>'+(busca?'Nenhuma solicitação localizada':'Nenhuma solicitação de material')+'</h3>'+(busca?'<p>Confira o nome do técnico ou o protocolo informado.</p>':'')+'</div>';
  rRastreioMateriais('ml-rastreio-lista');
  renderEstoqueTecnicos('ml-materiais-tecnicos-estoque','','ml-busca-estoque-tecnico');
+ renderAprovacoesAplicacoesMaterial('ml-aplicacoes-materiais-tecnicos');
  rMlEstoque();rMateriaisCadastro();
 }
 function rMlEstoque(){
@@ -1365,6 +1366,7 @@ function rLog(){
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
  rRastreioMateriais('lg-rastreio-lista');
  renderEstoqueTecnicos('lg-materiais-tecnicos-estoque','','lg-busca-estoque-tecnico');
+ renderAprovacoesAplicacoesMaterial('lg-aplicacoes-materiais-tecnicos');
  rLogEstoque();
 }
 function normalizarChaveEstoque(valor){return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');}
@@ -1460,6 +1462,7 @@ function rTmat(){
   return '<div class="os"><div class="os-h"><span class="os-id">📦 '+escM(m?m.nome:r.materialNome)+'</span><span class="badge '+st[0]+'">'+st[1]+'</span></div><div class="os-r"><b>'+(r.avulso?'Solicitação avulsa':'Protocolo')+':</b> '+(r.avulso?'Sem protocolo':escM(c?c.pr:r.protocolo||'—'))+'</div><div class="os-r"><b>Solicitado:</b> '+escM(r.qtdSolicitada||0)+' '+escM(m?m.unidade:'')+' &nbsp; <b>Separado:</b> '+escM(r.qtdSeparada||0)+' &nbsp; <b>Em trâmite:</b> '+escM(meta.quantidadeEmTransito||0)+' &nbsp; <b>Entregue:</b> '+escM(r.qtdEntregue||0)+'</div>'+(r.avulso&&r.motivoSolicitacao?'<div class="os-r"><b>Motivo:</b> '+escM(r.motivoSolicitacao)+'</div>':'')+(r.statusAprovacao==='reprovado'?'<div class="info" role="status"><b>Retorno da Logística:</b> Solicitação reprovada. Motivo: '+escM(r.motivoReprovacao||'Motivo não informado.')+'</div>':'')+'<div class="os-r"><b>Previsão de entrega:</b> '+(meta.prazo?escM(new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR')):'Ainda não informada pela Logística')+'</div>'+rastreioTramite(r)+logDetalhes(r)+'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+(aceitar?'<button class="btn btn-g btn-tech-aceitar-material" data-id="'+escM(r.id)+'">✅ Confirmar recebimento do material</button>':'')+(r.status==='separado'&&meta.prazo?'<button class="btn btn-y btn-tech-consultar-entrega" data-id="'+escM(r.id)+'">📅 Consultar previsão de entrega</button>':'')+'</div></div>';
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
  renderEstoqueTecnicos('t-materiais-estoque',S.u);
+ renderAplicacoesMaterialTecnico('t-aplicacoes-materiais');
 }
 function solicitarMaterial(){
  const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid&&x.te===S.u&&x.st==='andamento');
