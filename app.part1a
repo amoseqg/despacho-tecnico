@@ -978,10 +978,6 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <div class="form-group"><label class="label">Observação / finalidade</label><textarea id="tm-obs" class="input" rows="2" placeholder="Informe para qual atividade o material será utilizado"></textarea></div>
         <button class="btn btn-p" id="btn-tm-solicitar">📤 Solicitar Material</button>
       </div>
-      <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📋 Meus Materiais Solicitados e Entregues</h3>
-        <div id="tm-lista"></div>
-      </div>
       <div class="card" style="margin-bottom:12px">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📝 Solicitação Avulsa de Material</h3>
         <div class="info">Use esta opção quando o material não estiver vinculado a um chamado. A Logística analisará o pedido antes de iniciar a separação.</div>
