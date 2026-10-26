@@ -1519,10 +1519,12 @@ async function addOsServico() {
 async function addCh() {
   const pr = el('c-pr').value.trim();
   const sdm = el('c-sdm').value.trim();
-  const site = buscarCircuito();
+  const site = MODO_MANUAL_CHAMADO
+    ? (String(el('c-ci-manual')?.value||'').trim() ? {manual:true} : null)
+    : buscarCircuito();
   const abertura = el('c-abertura').value;
   const si = el('c-si').value.trim();
-  const ci = el('c-ci').value.trim();
+  const ci = MODO_MANUAL_CHAMADO ? String(el('c-ci-manual')?.value||'').trim() : el('c-ci').value.trim();
   const re = el('c-re').value;
   const skill = el('c-sk').value;
   const area = el('c-area').value;
@@ -1531,9 +1533,24 @@ async function addCh() {
   const liberarArea = el('c-liberar-area').checked;
   const en = el('c-en').value.trim();
   const de = el('c-de').value.trim();
+  if(MODO_MANUAL_CHAMADO && (!ci || !si || !el('c-cd').value.trim() || !en)){
+    const statusManual=el('c-status');
+    statusManual.textContent='Para cadastrar manualmente, preencha circuito, Site / Cliente, cidade e endereço.';
+    statusManual.style.color='var(--y)';
+    const campoFaltante=!ci?el('c-ci-manual'):!si?el('c-si'):!el('c-cd').value.trim()?el('c-cd'):el('c-en');
+    campoFaltante?.focus();
+    return;
+  }
   if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
-  if (!site) { alert('Informe um circuito válido da base de dados'); return; }
+  if (!site) {
+    definirModoManualChamado(true);
+    const statusCircuito=el('c-status');
+    statusCircuito.textContent='Circuito não localizado na base. Preencha os dados do circuito manualmente e clique em Criar Chamado novamente.';
+    statusCircuito.style.color='var(--y)';
+    el('c-ci-manual')?.focus();
+    return;
+  }
   if (!skill) { alert('Selecione a skill necessária para o chamado'); return; }
   if (re === 'capital' && !area) { alert('Selecione a área de atendimento da capital'); return; }
   if (!tecnico) { alert('Selecione um técnico com cadastro ativo que atenderá o chamado'); return; }
