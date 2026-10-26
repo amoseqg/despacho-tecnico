@@ -954,24 +954,22 @@ async function arquivarMaterialIndividual(id){
  finally{arquivosMateriaisEmCurso.delete(id);await sbRecarregarDados();}
 }
 function rMl(){
-  const box=el('ml-solicitacoes'); if(!box) return;
-  const busca=String(el('busca-solicitacoes-material')?.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
-  const list=D.mr.filter(materialVisivelNaLista).filter(r=>{
-    if(!busca)return true;const c=D.ch.find(x=>x.id===r.chamadoId);
-    const protocolo=String(c?c.pr:r.protocolo||'');const tecnico=String(nt(r.tecnico)||'');
-    return (tecnico+' '+protocolo).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').includes(busca);
-  }).slice().reverse();
-  box.innerHTML=list.length?list.map(r=>{
-    const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r);
-    return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
-      <div class="os-r"><b>Protocolo:</b> ${escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'))} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
-      <div class="os-r"><b>Destino:</b> ${materialInterior(r)?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Separado:</b> ${r.qtdSeparada||0} &nbsp; <b>Entregue:</b> ${r.qtdEntregue||0}</div>
-      ${logDetalhes(r)}
-      ${r.responsavel?`<div class="os-r"><b>Responsável logística:</b> ${escM(r.responsavel)}</div>`:''}
-      <div style="margin-top:8px">${!materialOcultoDaLista(r)&&r.status==='solicitado'?`<button class="btn btn-y btn-mat-direcionar" data-id="${r.id}">➡️ Direcionar para separação</button>`:''} ${botaoArquivoMaterial(r)}</div></div>`;
-  }).join(''):`<div class="empty"><h3>${busca?'Nenhuma solicitação localizada':'Nenhuma solicitação de material'}</h3>${busca?'<p>Confira o nome do técnico ou o protocolo informado.</p>':''}</div>`;
-  rRastreioMateriais('ml-rastreio-lista');
-  rMlEstoque(); rMateriaisCadastro();
+ const box=el('ml-solicitacoes');if(!box)return;
+ const busca=String(el('busca-solicitacoes-material')?.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim();
+ const list=D.mr.filter(materialVisivelNaLista).filter(r=>{
+  if(!busca)return true;const c=D.ch.find(x=>x.id===r.chamadoId),protocolo=String(c?c.pr:r.protocolo||''),tecnico=String(nt(r.tecnico)||'');
+  return (tecnico+' '+protocolo).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').includes(busca);
+ }).slice().reverse();
+ box.innerHTML=list.length?list.map(r=>{
+  const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),aguardando=r.avulso&&r.statusAprovacao==='aguardando';
+  const aprovacao=aguardando?'<button type="button" class="btn btn-g btn-avulso-aprovar" data-id="'+escM(r.id)+'">✅ Aprovar solicitação</button> <button type="button" class="btn btn-r btn-avulso-reprovar" data-id="'+escM(r.id)+'">❌ Reprovar</button>':'';
+  const protocolo=r.avulso?'Sem protocolo':escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'));
+  const direcionar=!aguardando&&!materialOcultoDaLista(r)&&r.status==='solicitado'&&(!r.avulso||r.statusAprovacao==='aprovado')?'<button class="btn btn-y btn-mat-direcionar" data-id="'+escM(r.id)+'">➡️ Direcionar para separação</button>':'';
+  return '<div class="os"><div class="os-h"><span class="os-id">📦 '+escM(m?m.nome:r.materialNome)+' — '+escM(r.qtdSolicitada)+' '+escM(m?m.unidade:'')+'</span><span class="badge '+st[0]+'">'+st[1]+'</span></div><div class="os-r"><b>'+(r.avulso?'Solicitação avulsa':'Protocolo')+':</b> '+protocolo+' &nbsp; <b>Técnico:</b> '+escM(nt(r.tecnico))+'</div>'+(r.avulso?'<div class="os-r"><b>Motivo informado pelo técnico:</b> '+escM(r.motivoSolicitacao||'—')+'</div>':'')+(r.statusAprovacao==='reprovado'?'<div class="os-r"><b>Motivo da reprovação:</b> '+escM(r.motivoReprovacao||'—')+'</div>':'')+'<div class="os-r"><b>Destino:</b> '+(materialInterior(r)?'Interior / Fernando de Noronha':'Capital')+' &nbsp; <b>Separado:</b> '+escM(r.qtdSeparada||0)+' &nbsp; <b>Entregue:</b> '+escM(r.qtdEntregue||0)+'</div>'+logDetalhes(r)+(r.responsavel?'<div class="os-r"><b>Responsável logística:</b> '+escM(r.responsavel)+'</div>':'')+'<div style="margin-top:8px">'+aprovacao+' '+direcionar+' '+botaoArquivoMaterial(r)+'</div></div>';
+ }).join(''):'<div class="empty"><h3>'+(busca?'Nenhuma solicitação localizada':'Nenhuma solicitação de material')+'</h3>'+(busca?'<p>Confira o nome do técnico ou o protocolo informado.</p>':'')+'</div>';
+ rRastreioMateriais('ml-rastreio-lista');
+ renderEstoqueTecnicos('ml-materiais-tecnicos-estoque','','ml-busca-estoque-tecnico');
+ rMlEstoque();rMateriaisCadastro();
 }
 function rMlEstoque(){
  const s=el('ml-estoque-material');
@@ -1356,21 +1354,17 @@ function rLog(){
  const box=el('lg-list');if(!box)return;
  const list=D.mr.filter(materialVisivelNaLista).slice().reverse();
  box.innerHTML=list.length?list.map(r=>{
-   const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),interior=materialInterior(r),tec=tecnicoMaterial(r),destino=enderecoEntregaTec(tec);
-   const gerenciavel=!!m&&!meta.manual&&!materialOcultoDaLista(r)&&r.status!=='cancelado'&&r.status!=='entregue';
-   const acao=gerenciavel?`<button type="button" class="btn btn-p btn-ml-processar" data-id="${escM(r.id)}">📋 Gerenciar solicitação</button>`:'';
-   const clicavel=gerenciavel?`role="button" tabindex="0" onclick="if(!event.target.closest('button,a,input,select,textarea'))abrirGestaoSolicitacaoMaterial('${escM(r.id)}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();abrirGestaoSolicitacaoMaterial('${escM(r.id)}')}" style="cursor:pointer" title="Clique para separar e atualizar o trâmite do material"`:'';
-   const transito=Number(meta.quantidadeEmTransito||0),entregue=Number(r.qtdEntregue||0);
-   return `<div class="os" ${clicavel}><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)} — ${r.qtdSolicitada} ${escM(m?m.unidade:'')}</span><span class="badge ${st[0]}">${st[1]}</span></div>
-    <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--b)">
-      <div class="os-r"><b>Protocolo:</b> ${escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'))} &nbsp; <b>Técnico:</b> ${escM(nt(r.tecnico))}</div>
-      <div class="os-r"><b>Destino:</b> ${interior?'Interior / Fernando de Noronha':'Capital'} &nbsp; <b>Estoque atual:</b> ${escM(m?m.estoque||0:'—')}</div>
-      <div class="os-r"><b>Quantidade solicitada:</b> ${escM(r.qtdSolicitada||0)} &nbsp; <b>Separada:</b> ${escM(r.qtdSeparada||0)} &nbsp; <b>Em trâmite:</b> ${escM(transito)} &nbsp; <b>Entregue ao técnico:</b> ${escM(entregue)}</div>
-      ${interior?`<div class="os-r"><b>Entrega:</b> ${escM(enderecoEntregaTexto(tec)||'Endereço não cadastrado')}${destino.contato?' — Contato: '+escM(destino.contato):''}</div>`:''}
-      ${rastreioTramite(r)}${logDetalhes(r)}<div style="margin-top:8px">${materialOcultoDaLista(r)?'':acao} ${botaoArquivoMaterial(r)}</div>
-    </div></div>`;
+  const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),interior=materialInterior(r),tec=tecnicoMaterial(r),destino=enderecoEntregaTec(tec);
+  const gerenciavel=!!m&&!meta.manual&&!r.avulso&&!materialOcultoDaLista(r)&&r.status!=='cancelado'&&r.status!=='entregue';
+  const acao=gerenciavel?'<button type="button" class="btn btn-p btn-ml-processar" data-id="'+escM(r.id)+'">📋 Gerenciar solicitação</button>':'';
+  const clicavel=gerenciavel?'role="button" tabindex="0" onclick="if(!event.target.closest(\'button,a,input,select,textarea\'))abrirGestaoSolicitacaoMaterial(\''+escM(r.id)+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();abrirGestaoSolicitacaoMaterial(\''+escM(r.id)+'\')}" style="cursor:pointer" title="Clique para separar e atualizar o trâmite do material"':'';
+  const aprovacao=r.avulso&&r.statusAprovacao==='aguardando'?'<button type="button" class="btn btn-g btn-avulso-aprovar" data-id="'+escM(r.id)+'">✅ Aprovar solicitação</button> <button type="button" class="btn btn-r btn-avulso-reprovar" data-id="'+escM(r.id)+'">❌ Reprovar</button>':'';
+  const protocolo=r.avulso?'Sem protocolo':escM(logMeta(r).manual?logMeta(r).protocolo:(c?c.pr:r.protocolo||'—'));
+  const transito=Number(meta.quantidadeEmTransito||0),entregue=Number(r.qtdEntregue||0);
+  return '<div class="os" '+clicavel+'><div class="os-h"><span class="os-id">📦 '+escM(m?m.nome:r.materialNome)+' — '+escM(r.qtdSolicitada)+' '+escM(m?m.unidade:'')+'</span><span class="badge '+st[0]+'">'+st[1]+'</span></div><div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--b)"><div class="os-r"><b>'+(r.avulso?'Solicitação avulsa':'Protocolo')+':</b> '+protocolo+' &nbsp; <b>Técnico:</b> '+escM(nt(r.tecnico))+'</div>'+(r.avulso?'<div class="os-r"><b>Motivo informado pelo técnico:</b> '+escM(r.motivoSolicitacao||'—')+'</div>':'')+(r.statusAprovacao==='reprovado'?'<div class="os-r"><b>Motivo da reprovação:</b> '+escM(r.motivoReprovacao||'—')+'</div>':'')+'<div class="os-r"><b>Destino:</b> '+(interior?'Interior / Fernando de Noronha':'Capital')+' &nbsp; <b>Estoque atual:</b> '+escM(m?m.estoque||0:'—')+'</div><div class="os-r"><b>Quantidade solicitada:</b> '+escM(r.qtdSolicitada||0)+' &nbsp; <b>Separada:</b> '+escM(r.qtdSeparada||0)+' &nbsp; <b>Em trâmite:</b> '+escM(transito)+' &nbsp; <b>Entregue ao técnico:</b> '+escM(entregue)+'</div>'+(interior?'<div class="os-r"><b>Entrega:</b> '+escM(enderecoEntregaTexto(tec)||'Endereço não cadastrado')+(destino.contato?' — Contato: '+escM(destino.contato):'')+'</div>':'')+rastreioTramite(r)+logDetalhes(r)+'<div style="margin-top:8px">'+aprovacao+(r.avulso&&r.statusAprovacao!=='aprovado'?'':' '+acao)+' '+botaoArquivoMaterial(r)+'</div></div></div>';
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
  rRastreioMateriais('lg-rastreio-lista');
+ renderEstoqueTecnicos('lg-materiais-tecnicos-estoque','','lg-busca-estoque-tecnico');
  rLogEstoque();
 }
 function normalizarChaveEstoque(valor){return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');}
