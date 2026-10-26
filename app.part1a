@@ -829,6 +829,12 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <div id="ml-solicitacoes"></div>
       </div>
       <div class="card" style="margin-bottom:12px">
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📦 Materiais em estoque dos técnicos</h3>
+        <div class="info">Saldo estimado a partir das entregas confirmadas menos o consumo registrado nas execuções.</div>
+        <div class="form-group"><label class="label" for="ml-busca-estoque-tecnico">Localizar técnico ou material</label><input type="search" id="ml-busca-estoque-tecnico" class="input" placeholder="Digite o nome do técnico ou material"></div>
+        <div id="ml-materiais-tecnicos-estoque"></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">🚚 Rastreamento de Materiais do Interior</h3>
         <div class="info">Acompanhe o trâmite completo: solicitação, direcionamento, separação, transporte para a localidade e entrega ao técnico.</div>
         <div id="ml-rastreio-lista"></div>
@@ -972,9 +978,23 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <div class="form-group"><label class="label">Observação / finalidade</label><textarea id="tm-obs" class="input" rows="2" placeholder="Informe para qual atividade o material será utilizado"></textarea></div>
         <button class="btn btn-p" id="btn-tm-solicitar">📤 Solicitar Material</button>
       </div>
-      <div class="card">
+      <div class="card" style="margin-bottom:12px">
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📝 Solicitação Avulsa de Material</h3>
+        <div class="info">Use esta opção quando o material não estiver vinculado a um chamado. A Logística analisará o pedido antes de iniciar a separação.</div>
+        <div class="grid-3">
+          <div class="form-group"><label class="label" for="tm-avulso-material">Material / Modelo</label><select id="tm-avulso-material" class="select"></select></div>
+          <div class="form-group"><label class="label" for="tm-avulso-qtd">Quantidade</label><input type="number" min="1" step="any" id="tm-avulso-qtd" class="input" placeholder="Quantidade"></div>
+        </div>
+        <div class="form-group"><label class="label" for="tm-avulso-motivo">Motivo da solicitação</label><textarea id="tm-avulso-motivo" class="input" rows="3" minlength="3" maxlength="2000" placeholder="Descreva por que precisa deste material" required></textarea></div>
+        <button type="button" class="btn btn-p" id="btn-tm-avulso-solicitar">📤 Enviar para aprovação</button>
+      </div>
+      <div class="card" style="margin-bottom:12px">
         <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📋 Meus Materiais Solicitados e Entregues</h3>
         <div id="tm-lista"></div>
+      </div>
+      <div class="card">
+        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">📦 Materiais em estoque do técnico</h3>
+        <div id="t-materiais-estoque"></div>
       </div>
     </div>
     <div id="t-ar" class="hidden">
@@ -1021,6 +1041,12 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">🚚 Rastreamento de Materiais do Interior</h3>
       <div class="info">Trâmite: solicitado → direcionado → separado → em transporte → recebido pelo técnico.</div>
       <div id="lg-rastreio-lista"></div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">📦 Materiais em estoque dos técnicos</h3>
+      <div class="info">Saldo estimado a partir das entregas confirmadas menos o consumo registrado nas execuções.</div>
+      <div class="form-group"><label class="label" for="lg-busca-estoque-tecnico">Localizar técnico ou material</label><input type="search" id="lg-busca-estoque-tecnico" class="input" placeholder="Digite o nome do técnico ou material"></div>
+      <div id="lg-materiais-tecnicos-estoque"></div>
     </div>
     <div class="card" style="margin-top:12px">
       <h3 style="font-size:.9rem;color:var(--p);margin-bottom:10px">📦 Estoque Logístico</h3>
