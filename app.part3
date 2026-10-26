@@ -1523,7 +1523,7 @@ async function addOsServico() {
 async function addCh() {
   const pr = el('c-pr').value.trim();
   const sdm = el('c-sdm').value.trim();
-  const siteEncontrado = buscarCircuito();
+  const siteEncontrado = MODO_MANUAL_CHAMADO ? null : buscarCircuito();
   const abertura = el('c-abertura').value;
   const si = el('c-si').value.trim();
   const ci = MODO_MANUAL_CHAMADO ? String(el('c-ci-manual')?.value||'').trim() : el('c-ci').value.trim();
@@ -1564,7 +1564,7 @@ async function addCh() {
     regiaoOperacional: el('c-regiao-planilha').value, tecnicosIndicados: el('c-tecnicos-planilha').value,
     cid: el('c-cd').value, contato: el('c-co').value, horario: el('c-ho').value,
     velocidade: el('c-ve').value, prtm: el('c-pt').value, pvfTotal: el('c-pv').value,
-    st: 'pendente', te: tecnico, mr: '', tr: [], dt: liberarArea ? { tipo: 'liberacao-area', admin: S.n, d: ag(), area, regiaoOperacional: el('c-regiao-planilha').value } : null, ex: null,
+    st: 'pendente', te: tecnico, mr: '', tr: [], dt: liberarArea ? { tipo: 'liberacao-area', admin: S?.n || '', d: ag(), area, regiaoOperacional: el('c-regiao-planilha').value } : null, ex: null,
     cr: ag(), ae: null, am: null, cc: null
   };
 
@@ -1573,7 +1573,8 @@ async function addCh() {
   try{
     if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
     const adminAtual=await sbExigirSessaoAdmin();
-    if(MODO_MANUAL_CHAMADO)await salvarCadastroSiteManualChamado(novoChamado);
+    if(novoChamado.dt)novoChamado.dt.admin=adminAtual.nome;
+    // O cadastro auxiliar do site não deve impedir a abertura do chamado.
     const linha=sbChamadoRow(novoChamado);
     linha.criado_por=adminAtual.id;
     const {data,error}=await SB.from('chamados').insert(linha)
@@ -1584,6 +1585,11 @@ async function addCh() {
       throw new Error('O servidor não confirmou corretamente o chamado e o técnico selecionado.');
     }
 
+    let erroCadastroSite=null;
+    if(MODO_MANUAL_CHAMADO){
+      try{await salvarCadastroSiteManualChamado(novoChamado);}
+      catch(erro){erroCadastroSite=erro;console.error('Chamado salvo; cadastro auxiliar do site não atualizado:',erro);}
+    }
     novoChamado.id=data.id;
     novoChamado.st=data.status;
     novoChamado.cr=data.criado_em||novoChamado.cr;
@@ -1600,7 +1606,7 @@ async function addCh() {
     el('c-status').style.color = 'var(--gr)';
     rCh();rDb();
     sbSetConnectionBadge('Chamado confirmado no Supabase',true);
-    nfToast('Chamado criado e confirmado no servidor!','sucesso');
+    nfToast(erroCadastroSite?'Chamado criado e enviado ao técnico. O cadastro auxiliar do site não foi atualizado.':'Chamado criado e confirmado no servidor!',erroCadastroSite?'erro':'sucesso');
   }catch(err){
     sbShowError('O chamado não foi salvo. Os dados foram mantidos para nova tentativa',err);
     sbSetConnectionBadge('Falha ao salvar chamado',false);
