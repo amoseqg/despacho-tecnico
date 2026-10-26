@@ -2470,6 +2470,25 @@ function limparCardsRelatorio() {
   if (container) container.innerHTML = '<div class="empty"><h3>Cards limpos da tela</h3><p>A base histórica permanece salva e disponível para filtros e relatórios. Clique em “Filtrar Período” para exibir os cards novamente.</p></div>';
 }
 
+// Cards, detalhes e exportações devem considerar os mesmos serviços.
+function servicosPagamentoUnicos(chamados) {
+  const grupos = new Map();
+  for (const c of chamados) {
+    const protocolo = String(c.pr || '').trim().toLocaleLowerCase('pt-BR');
+    const chave = JSON.stringify([c.te, protocolo || `id:${c.id}`]);
+    const anterior = grupos.get(chave);
+    const prioridade = item => item.ex?.pagamentoExcluido ? 3 :
+      ['aprovado','rejeitado'].includes(item.ap?.status) ? 2 : 1;
+    // Preserva decisões registradas em vez de cópias sem análise.
+    if (!anterior || prioridade(c) > prioridade(anterior) ||
+        (prioridade(c) === prioridade(anterior) &&
+         (Date.parse(c.ap?.data) || 0) > (Date.parse(anterior.ap?.data) || 0))) {
+      grupos.set(chave, c);
+    }
+  }
+  return [...grupos.values()];
+}
+
 function rRl(dt1, dt2, forcarExibicao) {
   const container = el('rl-cards');
   if(!container) return;
@@ -2494,6 +2513,7 @@ function rRl(dt1, dt2, forcarExibicao) {
     chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c));
   }
 
+  chamados = servicosPagamentoUnicos(chamados);
   const porTec = {};
   D.tc.forEach(t => { porTec[t.u] = { nome: t.n, regiao: t.r, chamados: [] }; });
 
@@ -2631,8 +2651,7 @@ function opPl(u) {
   if (RL_DT2_ATUAL) {
     chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= RL_DT2_ATUAL && !!dataEncerramentoChamado(c));
   }
-  const protocolosExibidos=new Set();
-  chamados=chamados.filter(c=>{const protocolo=String(c.pr||'').trim().toLocaleLowerCase('pt-BR')||`id:${c.id}`;if(protocolosExibidos.has(protocolo))return false;protocolosExibidos.add(protocolo);return true;});
+  chamados = servicosPagamentoUnicos(chamados);
   if (chamados.length === 0) return;
   const filtroProtocolo=el('pl-filtro-protocolo');if(filtroProtocolo)filtroProtocolo.value='';
 
@@ -3736,7 +3755,7 @@ function chamadosPagamentoPeriodo(dt1, dt2) {
   let list = D.ch.filter(c => c.st === 'concluida' && !c.ex?.pagamentoExcluido);
   if (dt1) { list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= dt1 && !!dataEncerramentoChamado(c)); }
   if (dt2) { list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c)); }
-  return list;
+  return servicosPagamentoUnicos(list);
 }
 
 function exportarConsolidadoPagamentos() {
@@ -3799,7 +3818,7 @@ function exportarServicoAprovadoExcel() {
   const nomeTec = tec ? tec.n : nt(PLU);
 
   // Somente serviços concluídos e efetivamente aprovados pelo administrador.
-  const list = D.ch.filter(c =>
+  const list = servicosPagamentoUnicos(D.ch).filter(c =>
     c.te === PLU &&
     c.st === 'concluida' && !c.ex?.pagamentoExcluido &&
     c.ap &&
@@ -4502,7 +4521,7 @@ async function sbLoadAll(){
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     sbTabelaCompleta('chamados','id'),
     sbTabelaCompleta('execucoes','chamado_id'),
-    SB.from('aprovacoes').select('*'),
+    sbTabelaCompleta('aprovacoes','chamado_id'),
     SB.from('chamado_transferencias').select('*').order('criado_em',{ascending:true}),
     SB.from('materiais').select('*').eq('ativo',true).order('nome'),
     SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true}),
@@ -4775,17 +4794,16 @@ async function sbSyncAll(){
     }
 
     // Execuções e aprovações.
-    const exRows=[]; const apRows=[];
+    const exRows=[];
     for(const c of D.ch){
       if(!sbUUID(c.id)) continue;
       if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),materiais_utilizados:normalizarMateriaisUtilizados(c.ex),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
-      if(c.ap) apRows.push({chamado_id:c.id,status:c.ap.status||'pendente',observacao:c.ap.obs||null,administrador_id:SB_PROFILE.tipo==='admin'?SB_PROFILE.id:null,reenviado:!!c.ap.reenviado,atualizado_em:sbIso(c.ap.data)||new Date().toISOString()});
       const start=Number(c._trLoadedCount||0); const novos=(c.tr||[]).slice(start);
       for(const tr of novos){ const {error}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:sbIdByUser(tr.de),para_tecnico_id:sbIdByUser(tr.para),motivo:tr.m||null,realizado_por:tr.adminId||SB_PROFILE.id,criado_em:sbIso(tr.d)||new Date().toISOString()}); if(error) throw error; }
       c._trLoadedCount=(c.tr||[]).length;
     }
     if(exRows.length){ const {error}=await SB.from('execucoes').upsert(exRows,{onConflict:'chamado_id'}); if(error) throw error; }
-    if(apRows.length && SB_PROFILE.tipo==='admin'){ const {error}=await SB.from('aprovacoes').upsert(apRows,{onConflict:'chamado_id'}); if(error) throw error; }
+    // Aprovações são gravadas somente na ação explícita sbPersistirAprovacoes.
 
     // Materiais: novos e existentes.
     for(const m of D.mat.filter(x=>!sbUUID(x.id))){

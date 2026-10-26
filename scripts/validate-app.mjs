@@ -155,7 +155,7 @@ const ctxRmat = {el:id=>camposRmat[id],S:{u:'tecnico-a'},D:{ch:[{id:'aberto',te:
 vm.runInNewContext(`${funcaoRmat}\nrTmat()`,ctxRmat);
 assert.match(camposRmat['tm-protocolo'].innerHTML,/PROTO-ATIVO/,'A solicitação deve listar chamado ativo do técnico.');
 assert.doesNotMatch(camposRmat['tm-protocolo'].innerHTML,/PROTO-FECHADO|PROTO-OUTRO/,'A solicitação deve ocultar chamados encerrados e de outros técnicos.');
-assert.match(parte3,/const protocolosExibidos=new Set\(\)[\s\S]*?protocolosExibidos\.has\(protocolo\)/,'A aprovação deve remover protocolos duplicados da planilha.');
+assert.match(parte3,/chamados = servicosPagamentoUnicos\(chamados\)/,'Cards e planilha devem compartilhar os protocolos únicos.');
 assert.match(parte3,/x\.te===S\.u&&x\.st==='andamento'/,'A gravação da solicitação de material deve validar que o chamado continua em atendimento.');
 const validacaoExcecao=parte3.match(/const tecnicoSelecionado = D\.tc\.find[\s\S]*?const dtexec = el\('c-dtexec'\)\.value;/)?.[0]||'';
 assert.match(validacaoExcecao,/!tecnicoCompativelComChamado && !liberarArea/,'Técnicos fora da skill/cobertura exigem liberação excepcional.');
