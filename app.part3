@@ -4402,8 +4402,27 @@ function nfSolicitarEncerramento(c){
 function sbShowError(prefix, err){ console.error(prefix, err); nfToast(prefix + (err?.message ? ': '+err.message : ''),'erro'); }
 
 async function sbExigirSessaoAdmin(){
-  const {data:{user},error:userErr}=await SB.auth.getUser();
-  if(userErr || !user) throw new Error('Sua sessao expirou. Entre novamente na area Administrador.');
+  let {data:{user},error:userErr}=await SB.auth.getUser();
+  if(userErr || !user){
+    // Se a verificacao remota falhar, tenta renovar a sessao armazenada uma vez
+    // antes de impedir o salvamento do chamado.
+    const {data:{session},error:sessionErr}=await SB.auth.getSession();
+    if(!sessionErr && session?.refresh_token){
+      const {data,error}=await SB.auth.refreshSession(session);
+      if(!error && data?.user){user=data.user;userErr=null;}
+      else userErr=error||sessionErr||userErr;
+    }else if(sessionErr){
+      userErr=sessionErr;
+    }
+  }
+  if(!user){
+    const codigo=String(userErr?.code||'').toLowerCase();
+    const statusHttp=Number(userErr?.status||0);
+    const sessaoInvalida=!userErr||statusHttp===400||statusHttp===401||
+      /session.?missing|session.?expired|refresh.?token|invalid.?grant|user.?not.?found/.test(codigo+' '+String(userErr?.message||'').toLowerCase());
+    if(sessaoInvalida) throw new Error('Sua sessão expirou ou não está mais válida. Entre novamente na área Administrador. Os dados do formulário foram mantidos.');
+    throw new Error('Não foi possível confirmar sua sessão com o Supabase. Verifique a conexão e tente novamente; os dados do formulário foram mantidos. '+(userErr?.message||''));
+  }
   const {data:perfil,error:perfilErr}=await SB.from('perfis')
     .select('id,nome,usuario,tipo,admin_geral,ativo')
     .eq('id',user.id)
