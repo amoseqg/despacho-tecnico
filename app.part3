@@ -905,6 +905,9 @@ function materialInterior(r){const meta=logMeta(r);if(meta.manual)return meta.re
 function logStatus(r){
   const m=logMeta(r);
   if(m.manual)return r.status==='entregue'?['b-concluida','Entregue']:['b-pendente','Não entregue'];
+  if(r.avulso&&r.statusAprovacao==='reprovado')return ['b-recusado','Reprovada'];
+  if(r.avulso&&r.statusAprovacao==='aguardando')return ['b-pendente','Aguardando aprovação da Logística'];
+  if(r.avulso&&r.statusAprovacao==='aprovado'&&r.status==='solicitado')return ['b-andamento','Aprovada — aguardando liberação'];
   if(r.status==='entregue')return ['b-concluida','Entregue'];
   if(m.etapa==='em_transito')return ['b-andamento','Em trânsito'];
   if(m.etapa==='aguardando_aceite')return ['b-pendente','Aguardando aceite'];
@@ -1370,18 +1373,48 @@ function rLog(){
  rRastreioMateriais('lg-rastreio-lista');
  rLogEstoque();
 }
-function rTmat(){
- const ps=el('tm-protocolo'),ms=el('tm-material'),box=el('tm-lista');if(!ps||!ms||!box)return;
- const protocoloSelecionado=ps.value||'',materialSelecionado=ms.value||'';
- const meus=D.ch.filter(c=>c.te===S.u&&c.st==='andamento'); ps.innerHTML='<option value="">Selecione...</option>'+meus.map(c=>`<option value="${escM(c.id)}">${escM(c.pr)} — ${escM(c.si)}</option>`).join('');
- ms.innerHTML='<option value="">Selecione...</option>'+D.mat.map(m=>`<option value="${m.id}">${escM(m.nome)} (${m.unidade}) — estoque ${m.estoque||0}</option>`).join('');
- if(meus.some(c=>String(c.id)===String(protocoloSelecionado))) ps.value=protocoloSelecionado;
- if(D.mat.some(m=>String(m.id)===String(materialSelecionado))) ms.value=materialSelecionado;
- const list=D.mr.filter(r=>r.tecnico===S.u).slice().reverse();
- box.innerHTML=list.length?list.map(r=>{const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);return `<div class="os"><div class="os-h"><span class="os-id">📦 ${escM(m?m.nome:r.materialNome)}</span><span class="badge ${st[0]}">${st[1]}</span></div><div class="os-r"><b>Protocolo:</b> ${escM(c?c.pr:r.protocolo)}</div><div class="os-r"><b>Solicitado:</b> ${escM(r.qtdSolicitada||0)} ${escM(m?m.unidade:'')} &nbsp; <b>Separado:</b> ${escM(r.qtdSeparada||0)} &nbsp; <b>Em trâmite:</b> ${escM(meta.quantidadeEmTransito||0)} &nbsp; <b>Entregue:</b> ${escM(r.qtdEntregue||0)}</div><div class="os-r"><b>Previsão de entrega:</b> ${meta.prazo?escM(new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR')):'Ainda não informada pela Logística'}</div>${rastreioTramite(r)}${logDetalhes(r)}<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-p btn-tech-consultar-entrega" data-id="${escM(r.id)}">📅 Consultar previsão de entrega</button>${aceitar?`<button class="btn btn-g btn-tech-aceitar-material" data-id="${escM(r.id)}">✅ Confirmar recebimento do material</button>`:''}</div></div>`}).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
+function normalizarChaveEstoque(valor){return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');}
+function calcularEstoqueTecnicos(){
+ const mapa=new Map(),chave=(tecnico,material)=>String(tecnico)+'|'+String(material);
+ for(const r of D.mr||[]){
+  if(r.status!=='entregue'||!(Number(r.qtdEntregue)>0)||!r.tecnico)continue;
+  const m=materialById(r.materialId);if(!m)continue;
+  const k=chave(r.tecnico,m.id),row=mapa.get(k)||{tecnico:r.tecnico,material:m.nome,unidade:m.unidade,entregue:0,consumido:0};
+  row.entregue+=Number(r.qtdEntregue)||0;mapa.set(k,row);
+ }
+ for(const c of D.ch||[])for(const item of normalizarMateriaisUtilizados(c.ex||{})){
+  const nk=normalizarChaveEstoque(item.nome),uk=normalizarChaveEstoque(item.unidade);
+  const m=(D.mat||[]).find(x=>normalizarChaveEstoque(x.nome)===nk&&normalizarChaveEstoque(x.unidade)===uk);
+  if(!m||!c.te)continue;
+  const k=chave(c.te,m.id),row=mapa.get(k)||{tecnico:c.te,material:m.nome,unidade:m.unidade,entregue:0,consumido:0};
+  row.consumido+=Number(item.quantidade)||0;mapa.set(k,row);
+ }
+ return [...mapa.values()].map(row=>({...row,saldo:Math.max(0,row.entregue-row.consumido)}))
+  .sort((a,b)=>nt(a.tecnico).localeCompare(nt(b.tecnico),'pt-BR')||a.material.localeCompare(b.material,'pt-BR'));
 }
-function solicitarMaterial(){const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid&&x.te===S.u&&x.st==='andamento'),m=materialById(mid);if(!cid||!mid||!q||q<1){alert('Preencha protocolo, material e quantidade');return;}if(!c){alert('Selecione um chamado que esteja em atendimento.');rTmat();return;}if(D.mr.some(r=>r.chamadoId===cid&&r.materialId===mid&&['solicitado','direcionado','separado'].includes(r.status))){alert('Já existe uma solicitação pendente deste material para este chamado.');return;}D.mr.push({id:'MR-'+Date.now(),chamadoId:cid,tecnico:S.u,materialId:mid,qtdSolicitada:q,qtdSeparada:0,qtdEntregue:0,status:'solicitado',obs,data:ag(),protocolo:c.pr||'',infoChamado:`${c.si} — ${c.de}`});sv();el('tm-material').value='';el('busca-material-tecnico').value='';el('tm-qtd').value='';el('tm-obs').value='';rTmat();alert('Solicitação enviada ao administrador.');}
-
+function renderEstoqueTecnicos(containerId,tecnicoUsuario='',buscaId=''){
+ const box=el(containerId);if(!box)return;
+ const busca=normalizarChaveEstoque(buscaId?el(buscaId)?.value:'');
+ const rows=calcularEstoqueTecnicos().filter(row=>(!tecnicoUsuario||row.tecnico===tecnicoUsuario)&&(!busca||normalizarChaveEstoque(nt(row.tecnico)+' '+row.material).includes(busca)));
+ box.innerHTML=rows.length?'<div style="overflow-x:auto"><table class="table"><thead><tr>'+(tecnicoUsuario?'':'<th>Técnico</th>')+'<th>Material</th><th>Unidade</th><th>Entregue</th><th>Consumo registrado</th><th>Saldo estimado</th></tr></thead><tbody>'+rows.map(row=>'<tr>'+(tecnicoUsuario?'':'<td>'+escM(nt(row.tecnico))+'</td>')+'<td>'+escM(row.material)+'</td><td>'+escM(row.unidade)+'</td><td>'+escM(row.entregue)+'</td><td>'+escM(row.consumido)+'</td><td><b>'+escM(row.saldo)+'</b></td></tr>').join('')+'</tbody></table></div><div class="info">Saldo estimado: entregas confirmadas menos materiais registrados nas execuções. Diferenças de nome ou unidade no registro de consumo podem deixar itens sem abatimento.</div>':'<div class="empty"><h3>Nenhum saldo de material registrado</h3><p>O estoque aparece após a confirmação de entregas de materiais aos técnicos.</p></div>';
+}
+function rTmat(){
+ const ps=el('tm-protocolo'),ms=el('tm-material'),av=el('tm-avulso-material'),box=el('tm-lista');if(!ps||!ms||!box)return;
+ const protocoloSelecionado=ps.value||'',materialSelecionado=ms.value||'',avulsoSelecionado=av?.value||'';
+ const meus=D.ch.filter(c=>c.te===S.u&&c.st==='andamento');
+ ps.innerHTML='<option value="">Selecione...</option>'+meus.map(c=>'<option value="'+escM(c.id)+'">'+escM(c.pr)+' — '+escM(c.si)+'</option>').join('');
+ const opcoes='<option value="">Selecione...</option>'+D.mat.map(m=>'<option value="'+escM(m.id)+'">'+escM(m.nome)+' ('+escM(m.unidade)+') — estoque '+escM(m.estoque||0)+'</option>').join('');
+ ms.innerHTML=opcoes;if(av)av.innerHTML=opcoes;
+ if(meus.some(c=>String(c.id)===String(protocoloSelecionado)))ps.value=protocoloSelecionado;
+ if(D.mat.some(m=>String(m.id)===String(materialSelecionado)))ms.value=materialSelecionado;
+ if(av&&D.mat.some(m=>String(m.id)===String(avulsoSelecionado)))av.value=avulsoSelecionado;
+ const list=D.mr.filter(r=>r.tecnico===S.u).slice().reverse();
+ box.innerHTML=list.length?list.map(r=>{
+  const m=materialById(r.materialId),c=D.ch.find(x=>x.id===r.chamadoId),st=logStatus(r),meta=logMeta(r),aceitar=r.status==='separado'&&['aguardando_aceite','em_transito'].includes(meta.etapa);
+  return '<div class="os"><div class="os-h"><span class="os-id">📦 '+escM(m?m.nome:r.materialNome)+'</span><span class="badge '+st[0]+'">'+st[1]+'</span></div><div class="os-r"><b>'+(r.avulso?'Solicitação avulsa':'Protocolo')+':</b> '+(r.avulso?'Sem protocolo':escM(c?c.pr:r.protocolo||'—'))+'</div><div class="os-r"><b>Solicitado:</b> '+escM(r.qtdSolicitada||0)+' '+escM(m?m.unidade:'')+' &nbsp; <b>Separado:</b> '+escM(r.qtdSeparada||0)+' &nbsp; <b>Em trâmite:</b> '+escM(meta.quantidadeEmTransito||0)+' &nbsp; <b>Entregue:</b> '+escM(r.qtdEntregue||0)+'</div>'+(r.avulso&&r.motivoSolicitacao?'<div class="os-r"><b>Motivo:</b> '+escM(r.motivoSolicitacao)+'</div>':'')+(r.statusAprovacao==='reprovado'?'<div class="info" role="status"><b>Retorno da Logística:</b> Solicitação reprovada. Motivo: '+escM(r.motivoReprovacao||'Motivo não informado.')+'</div>':'')+'<div class="os-r"><b>Previsão de entrega:</b> '+(meta.prazo?escM(new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR')):'Ainda não informada pela Logística')+'</div>'+rastreioTramite(r)+logDetalhes(r)+'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+(aceitar?'<button class="btn btn-g btn-tech-aceitar-material" data-id="'+escM(r.id)+'">✅ Confirmar recebimento do material</button>':'')+(r.status==='separado'&&meta.prazo?'<button class="btn btn-y btn-tech-consultar-entrega" data-id="'+escM(r.id)+'">📅 Consultar previsão de entrega</button>':'')+'</div></div>';
+ }).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
+ renderEstoqueTecnicos('t-materiais-estoque',S.u);
+}
 // ========== CADASTROS ==========
 function limparCEP(v){return String(v||'').replace(/\D/g,'').slice(0,8);}
 function formatarCEP(v){const s=limparCEP(v);return s.length>5?s.slice(0,5)+'-'+s.slice(5):s;}
@@ -4577,7 +4610,7 @@ async function sbLoadAll(){
   }
 
   D.mat=(mR.data||[]).map(m=>({id:m.id,nome:m.nome,unidade:m.unidade,estoque:Number(m.estoque||0),c:m.criado_em}));
-  D.mr=(sR.data||[]).map(r=>({id:r.id,chamadoId:r.chamado_id,tecnico:sbUserById(r.tecnico_id),materialId:r.material_id,qtdSolicitada:Number(r.quantidade_solicitada||0),qtdSeparada:Number(r.quantidade_separada||0),qtdEntregue:Number(r.quantidade_entregue||0),status:r.status,obs:r.observacao||'',data:r.solicitado_em,direcionadoEm:r.direcionado_em,separadoEm:r.separado_em,entregueEm:r.entregue_em,responsavel:sbNameById(r.responsavel_id)}));
+  D.mr=(sR.data||[]).map(r=>({id:r.id,chamadoId:r.chamado_id,tecnico:sbUserById(r.tecnico_id),materialId:r.material_id,qtdSolicitada:Number(r.quantidade_solicitada||0),qtdSeparada:Number(r.quantidade_separada||0),qtdEntregue:Number(r.quantidade_entregue||0),status:r.status,obs:r.observacao||'',data:r.solicitado_em,direcionadoEm:r.direcionado_em,separadoEm:r.separado_em,entregueEm:r.entregue_em,responsavel:sbNameById(r.responsavel_id),avulso:!!r.avulso,motivoSolicitacao:r.motivo_solicitacao||'',statusAprovacao:r.status_aprovacao||'nao_aplicavel',motivoReprovacao:r.motivo_reprovacao||''}));
   SB_RETIRADOS=(retR.data||[]).map(r=>({id:r.id,materialId:r.material_id,quantidade:Number(r.quantidade||0),sitePlanta:r.site_planta,protocoloOs:r.protocolo_os||'',condicao:r.condicao,observacao:r.observacao||'',status:r.status,retiradoPor:r.retirado_por,retiradoEm:r.retirado_em,recuperadoPor:r.recuperado_por,recuperadoEm:r.recuperado_em}));
   SB_MOVIMENTOS=(movR.data||[]).map(m=>({id:m.id,materialId:m.material_id,tipo:m.tipo,quantidade:Number(m.quantidade||0),estoqueAnterior:m.estoque_anterior,estoqueNovo:m.estoque_novo,observacao:m.observacao||'',realizadoPor:m.realizado_por,criadoEm:m.criado_em}));
 
