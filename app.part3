@@ -394,9 +394,13 @@ function buscarCircuitoNaDescricao() {
 async function salvarCadastroSiteManualChamado(c){
   if(!MODO_MANUAL_CHAMADO)return null;
   const circuito=String(c.ci||'').trim(),site=String(c.si||'').trim(),cidade=String(c.cid||'').trim(),endereco=String(c.en||'').trim();
-  if(!circuito||!site||!cidade||!endereco)throw new Error('Para salvar o cadastro manual, informe circuito, site/cliente, cidade e endereço.');
+  if(!circuito)throw new Error('Informe o circuito para abrir o chamado.');
+  // O chamado pode ser aberto com o circuito mesmo antes do cadastro completo
+  // do local. Quando o nome do site estiver preenchido, grava o cadastro; os
+  // demais campos do local são opcionais no banco.
+  if(!site)return null;
   const regiaoOperacional=String(c.regiaoOperacional||'').trim()||(c.re==='capital'?(c.area||'').toUpperCase():c.re==='noronha'?'Fernando de Noronha':'Interior');
-  const linha={circuito,site,cidade,endereco,contato:c.contato||null,horario_expediente:c.horario||null,velocidade:c.velocidade||null,prtm:c.prtm||null,pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null,regiao_operacional:regiaoOperacional,tecnicos_indicados:c.tecnicosIndicados||null,ativo:true,atualizado_em:new Date().toISOString()};
+  const linha={circuito,site,cidade:cidade||null,endereco:endereco||null,contato:c.contato||null,horario_expediente:c.horario||null,velocidade:c.velocidade||null,prtm:c.prtm||null,pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null,regiao_operacional:regiaoOperacional,tecnicos_indicados:c.tecnicosIndicados||null,ativo:true,atualizado_em:new Date().toISOString()};
   const {data,error}=await SB.from('sites').upsert(linha,{onConflict:'circuito'}).select('circuito,site,cidade,endereco,contato,horario_expediente,velocidade,prtm,pvf_total,regiao_operacional,tecnicos_indicados').single();
   if(error)throw error;
   return registrarSiteOsServico(siteOsServicoDoBanco(data));
@@ -1519,10 +1523,11 @@ async function addOsServico() {
 async function addCh() {
   const pr = el('c-pr').value.trim();
   const sdm = el('c-sdm').value.trim();
-  const site = buscarCircuito();
+  const siteEncontrado = buscarCircuito();
   const abertura = el('c-abertura').value;
   const si = el('c-si').value.trim();
   const ci = MODO_MANUAL_CHAMADO ? String(el('c-ci-manual')?.value||'').trim() : el('c-ci').value.trim();
+  const site = MODO_MANUAL_CHAMADO && ci ? (siteEncontrado || {manual:true}) : siteEncontrado;
   const re = el('c-re').value;
   const skill = el('c-sk').value;
   const area = el('c-area').value;
@@ -1531,20 +1536,12 @@ async function addCh() {
   const liberarArea = el('c-liberar-area').checked;
   const en = el('c-en').value.trim();
   const de = el('c-de').value.trim();
-  if(MODO_MANUAL_CHAMADO && (!ci || !si || !el('c-cd').value.trim() || !en)){
-    const statusManual=el('c-status');
-    statusManual.textContent='Para cadastrar manualmente, preencha circuito, Site / Cliente, cidade e endereço.';
-    statusManual.style.color='var(--y)';
-    const campoFaltante=!ci?el('c-ci-manual'):!si?el('c-si'):!el('c-cd').value.trim()?el('c-cd'):el('c-en');
-    campoFaltante?.focus();
-    return;
-  }
   if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
   if (!site) {
     definirModoManualChamado(true);
     const statusCircuito=el('c-status');
-    statusCircuito.textContent='Circuito não localizado na base. Preencha os dados do circuito manualmente e clique em Criar Chamado novamente.';
+    statusCircuito.textContent='Informe o circuito no campo manual para abrir o chamado. Site, cidade e endereço podem ser completados depois.';
     statusCircuito.style.color='var(--y)';
     el('c-ci-manual')?.focus();
     return;
