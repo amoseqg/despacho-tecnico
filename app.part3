@@ -1878,8 +1878,8 @@ function dataChamadoMs(c, preferirConclusao=false){
 }
 function numeroRamalChamado(c){
   const informado=String(c?.ramal||'').trim();if(informado)return numeroCircuito(informado);
-  const texto=String(c?.de||'')+'\\n'+String(c?.informacoesAdicionais||'');
-  const achado=texto.match(/\\b(?:ramal|extens[aã]o)\\s*(?:n[ºo.]*)?\\s*[:#-]?\\s*([0-9][0-9\\s().-]{0,20})/i);
+  const texto=String(c?.de||'')+'\n'+String(c?.informacoesAdicionais||'');
+  const achado=texto.match(/\b(?:ramal|extens[aã]o)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
   return achado?numeroCircuito(achado[1]):'';
 }
 function chaveCircuitoReincidencia(c){
