@@ -1421,7 +1421,11 @@ function abrirRegistroAplicacaoMaterial(materialId){
   if(!chamadoId||!Number.isFinite(qtd)||qtd<=0||qtd>saldo||local.length<3){dialog.querySelector('.erro').textContent='Informe serviço, quantidade válida dentro do saldo e local de aplicação.';return;}
   const servico=servicos.find(c=>String(c.id)===String(chamadoId));if(!servico){dialog.querySelector('.erro').textContent='Atualize a tela e selecione um serviço válido.';return;}
   try{
-   btn.disabled=true;btn.textContent='Enviando...';
+   btn.disabled=true;btn.textContent='Verificando saldo...';
+   await sbRecarregarDados();
+   const saldoAtual=Number(calcularEstoqueTecnicos().find(x=>x.tecnico===S.u&&String(x.materialId)===String(m.id))?.saldo||0);
+   if(qtd>saldoAtual)throw new Error('O saldo disponível foi alterado. Informe uma quantidade de até '+saldoAtual+' '+m.unidade+'.');
+   btn.textContent='Enviando...';
    const {error}=await SB.from('aplicacoes_materiais_tecnicos').insert({tecnico_id:SB_PROFILE.id,material_id:m.id,chamado_id:servico.id,quantidade:qtd,local_aplicacao:local,servico_nome:servico.ex?.atv||servico.atividadeServico||nomeSkill(skillChamado(servico)),status:'aguardando_aprovacao'}).select('id').single();
    if(error)throw error;dialog.close();await sbRecarregarDados();nfToast('Aplicação enviada à Logística. A quantidade foi retirada do saldo disponível.','sucesso');
   }catch(err){dialog.querySelector('.erro').textContent=err?.message||'Não foi possível enviar a aplicação.';btn.disabled=false;btn.textContent='Enviar para aprovação';}
