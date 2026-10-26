@@ -969,6 +969,7 @@ function rMl(){
  }).join(''):'<div class="empty"><h3>'+(busca?'Nenhuma solicitação localizada':'Nenhuma solicitação de material')+'</h3>'+(busca?'<p>Confira o nome do técnico ou o protocolo informado.</p>':'')+'</div>';
  rRastreioMateriais('ml-rastreio-lista');
  renderEstoqueTecnicos('ml-materiais-tecnicos-estoque','','ml-busca-estoque-tecnico');
+ renderAprovacoesAplicacoesMaterial('ml-aplicacoes-materiais-tecnicos');
  rMlEstoque();rMateriaisCadastro();
 }
 function rMlEstoque(){
@@ -1365,32 +1366,94 @@ function rLog(){
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
  rRastreioMateriais('lg-rastreio-lista');
  renderEstoqueTecnicos('lg-materiais-tecnicos-estoque','','lg-busca-estoque-tecnico');
+ renderAprovacoesAplicacoesMaterial('lg-aplicacoes-materiais-tecnicos');
  rLogEstoque();
 }
 function normalizarChaveEstoque(valor){return String(valor||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('pt-BR').trim().replace(/\s+/g,' ');}
 function calcularEstoqueTecnicos(){
  const mapa=new Map(),chave=(tecnico,material)=>String(tecnico)+'|'+String(material);
+ const obter=(tecnico,m)=>{const k=chave(tecnico,m.id);if(!mapa.has(k))mapa.set(k,{tecnico,materialId:m.id,material:m.nome,unidade:m.unidade,entregue:0,consumoExecucao:0,aplicacaoPendente:0,aplicacaoAprovada:0});return mapa.get(k);};
  for(const r of D.mr||[]){
   if(r.status!=='entregue'||!(Number(r.qtdEntregue)>0)||!r.tecnico)continue;
-  const m=materialById(r.materialId);if(!m)continue;
-  const k=chave(r.tecnico,m.id),row=mapa.get(k)||{tecnico:r.tecnico,material:m.nome,unidade:m.unidade,entregue:0,consumido:0};
-  row.entregue+=Number(r.qtdEntregue)||0;mapa.set(k,row);
+  const m=materialById(r.materialId);if(m)obter(r.tecnico,m).entregue+=Number(r.qtdEntregue)||0;
  }
+ const usosAtivos=new Set((D.aplicacoesMateriais||[]).filter(a=>['aguardando_aprovacao','aprovado'].includes(a.status)).map(a=>[a.tecnico,a.chamadoId,a.materialId].join('|')));
  for(const c of D.ch||[])for(const item of normalizarMateriaisUtilizados(c.ex||{})){
   const nk=normalizarChaveEstoque(item.nome),uk=normalizarChaveEstoque(item.unidade);
   const m=(D.mat||[]).find(x=>normalizarChaveEstoque(x.nome)===nk&&normalizarChaveEstoque(x.unidade)===uk);
-  if(!m||!c.te)continue;
-  const k=chave(c.te,m.id),row=mapa.get(k)||{tecnico:c.te,material:m.nome,unidade:m.unidade,entregue:0,consumido:0};
-  row.consumido+=Number(item.quantidade)||0;mapa.set(k,row);
+  if(!m||!c.te||usosAtivos.has([c.te,c.id,m.id].join('|')))continue;
+  obter(c.te,m).consumoExecucao+=Number(item.quantidade)||0;
  }
- return [...mapa.values()].map(row=>({...row,saldo:Math.max(0,row.entregue-row.consumido)}))
+ for(const uso of D.aplicacoesMateriais||[]){
+  if(!['aguardando_aprovacao','aprovado'].includes(uso.status))continue;
+  const m=materialById(uso.materialId);if(!m||!uso.tecnico)continue;
+  const row=obter(uso.tecnico,m);
+  if(uso.status==='aguardando_aprovacao')row.aplicacaoPendente+=Number(uso.quantidade)||0;
+  else row.aplicacaoAprovada+=Number(uso.quantidade)||0;
+ }
+ return [...mapa.values()].map(row=>({...row,saldo:Math.max(0,row.entregue-row.consumoExecucao-row.aplicacaoPendente-row.aplicacaoAprovada)}))
   .sort((a,b)=>nt(a.tecnico).localeCompare(nt(b.tecnico),'pt-BR')||a.material.localeCompare(b.material,'pt-BR'));
 }
 function renderEstoqueTecnicos(containerId,tecnicoUsuario='',buscaId=''){
  const box=el(containerId);if(!box)return;
  const busca=normalizarChaveEstoque(buscaId?el(buscaId)?.value:'');
  const rows=calcularEstoqueTecnicos().filter(row=>(!tecnicoUsuario||row.tecnico===tecnicoUsuario)&&(!busca||normalizarChaveEstoque(nt(row.tecnico)+' '+row.material).includes(busca)));
- box.innerHTML=rows.length?'<div style="overflow-x:auto"><table class="table"><thead><tr>'+(tecnicoUsuario?'':'<th>Técnico</th>')+'<th>Material</th><th>Unidade</th><th>Entregue</th><th>Consumo registrado</th><th>Saldo estimado</th></tr></thead><tbody>'+rows.map(row=>'<tr>'+(tecnicoUsuario?'':'<td>'+escM(nt(row.tecnico))+'</td>')+'<td>'+escM(row.material)+'</td><td>'+escM(row.unidade)+'</td><td>'+escM(row.entregue)+'</td><td>'+escM(row.consumido)+'</td><td><b>'+escM(row.saldo)+'</b></td></tr>').join('')+'</tbody></table></div><div class="info">Saldo estimado: entregas confirmadas menos materiais registrados nas execuções. Diferenças de nome ou unidade no registro de consumo podem deixar itens sem abatimento.</div>':'<div class="empty"><h3>Nenhum saldo de material registrado</h3><p>O estoque aparece após a confirmação de entregas de materiais aos técnicos.</p></div>';
+ if(!rows.length){box.innerHTML='<div class="empty"><h3>Nenhum saldo de material registrado</h3><p>O estoque aparece após a confirmação de entregas de materiais aos técnicos.</p></div>';return;}
+ const linhas=rows.map(row=>{
+  const material=tecnicoUsuario?'<button type="button" class="btn-aplicar-material" data-material-id="'+escM(row.materialId)+'" data-saldo="'+escM(row.saldo)+'" title="Clique para informar onde este material foi aplicado" style="border:0;background:none;padding:0;color:var(--p);font:inherit;text-decoration:underline;cursor:pointer">'+escM(row.material)+'</button>':escM(row.material);
+  return '<tr>'+(tecnicoUsuario?'':'<td>'+escM(nt(row.tecnico))+'</td>')+'<td>'+material+'</td><td>'+escM(row.unidade)+'</td><td>'+escM(row.entregue)+'</td><td>'+escM(row.consumoExecucao)+'</td><td>'+escM(row.aplicacaoPendente)+'</td><td>'+escM(row.aplicacaoAprovada)+'</td><td><b>'+escM(row.saldo)+'</b></td></tr>';
+ }).join('');
+ box.innerHTML=(tecnicoUsuario?'<div class="info">Clique no nome do material para informar em qual serviço ele foi aplicado.</div>':'')+'<div style="overflow-x:auto"><table class="table"><thead><tr>'+(tecnicoUsuario?'':'<th>Técnico</th>')+'<th>Material</th><th>Unidade</th><th>Entregue</th><th>Consumo em serviços</th><th>Aplicação pendente</th><th>Aplicação aprovada</th><th>Saldo disponível</th></tr></thead><tbody>'+linhas+'</tbody></table></div><div class="info">Aplicações enviadas à Logística reduzem o saldo disponível enquanto aguardam aprovação. Aplicações rejeitadas deixam de ser abatidas.</div>';
+}
+function abrirRegistroAplicacaoMaterial(materialId){
+ if(S?.t!=='tec'||!SB_PROFILE?.id)return;
+ const m=materialById(materialId);if(!m)return;
+ const row=calcularEstoqueTecnicos().find(x=>x.tecnico===S.u&&String(x.materialId)===String(materialId)),saldo=Number(row?.saldo||0);
+ if(saldo<=0){nfToast('Não há saldo disponível deste material.','erro');return;}
+ const servicos=D.ch.filter(c=>c.te===S.u&&['andamento','concluida'].includes(c.st));
+ if(!servicos.length){nfToast('Não há serviços seus disponíveis para vincular esta aplicação.','erro');return;}
+ const dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(620px,calc(100% - 24px));max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:0;box-shadow:0 24px 70px #0005;color:#16324f';
+ dialog.innerHTML='<form id="aplicacao-material-form" style="padding:20px"><h3 style="margin:0 0 8px">📦 Registrar aplicação de material</h3><p class="info">'+escM(m.nome)+' — saldo disponível: <b>'+escM(saldo)+' '+escM(m.unidade)+'</b>. O registro sairá do saldo enquanto aguarda aprovação logística.</p><div class="form-group"><label class="label" for="aplicacao-material-servico">Serviço em que foi aplicado</label><select id="aplicacao-material-servico" class="select" required><option value="">Selecione o serviço...</option>'+servicos.map(c=>'<option value="'+escM(c.id)+'">'+escM(c.pr||'Sem protocolo')+' — '+escM(c.si||'Cliente não informado')+' — '+escM(c.ex?.atv||c.atividadeServico||nomeSkill(skillChamado(c)))+'</option>').join('')+'</select></div><div class="grid-2"><div class="form-group"><label class="label" for="aplicacao-material-qtd">Quantidade aplicada ('+escM(m.unidade)+')</label><input id="aplicacao-material-qtd" class="input" type="number" min="0.01" max="'+escM(saldo)+'" step="any" required></div><div class="form-group"><label class="label" for="aplicacao-material-local">Onde foi aplicado</label><input id="aplicacao-material-local" class="input" maxlength="2000" placeholder="Ex.: rack, aparelho, setor ou ambiente" required></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button type="button" class="btn btn-s cancelar">Cancelar</button><button type="submit" class="btn btn-p salvar">Enviar para aprovação</button></div><p class="erro" role="alert" style="color:#b91c1c"></p></form>';
+ document.body.append(dialog);dialog.querySelector('.cancelar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+ dialog.querySelector('#aplicacao-material-form').addEventListener('submit',async ev=>{
+  ev.preventDefault();const qtd=Number(dialog.querySelector('#aplicacao-material-qtd').value),chamadoId=dialog.querySelector('#aplicacao-material-servico').value,local=dialog.querySelector('#aplicacao-material-local').value.trim(),btn=dialog.querySelector('.salvar');
+  if(!chamadoId||!Number.isFinite(qtd)||qtd<=0||qtd>saldo||local.length<3){dialog.querySelector('.erro').textContent='Informe serviço, quantidade válida dentro do saldo e local de aplicação.';return;}
+  const servico=servicos.find(c=>String(c.id)===String(chamadoId));if(!servico){dialog.querySelector('.erro').textContent='Atualize a tela e selecione um serviço válido.';return;}
+  try{
+   btn.disabled=true;btn.textContent='Verificando saldo...';
+   await sbRecarregarDados();
+   const saldoAtual=Number(calcularEstoqueTecnicos().find(x=>x.tecnico===S.u&&String(x.materialId)===String(m.id))?.saldo||0);
+   if(qtd>saldoAtual)throw new Error('O saldo disponível foi alterado. Informe uma quantidade de até '+saldoAtual+' '+m.unidade+'.');
+   btn.textContent='Enviando...';
+   const {error}=await SB.from('aplicacoes_materiais_tecnicos').insert({tecnico_id:SB_PROFILE.id,material_id:m.id,chamado_id:servico.id,quantidade:qtd,local_aplicacao:local,servico_nome:servico.ex?.atv||servico.atividadeServico||nomeSkill(skillChamado(servico)),status:'aguardando_aprovacao'}).select('id').single();
+   if(error)throw error;dialog.close();await sbRecarregarDados();nfToast('Aplicação enviada à Logística. A quantidade foi retirada do saldo disponível.','sucesso');
+  }catch(err){dialog.querySelector('.erro').textContent=err?.message||'Não foi possível enviar a aplicação.';btn.disabled=false;btn.textContent='Enviar para aprovação';}
+ });
+ dialog.showModal();
+}
+function renderAplicacoesMaterialTecnico(containerId){
+ const box=el(containerId);if(!box)return;
+ const list=(D.aplicacoesMateriais||[]).filter(a=>a.tecnico===S?.u).slice().reverse();
+ box.innerHTML=list.length?'<div style="margin-top:12px"><h4>Aplicações registradas</h4>'+list.map(a=>'<article class="os"><div class="os-h"><b>'+escM(a.materialNome||materialById(a.materialId)?.nome||'Material')+' — '+escM(a.quantidade)+' '+escM(a.unidade||'')+'</b><span class="badge '+(a.status==='aprovado'?'b-concluida':a.status==='reprovado'?'b-recusado':'b-pendente')+'">'+(a.status==='aprovado'?'Aprovada':a.status==='reprovado'?'Reprovada':'Aguardando aprovação')+'</span></div><div class="os-r"><b>Serviço:</b> '+escM(a.protocolo||'—')+' — '+escM(a.site||'')+' ('+escM(a.servicoNome||'')+')</div><div class="os-r"><b>Aplicado em:</b> '+escM(a.localAplicacao)+'</div>'+(a.status==='reprovado'?'<div class="info"><b>Retorno da Logística:</b> '+escM(a.motivoReprovacao||'Motivo não informado')+'</div>':'')+'</article>').join('')+'</div>':'<div class="info" style="margin-top:12px">Ainda não há aplicações de materiais registradas.</div>';
+}
+function renderAprovacoesAplicacoesMaterial(containerId){
+ const box=el(containerId);if(!box)return;
+ const list=(D.aplicacoesMateriais||[]).filter(a=>a.status==='aguardando_aprovacao').slice().reverse();
+ box.innerHTML=list.length?list.map(a=>'<article class="os"><div class="os-h"><b>📦 '+escM(a.materialNome||materialById(a.materialId)?.nome||'Material')+' — '+escM(a.quantidade)+' '+escM(a.unidade||'')+'</b><span class="badge b-pendente">Aguardando aprovação</span></div><div class="os-r"><b>Técnico:</b> '+escM(nt(a.tecnico))+' &nbsp; <b>Protocolo:</b> '+escM(a.protocolo||'—')+' &nbsp; <b>Serviço:</b> '+escM(a.servicoNome||'')+'</div><div class="os-r"><b>Onde foi aplicado:</b> '+escM(a.localAplicacao)+'</div><div class="os-r"><b>Enviado em:</b> '+escM(a.solicitadoEm?new Date(a.solicitadoEm).toLocaleString('pt-BR'):'—')+'</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-g btn-aplicacao-aprovar" data-id="'+escM(a.id)+'">✅ Aprovar encerramento</button><button type="button" class="btn btn-r btn-aplicacao-reprovar" data-id="'+escM(a.id)+'">❌ Reprovar</button></div></article>').join(''):'<div class="empty">Nenhuma aplicação aguardando aprovação.</div>';
+}
+async function decidirAplicacaoMaterial(id,decisao){
+ const uso=(D.aplicacoesMateriais||[]).find(a=>String(a.id)===String(id));if(!uso||uso.status!=='aguardando_aprovacao')return;
+ if(!['adm','log'].includes(S?.t)){nfToast('Somente Administração ou Logística pode analisar aplicações.','erro');return;}
+ let motivo='';
+ if(decisao==='reprovar'){motivo=String(prompt('Informe o motivo da reprovação da aplicação:')||'').trim();if(motivo.length<3){if(motivo)alert('O motivo precisa ter pelo menos 3 caracteres.');return;}if(motivo.length>2000){alert('O motivo pode ter até 2.000 caracteres.');return;}}
+ try{
+  const btn=document.querySelector('.btn-aplicacao-'+(decisao==='aprovar'?'aprovar':'reprovar')+'[data-id="'+CSS.escape(String(id))+'"]');
+  if(btn){btn.disabled=true;btn.textContent='Salvando...';}
+  const {data,error}=await SB.from('aplicacoes_materiais_tecnicos').update({status:decisao==='aprovar'?'aprovado':'reprovado',motivo_reprovacao:decisao==='aprovar'?null:motivo,decidido_por:SB_PROFILE.id,decidido_em:new Date().toISOString()}).eq('id',id).eq('status','aguardando_aprovacao').select('id').single();
+  if(error)throw error;if(!data)throw new Error('Esta aplicação já foi analisada por outro usuário.');
+  await sbRecarregarDados();nfToast(decisao==='aprovar'?'Aplicação aprovada e encerrada.':'Aplicação reprovada; o saldo disponível do técnico foi restaurado.','sucesso');
+ }catch(err){sbShowError('Não foi possível decidir a aplicação do material',err);await sbRecarregarDados();}
 }
 function rTmat(){
  const ps=el('tm-protocolo'),ms=el('tm-material'),av=el('tm-avulso-material'),box=el('tm-lista');if(!ps||!ms||!box)return;
@@ -1408,6 +1471,7 @@ function rTmat(){
   return '<div class="os"><div class="os-h"><span class="os-id">📦 '+escM(m?m.nome:r.materialNome)+'</span><span class="badge '+st[0]+'">'+st[1]+'</span></div><div class="os-r"><b>'+(r.avulso?'Solicitação avulsa':'Protocolo')+':</b> '+(r.avulso?'Sem protocolo':escM(c?c.pr:r.protocolo||'—'))+'</div><div class="os-r"><b>Solicitado:</b> '+escM(r.qtdSolicitada||0)+' '+escM(m?m.unidade:'')+' &nbsp; <b>Separado:</b> '+escM(r.qtdSeparada||0)+' &nbsp; <b>Em trâmite:</b> '+escM(meta.quantidadeEmTransito||0)+' &nbsp; <b>Entregue:</b> '+escM(r.qtdEntregue||0)+'</div>'+(r.avulso&&r.motivoSolicitacao?'<div class="os-r"><b>Motivo:</b> '+escM(r.motivoSolicitacao)+'</div>':'')+(r.statusAprovacao==='reprovado'?'<div class="info" role="status"><b>Retorno da Logística:</b> Solicitação reprovada. Motivo: '+escM(r.motivoReprovacao||'Motivo não informado.')+'</div>':'')+'<div class="os-r"><b>Previsão de entrega:</b> '+(meta.prazo?escM(new Date(meta.prazo+'T12:00:00').toLocaleDateString('pt-BR')):'Ainda não informada pela Logística')+'</div>'+rastreioTramite(r)+logDetalhes(r)+'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'+(aceitar?'<button class="btn btn-g btn-tech-aceitar-material" data-id="'+escM(r.id)+'">✅ Confirmar recebimento do material</button>':'')+(r.status==='separado'&&meta.prazo?'<button class="btn btn-y btn-tech-consultar-entrega" data-id="'+escM(r.id)+'">📅 Consultar previsão de entrega</button>':'')+'</div></div>';
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação de material</h3></div>';
  renderEstoqueTecnicos('t-materiais-estoque',S.u);
+ renderAplicacoesMaterialTecnico('t-aplicacoes-materiais');
 }
 function solicitarMaterial(){
  const cid=el('tm-protocolo').value,mid=el('tm-material').value,q=Number(el('tm-qtd').value),obs=el('tm-obs').value.trim(),c=D.ch.find(x=>x.id===cid&&x.te===S.u&&x.st==='andamento');
@@ -1591,6 +1655,7 @@ async function addCh() {
   const sdm = el('c-sdm').value.trim();
   const siteEncontrado = MODO_MANUAL_CHAMADO ? null : buscarCircuito();
   const abertura = el('c-abertura').value;
+  const ramal = String(el('c-ramal')?.value||'').trim();
   const si = el('c-si').value.trim();
   const ci = MODO_MANUAL_CHAMADO ? String(el('c-ci-manual')?.value||'').trim() : el('c-ci').value.trim();
   const site = MODO_MANUAL_CHAMADO && ci ? (siteEncontrado || {manual:true}) : siteEncontrado;
@@ -1604,6 +1669,7 @@ async function addCh() {
   const de = el('c-de').value.trim();
   if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
+  if (campoRamalNecessario(skill,abertura) && !numeroCircuito(ramal)) { alert('Informe o número do ramal para chamado de voz aberto pela Vectra ou Método.'); el('c-ramal')?.focus(); return; }
   if (!site) {
     definirModoManualChamado(true);
     const statusCircuito=el('c-status');
@@ -1626,7 +1692,7 @@ async function addCh() {
   const dtexec = el('c-dtexec').value;
   const novoChamado = {
     id: 'CH-'+Date.now(), pr, sdm, si, ci, re, skill, area: re === 'capital' ? area : '', en, de, dtexec,
-    abertura,
+    abertura, ramal,
     regiaoOperacional: el('c-regiao-planilha').value, tecnicosIndicados: el('c-tecnicos-planilha').value,
     cid: el('c-cd').value, contato: el('c-co').value, horario: el('c-ho').value,
     velocidade: el('c-ve').value, prtm: el('c-pt').value, pvfTotal: el('c-pv').value,
@@ -1663,7 +1729,7 @@ async function addCh() {
     SB_LOADED_CH.add(data.id);
     lsSet('dd',D);
 
-    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
+    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; if(el('c-ramal'))el('c-ramal').value=''; atualizarCampoRamalChamado(); el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
     el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
     el('c-de').value = ''; el('c-dtexec').value = '';
     el('c-sk').value = ''; el('c-area').value = ''; atualizarRotulosSlaRegiao();
@@ -1819,11 +1885,32 @@ function dataChamadoMs(c, preferirConclusao=false){
   const ms=new Date(valor||0).getTime();
   return Number.isFinite(ms)?ms:0;
 }
-function chaveCircuitoReincidencia(c){return numeroCircuito(c?.ci)||normalizarCircuito(c?.ci);}
+function numeroRamalChamado(c){
+  const informado=String(c?.ramal||'').trim();if(informado)return numeroCircuito(informado);
+  const texto=String(c?.de||'')+'\n'+String(c?.informacoesAdicionais||'');
+  const achado=texto.match(/\b(?:ramal|extens[aã]o)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
+  return achado?numeroCircuito(achado[1]):'';
+}
+function chaveCircuitoReincidencia(c){
+  const origem=normalizarChaveEstoque(c?.operadora||c?.abertura||'').replace(/[^a-z0-9]/g,'');
+  if(skillChamado(c)==='voz'&&['vectra','metodo'].includes(origem))return 'ramal:'+numeroRamalChamado(c);
+  return 'circuito:'+(numeroCircuito(c?.ci)||normalizarCircuito(c?.ci));
+}
+function campoRamalNecessario(skill,abertura){
+  const origem=normalizarChaveEstoque(abertura||'').replace(/[^a-z0-9]/g,'');
+  return skill==='voz'&&['vectra','metodo'].includes(origem);
+}
+function atualizarCampoRamalChamado(){
+  const box=el('c-ramal-box'),campo=el('c-ramal');
+  if(!box||!campo)return;
+  const mostrar=campoRamalNecessario(el('c-sk')?.value,el('c-abertura')?.value);
+  box.classList.toggle('hidden',!mostrar);campo.required=mostrar;
+  if(!mostrar)campo.value='';
+}
 function historicoAnteriorCircuito(c){
   const chave=chaveCircuitoReincidencia(c);
   const abertura=dataChamadoMs(c);
-  if(!chave||!abertura)return null;
+  if(!chave||chave==='ramal:'||chave==='circuito:'||!abertura)return null;
   const anteriores=D.ch.filter(x=>x.id!==c.id&&x.st==='concluida'&&chaveCircuitoReincidencia(x)===chave)
     .map(x=>({chamado:x,data:dataChamadoMs(x,true)}))
     .filter(x=>x.data&&x.data<=abertura&&abertura-x.data<JANELA_REINCIDENCIA_MS)
@@ -1831,17 +1918,20 @@ function historicoAnteriorCircuito(c){
   return anteriores[0]||null;
 }
 function infoReincidencia(c){
+  const usaRamal=campoRamalNecessario(skillChamado(c),c?.operadora||c?.abertura);
+  const referencia=usaRamal?('ramal '+(numeroRamalChamado(c)||'não informado')):('circuito '+(c?.ci||'não informado'));
+  const semHistorico='<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para o mesmo '+esc(referencia)+' nos últimos 30 dias.</div>';
   if(Object.prototype.hasOwnProperty.call(c,'_reincidenciaServidor')){
     const h=c._reincidenciaServidor;
-    if(!h)return {reincidente:false,html:'<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para este circuito nos últimos 30 dias.</div>'};
+    if(!h)return {reincidente:false,html:semHistorico};
     const data=new Date(h.concluido_em).toLocaleDateString('pt-BR');
-    return {reincidente:true,anterior:h,html:`<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Chamado anterior:</b> ${esc(h.protocolo_anterior||'Não informado')}<br><b>Último técnico:</b> ${esc(h.tecnico_anterior||'Não informado')}<br><b>Último atendimento:</b> ${data}<br><b>Ação realizada:</b> ${valorInfo(h.acao_realizada)}</div>`};
+    return {reincidente:true,anterior:h,html:'<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Identificador usado:</b> '+esc(referencia)+'<br><b>Chamado anterior:</b> '+esc(h.protocolo_anterior||'Não informado')+'<br><b>Último técnico:</b> '+esc(h.tecnico_anterior||'Não informado')+'<br><b>Último atendimento:</b> '+data+'<br><b>Ação realizada:</b> '+valorInfo(h.acao_realizada)+'</div>'};
   }
   const anterior=historicoAnteriorCircuito(c);
-  if(!anterior)return {reincidente:false,html:'<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para este circuito nos últimos 30 dias.</div>'};
+  if(!anterior)return {reincidente:false,html:semHistorico};
   const a=anterior.chamado,acao=a.ex?.atv||a.ex?.relatorio||a.ex?.obs||'Ação não informada';
   const data=new Date(anterior.data).toLocaleDateString('pt-BR');
-  return {reincidente:true,anterior:a,html:`<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Último técnico:</b> ${esc(nt(a.te)||'Não informado')}<br><b>Último atendimento:</b> ${data}<br><b>Ação realizada:</b> ${valorInfo(acao)}</div>`};
+  return {reincidente:true,anterior:a,html:'<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Identificador usado:</b> '+esc(referencia)+'<br><b>Último técnico:</b> '+esc(nt(a.te)||'Não informado')+'<br><b>Último atendimento:</b> '+data+'<br><b>Ação realizada:</b> '+valorInfo(acao)+'</div>'};
 }
 
 let NF_PAINEL_CONFIG=null;
@@ -2555,6 +2645,20 @@ function servicosPagamentoUnicos(chamados) {
   return [...grupos.values()];
 }
 
+function abrirDetalheRelatorioServicos(usuario,tipo){
+ if(S?.t!=='adm')return;
+ PLU=usuario;
+ let chamados=D.ch.filter(c=>c.te===usuario&&c.st==='concluida');
+ if(RL_DT1_ATUAL)chamados=chamados.filter(c=>dataBrasilISO(dataEncerramentoChamado(c))>=RL_DT1_ATUAL&&!!dataEncerramentoChamado(c));
+ if(RL_DT2_ATUAL)chamados=chamados.filter(c=>dataBrasilISO(dataEncerramentoChamado(c))<=RL_DT2_ATUAL&&!!dataEncerramentoChamado(c));
+ chamados=servicosPagamentoUnicos(chamados).filter(c=>!c.ex?.pagamentoExcluido);
+ const aprovados=tipo==='aprovados',alvos=chamados.filter(c=>aprovados?c.ap?.status==='aprovado':c.ap?.status!=='aprovado');
+ const tecnico=D.tc.find(t=>t.u===usuario),dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(900px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 70px #0005;color:#16324f';
+ dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3 style="margin:0">'+(aprovados?'✅ Serviços aprovados':'🕒 Serviços não aprovados')+' — '+esc(tecnico?.n||nt(usuario))+'</h3><button type="button" class="btn btn-s fechar-rel-servicos">Fechar</button></div><p class="info">Período: '+esc(RL_DT1_ATUAL||'início')+' a '+esc(RL_DT2_ATUAL||'atual')+'</p>'+(alvos.length?alvos.map(c=>'<article class="os"><div class="os-h"><b>Protocolo '+esc(c.pr||'—')+' — '+esc(c.si||'Cliente não informado')+'</b><span class="badge '+(c.ap?.status==='aprovado'?'b-concluida':c.ap?.status==='rejeitado'?'b-recusado':'b-pendente')+'">'+(c.ap?.status==='aprovado'?'Aprovado':c.ap?.status==='rejeitado'?'Rejeitado':'Pendente')+'</span></div><div class="os-r"><b>Serviço:</b> '+esc(c.ex?.atv?.split('|')[0]||c.atividadeServico||nomeSkill(skillChamado(c)))+' &nbsp; <b>Valor:</b> '+esc(c.ex?.total||'—')+' &nbsp; <b>Encerrado:</b> '+esc(dataEncerramentoChamado(c)?formatarDataBrasil(dataEncerramentoChamado(c)):'—')+'</div>'+(c.ap?.status==='rejeitado'&&c.ap?.obs?'<div class="info"><b>Motivo da rejeição:</b> '+esc(c.ap.obs)+'</div>':'')+(!aprovados?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-g btn-rl-aprovar" data-id="'+esc(c.id)+'">✅ Aprovar serviço</button><button type="button" class="btn btn-r btn-rl-rejeitar" data-id="'+esc(c.id)+'">❌ Rejeitar serviço</button></div>':'')+'</article>').join(''):'<div class="empty">Nenhum serviço '+(aprovados?'aprovado':'não aprovado')+' neste período.</div>');
+ dialog.querySelector('.fechar-rel-servicos').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+}
+
 function rRl(dt1, dt2, forcarExibicao) {
   const container = el('rl-cards');
   if(!container) return;
@@ -2617,8 +2721,8 @@ function rRl(dt1, dt2, forcarExibicao) {
     return `<tr class="btn-ver-pl" data-u="${esc(u)}" title="Clique para ver os serviços deste técnico" style="cursor:pointer">
       <td><span style="font-size:12px;font-weight:650">${esc(t.nome)}</span>${historico}</td>
       <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
-      <td>${aprovados}</td>
-      <td>${naoAprovados}</td>
+      <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
+      <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
       <td>${regBadge}</td>
     </tr>`;
   }).join('');
@@ -4075,6 +4179,9 @@ document.addEventListener('DOMContentLoaded', function() {
   el('c-re').addEventListener('change', atualizarCamposRegiao);
   el('c-sk').addEventListener('change',()=>{atualizarRotulosSlaRegiao();atualizarTecnicosChamado();});
   el('c-area').addEventListener('change', atualizarTecnicosChamado);
+  el('c-abertura')?.addEventListener('change',atualizarCampoRamalChamado);
+  el('c-sk')?.addEventListener('change',atualizarCampoRamalChamado);
+  atualizarCampoRamalChamado();
   el('c-liberar-area').addEventListener('change', atualizarTecnicosChamado);
   atualizarCamposRegiao();
 
@@ -4188,11 +4295,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
+    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
+    if(t.classList.contains('btn-rl-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'aprovados'); }
+    if(t.classList.contains('btn-rl-nao-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'nao-aprovados'); }
+    if(t.classList.contains('btn-rl-aprovar')) { t.closest('dialog')?.close(); opApv('aprovado',t.dataset.id); }
+    if(t.classList.contains('btn-rl-rejeitar')) { t.closest('dialog')?.close(); opApv('rejeitado',t.dataset.id); }
+    if(t.classList.contains('btn-aplicar-material')) { abrirRegistroAplicacaoMaterial(t.dataset.materialId); }
+    if(t.classList.contains('btn-aplicacao-aprovar')) { decidirAplicacaoMaterial(t.dataset.id,'aprovar'); }
+    if(t.classList.contains('btn-aplicacao-reprovar')) { decidirAplicacaoMaterial(t.dataset.id,'reprovar'); }
     if(t.classList.contains('btn-tec-chamados')) { const tecnicoId=String(t.dataset.tecnico||''); if(CHAMADOS_TECNICOS_ABERTOS.has(tecnicoId)) CHAMADOS_TECNICOS_ABERTOS.delete(tecnicoId); else CHAMADOS_TECNICOS_ABERTOS.add(tecnicoId); rCh(); return; }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-suporte-tec')) { abrirDialogoSuporteTecnico(t.dataset.id); }
@@ -4585,7 +4699,7 @@ async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
   await carregarConfigPainel();
-  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR,retR,movR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     sbTabelaCompleta('chamados','id'),
     sbTabelaCompleta('execucoes','chamado_id'),
@@ -4593,6 +4707,7 @@ async function sbLoadAll(){
     SB.from('chamado_transferencias').select('*').order('criado_em',{ascending:true}),
     SB.from('materiais').select('*').eq('ativo',true).order('nome'),
     SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true}),
+    SB.from('aplicacoes_materiais_tecnicos').select('*').order('solicitado_em',{ascending:true}),
     sbCarregarTodasEscolas(),
     SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true}),
     SB.from('validacoes_encerramento').select('*'),
@@ -4600,7 +4715,7 @@ async function sbLoadAll(){
     SB.from('materiais_retirados').select('*').order('retirado_em',{ascending:false}),
     SB.from('movimentacoes_estoque').select('*').order('criado_em',{ascending:false}).limit(60)
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR,retR,movR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR]) if(r.error) throw r.error;
   SB_ESCOLAS=escR.data||[];
   SB_FOTOS_MAP=new Map();
   (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
@@ -4620,7 +4735,7 @@ async function sbLoadAll(){
   D.ch=(cR.data||[]).map(c=>{
     const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
-      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'',
+      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'',
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
@@ -4649,6 +4764,10 @@ async function sbLoadAll(){
 
   D.mat=(mR.data||[]).map(m=>({id:m.id,nome:m.nome,unidade:m.unidade,estoque:Number(m.estoque||0),c:m.criado_em}));
   D.mr=(sR.data||[]).map(r=>({id:r.id,chamadoId:r.chamado_id,tecnico:sbUserById(r.tecnico_id),materialId:r.material_id,qtdSolicitada:Number(r.quantidade_solicitada||0),qtdSeparada:Number(r.quantidade_separada||0),qtdEntregue:Number(r.quantidade_entregue||0),status:r.status,obs:r.observacao||'',data:r.solicitado_em,direcionadoEm:r.direcionado_em,separadoEm:r.separado_em,entregueEm:r.entregue_em,responsavel:sbNameById(r.responsavel_id),avulso:!!r.avulso,motivoSolicitacao:r.motivo_solicitacao||'',statusAprovacao:r.status_aprovacao||'nao_aplicavel',motivoReprovacao:r.motivo_reprovacao||''}));
+  D.aplicacoesMateriais=(amR.data||[]).map(a=>{
+    const c=D.ch.find(x=>String(x.id)===String(a.chamado_id)),m=materialById(a.material_id);
+    return {id:a.id,tecnico:sbUserById(a.tecnico_id),materialId:a.material_id,materialNome:m?.nome||'',unidade:m?.unidade||'',chamadoId:a.chamado_id,protocolo:c?.pr||'',site:c?.si||'',quantidade:Number(a.quantidade||0),localAplicacao:a.local_aplicacao||'',servicoNome:a.servico_nome||'',status:a.status,motivoReprovacao:a.motivo_reprovacao||'',solicitadoEm:a.solicitado_em,decididoPor:sbNameById(a.decidido_por),decididoEm:a.decidido_em};
+  });
   SB_RETIRADOS=(retR.data||[]).map(r=>({id:r.id,materialId:r.material_id,quantidade:Number(r.quantidade||0),sitePlanta:r.site_planta,protocoloOs:r.protocolo_os||'',condicao:r.condicao,observacao:r.observacao||'',status:r.status,retiradoPor:r.retirado_por,retiradoEm:r.retirado_em,recuperadoPor:r.recuperado_por,recuperadoEm:r.recuperado_em}));
   SB_MOVIMENTOS=(movR.data||[]).map(m=>({id:m.id,materialId:m.material_id,tipo:m.tipo,quantidade:Number(m.quantidade||0),estoqueAnterior:m.estoque_anterior,estoqueNovo:m.estoque_novo,observacao:m.observacao||'',realizadoPor:m.realizado_por,criadoEm:m.criado_em}));
 
@@ -4710,7 +4829,7 @@ function sbChamadoRow(c){
     pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null, regiao_operacional:c.regiaoOperacional||null, tecnicos_indicados:c.tecnicosIndicados||null,
     regiao:c.re, skill:c.skill, area:c.re==='capital'?(c.area||null):null, tecnico_id:sbIdByUser(c.te), criado_por:SB_PROFILE?.id||null,
     descricao:c.de||null, informacoes_adicionais:c.informacoesAdicionais??null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
-    solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, vencimento_em:sbIso(c.vencimento),
+    solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, numero_ramal:c.ramal||null, vencimento_em:sbIso(c.vencimento),
     tipo_os:c.tipoOs==='servico'?'servico':'manutencao', os_pe_conectado:c.osPeConectado||null, atividade_servico:c.atividadeServico||null,
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:sbIso(c.cr)||new Date().toISOString(), aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
@@ -5213,6 +5332,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     .on('postgres_changes',{event:'*',schema:'public',table:'chamado_transferencias'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'aplicacoes_materiais_tecnicos'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'escolas'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'fotos_atividade'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'exclusoes_chamados_portal'},sbRecarregarDados)

@@ -24,9 +24,15 @@
   function mostrarPortal(){
     $('tela-login').classList.add('oculto');$('tela-portal').classList.remove('oculto');$('btn-sair').classList.remove('oculto');
     const operadoras={vectra:'Vectra',um_telecom:'UM Telecom',metodo:'Método'};$('nome-solicitante').textContent=solicitante.nome;$('email-solicitante').textContent=solicitante.email+' • '+(operadoras[solicitante.operadora]||'Operadora não definida');$('aberto-por').value=solicitante.nome;
-    atualizarDataAbertura();definirVencimentoInicial();
+    atualizarDataAbertura();definirVencimentoInicial();atualizarCampoRamalPortal();
   }
   function atualizarDataAbertura(){$('data-abertura').value=new Date().toLocaleString('pt-BR');}
+  function atualizarCampoRamalPortal(){
+    const operadora=normalizar(solicitante?.operadora||'');
+    const mostrar=['VECTRA','METODO'].includes(operadora);
+    $('ramal-box')?.classList.toggle('oculto',!mostrar);
+    if($('ramal')){$('ramal').required=mostrar;if(!mostrar)$('ramal').value='';}
+  }
   function regiaoDoSite(site){return ['NORTE','SUL','LESTE','OESTE'].includes(texto(site?.regiao_operacional).toUpperCase())?'capital':'interior';}
   function definirVencimentoInicial(site=siteSelecionado){const horas=regiaoDoSite(site)==='capital'?6:8,d=new Date(Date.now()+horas*60*60*1000);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());$('vencimento').value=d.toISOString().slice(0,16);$('vencimento').title=`SLA automático: ${horas} horas (${horas===6?'Capital':'Interior'})`;}
 
@@ -117,7 +123,9 @@
     definirVencimentoInicial(siteSelecionado);const vencimento=new Date($('vencimento').value);if(!Number.isFinite(vencimento.getTime())||vencimento<=new Date()){status($('chamado-status'),'Não foi possível calcular o SLA do chamado.');return;}
     bloquear(botao,true,'Enviando...');
     try{
-      const linha={protocolo:'GERADO-AUTOMATICAMENTE',sdm:texto($('sdm').value),site_id:siteSelecionado.id,circuito:siteSelecionado.circuito,site_nome:siteSelecionado.site||null,cidade:siteSelecionado.cidade||null,endereco:siteSelecionado.endereco||null,contato:texto($('contato').value),horario_expediente:siteSelecionado.horario_expediente||null,regiao:regiaoDoSite(siteSelecionado),skill:'voz',descricao:texto($('observacoes').value)||null,status:'aberto',solicitante_id:solicitante.user_id,vencimento_em:vencimento.toISOString()};
+      const ramal=texto($('ramal')?.value||'');
+      if(['VECTRA','METODO'].includes(normalizar(solicitante.operadora))&&!numero(ramal)){status($('chamado-status'),'Informe o número do ramal para chamados de voz da Vectra ou Método.');$('ramal')?.focus();return;}
+      const linha={protocolo:'GERADO-AUTOMATICAMENTE',sdm:texto($('sdm').value),site_id:siteSelecionado.id,circuito:siteSelecionado.circuito,numero_ramal:ramal||null,site_nome:siteSelecionado.site||null,cidade:siteSelecionado.cidade||null,endereco:siteSelecionado.endereco||null,contato:texto($('contato').value),horario_expediente:siteSelecionado.horario_expediente||null,regiao:regiaoDoSite(siteSelecionado),skill:'voz',descricao:texto($('observacoes').value)||null,status:'aberto',solicitante_id:solicitante.user_id,vencimento_em:vencimento.toISOString()};
       const {data,error}=await sb.from('chamados').insert(linha).select('id,protocolo,status,criado_em,vencimento_em').single();if(error)throw error;
       $('protocolo-gerado').textContent=data.protocolo;$('confirmacao').showModal();$('form-chamado').reset();definirModoNovoCircuito(false);$('aberto-por').value=solicitante.nome;atualizarDataAbertura();definirVencimentoInicial();buscarCircuito();await carregarChamados();
     }catch(e){status($('chamado-status'),'Não foi possível abrir o chamado: '+e.message);}
