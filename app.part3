@@ -2529,43 +2529,40 @@ function rRl(dt1, dt2, forcarExibicao) {
     return;
   }
 
-  container.innerHTML = '<div class="grid-2">' + tecnicos.map(u => {
+  const linhas = tecnicos.map(u => {
     const t = porTec[u];
-    const pendentes = t.chamados.filter(c => !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente')).length;
-    const aprovados = t.chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
-    const rejeitados = t.chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'rejeitado').length;
-
-    let statusGeral = 'pendente';
-    if (pendentes === 0 && aprovados > 0 && rejeitados === 0) statusGeral = 'aprovado';
-    else if (pendentes === 0 && rejeitados > 0 && aprovados === 0) statusGeral = 'rejeitado';
-    else if (pendentes === 0) statusGeral = 'parcial';
-
-    const badgeGeral = {
-      aprovado: '<span class="badge b-aprovado">✅ Aprovada</span>',
-      rejeitado: '<span class="badge b-rejeitado">❌ Rejeitada</span>',
-      parcial: '<span class="badge b-pag-pendente">⚠️ Parcial</span>',
-      pendente: '<span class="badge b-pag-pendente">⏳ Pendente</span>'
-    }[statusGeral];
-
+    const ativos = t.chamados.filter(c => !c.ex?.pagamentoExcluido);
+    const aprovados = ativos.filter(c => c.ap?.status === 'aprovado').length;
+    const naoAprovados = ativos.length - aprovados;
     let totalVal = 0;
-    t.chamados.forEach(c => {
-      if (c.ex && c.ex.total && !c.ex.pagamentoExcluido) {
+    ativos.forEach(c => {
+      if (c.ex?.total) {
         const v = numeroExcel(c.ex.total);
         if (!isNaN(v)) totalVal += v;
       }
     });
 
     const totalStr = 'R$ ' + totalVal.toFixed(2).replace('.', ',');
-    const regBadge = t.regiao === 'capital' ? '<span class="badge b-capital">🏙️ Capital</span>' : '<span class="badge b-interior">🌾 Interior</span>';
+    const regBadge = t.regiao === 'capital' ? '<span class="badge b-capital">Capital</span>' : '<span class="badge b-interior">Interior</span>';
+    const historico = t.chamados.some(c => c.ex?.pagamentoExcluido)
+      ? '<small style="display:block;margin-top:2px;color:#708096;font-size:10px">Há valores excluídos no histórico</small>'
+      : '';
 
-    return `<div class="pl-card-mini btn-ver-pl" data-u="${u}">
-      <div class="icon">👷</div>
-      <h3>${t.nome}</h3>
-      <div class="reg">${regBadge}</div>
-      <div class="tot">${totalStr}</div>
-      <div class="qtd"><b>${t.chamados.filter(c=>!c.ex?.pagamentoExcluido).length}</b> serviço(s) — ${badgeGeral}${t.chamados.some(c=>c.ex?.pagamentoExcluido)?'<br>Há valores excluídos no histórico':''}</div>
-    </div>`;
-  }).join('') + '</div>';
+    return `<tr class="btn-ver-pl" data-u="${esc(u)}" title="Clique para ver os serviços deste técnico" style="cursor:pointer">
+      <td><span style="font-size:12px;font-weight:650">${esc(t.nome)}</span>${historico}</td>
+      <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
+      <td>${aprovados}</td>
+      <td>${naoAprovados}</td>
+      <td>${regBadge}</td>
+    </tr>`;
+  }).join('');
+
+  container.innerHTML = `<div style="overflow-x:auto">
+    <table class="table" style="width:100%;min-width:680px;font-size:12px">
+      <thead><tr><th>Técnico</th><th>Valor</th><th>Serviços aprovados</th><th>Serviços não aprovados</th><th>Localidade</th></tr></thead>
+      <tbody>${linhas}</tbody>
+    </table>
+  </div>`;
 }
 
 function renderRelatoriosQualidade(){
