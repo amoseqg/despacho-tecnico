@@ -2610,6 +2610,20 @@ function servicosPagamentoUnicos(chamados) {
   return [...grupos.values()];
 }
 
+function abrirDetalheRelatorioServicos(usuario,tipo){
+ if(S?.t!=='adm')return;
+ PLU=usuario;
+ let chamados=D.ch.filter(c=>c.te===usuario&&c.st==='concluida');
+ if(RL_DT1_ATUAL)chamados=chamados.filter(c=>dataBrasilISO(dataEncerramentoChamado(c))>=RL_DT1_ATUAL&&!!dataEncerramentoChamado(c));
+ if(RL_DT2_ATUAL)chamados=chamados.filter(c=>dataBrasilISO(dataEncerramentoChamado(c))<=RL_DT2_ATUAL&&!!dataEncerramentoChamado(c));
+ chamados=servicosPagamentoUnicos(chamados).filter(c=>!c.ex?.pagamentoExcluido);
+ const aprovados=tipo==='aprovados',alvos=chamados.filter(c=>aprovados?c.ap?.status==='aprovado':c.ap?.status!=='aprovado');
+ const tecnico=D.tc.find(t=>t.u===usuario),dialog=document.createElement('dialog');
+ dialog.style.cssText='width:min(900px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 70px #0005;color:#16324f';
+ dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3 style="margin:0">'+(aprovados?'✅ Serviços aprovados':'🕒 Serviços não aprovados')+' — '+esc(tecnico?.n||nt(usuario))+'</h3><button type="button" class="btn btn-s fechar-rel-servicos">Fechar</button></div><p class="info">Período: '+esc(RL_DT1_ATUAL||'início')+' a '+esc(RL_DT2_ATUAL||'atual')+'</p>'+(alvos.length?alvos.map(c=>'<article class="os"><div class="os-h"><b>Protocolo '+esc(c.pr||'—')+' — '+esc(c.si||'Cliente não informado')+'</b><span class="badge '+(c.ap?.status==='aprovado'?'b-concluida':c.ap?.status==='rejeitado'?'b-recusado':'b-pendente')+'">'+(c.ap?.status==='aprovado'?'Aprovado':c.ap?.status==='rejeitado'?'Rejeitado':'Pendente')+'</span></div><div class="os-r"><b>Serviço:</b> '+esc(c.ex?.atv?.split('|')[0]||c.atividadeServico||nomeSkill(skillChamado(c)))+' &nbsp; <b>Valor:</b> '+esc(c.ex?.total||'—')+' &nbsp; <b>Encerrado:</b> '+esc(dataEncerramentoChamado(c)?formatarDataBrasil(dataEncerramentoChamado(c)):'—')+'</div>'+(c.ap?.status==='rejeitado'&&c.ap?.obs?'<div class="info"><b>Motivo da rejeição:</b> '+esc(c.ap.obs)+'</div>':'')+(!aprovados?'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn btn-g btn-rl-aprovar" data-id="'+esc(c.id)+'">✅ Aprovar serviço</button><button type="button" class="btn btn-r btn-rl-rejeitar" data-id="'+esc(c.id)+'">❌ Rejeitar serviço</button></div>':'')+'</article>').join(''):'<div class="empty">Nenhum serviço '+(aprovados?'aprovado':'não aprovado')+' neste período.</div>');
+ dialog.querySelector('.fechar-rel-servicos').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+}
+
 function rRl(dt1, dt2, forcarExibicao) {
   const container = el('rl-cards');
   if(!container) return;
@@ -2672,8 +2686,8 @@ function rRl(dt1, dt2, forcarExibicao) {
     return `<tr class="btn-ver-pl" data-u="${esc(u)}" title="Clique para ver os serviços deste técnico" style="cursor:pointer">
       <td><span style="font-size:12px;font-weight:650">${esc(t.nome)}</span>${historico}</td>
       <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
-      <td>${aprovados}</td>
-      <td>${naoAprovados}</td>
+      <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
+      <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
       <td>${regBadge}</td>
     </tr>`;
   }).join('');
@@ -4243,11 +4257,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
+    const t = e.target.closest('.btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
     if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
+    if(t.classList.contains('btn-rl-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'aprovados'); }
+    if(t.classList.contains('btn-rl-nao-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'nao-aprovados'); }
+    if(t.classList.contains('btn-rl-aprovar')) { t.closest('dialog')?.close(); opApv('aprovado',t.dataset.id); }
+    if(t.classList.contains('btn-rl-rejeitar')) { t.closest('dialog')?.close(); opApv('rejeitado',t.dataset.id); }
+    if(t.classList.contains('btn-aplicar-material')) { abrirRegistroAplicacaoMaterial(t.dataset.materialId); }
+    if(t.classList.contains('btn-aplicacao-aprovar')) { decidirAplicacaoMaterial(t.dataset.id,'aprovar'); }
+    if(t.classList.contains('btn-aplicacao-reprovar')) { decidirAplicacaoMaterial(t.dataset.id,'reprovar'); }
     if(t.classList.contains('btn-tec-chamados')) { const tecnicoId=String(t.dataset.tecnico||''); if(CHAMADOS_TECNICOS_ABERTOS.has(tecnicoId)) CHAMADOS_TECNICOS_ABERTOS.delete(tecnicoId); else CHAMADOS_TECNICOS_ABERTOS.add(tecnicoId); rCh(); return; }
     if(t.classList.contains('btn-dp')) { opDp(t.dataset.id); }
     if(t.classList.contains('btn-suporte-tec')) { abrirDialogoSuporteTecnico(t.dataset.id); }
