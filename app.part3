@@ -1351,6 +1351,11 @@ async function salvarGestaoSolicitacaoMaterial(dialog,id){
  }finally{if(botao&&dialog.open){botao.disabled=false;botao.textContent='Salvar trâmite';}}
 }
 
+function selecionarSecaoLogistica(secao){
+ const painel=el('lg-panel-'+secao);if(!painel)return;
+ document.querySelectorAll('#plog .lg-secao-logistica').forEach(p=>p.classList.toggle('hidden',p!==painel));
+ document.querySelectorAll('#lg-nav .btn-lg-secao').forEach(b=>b.classList.toggle('a',b.dataset.secao===secao));
+}
 function rLog(){
  const box=el('lg-list');if(!box)return;
  const list=D.mr.filter(materialVisivelNaLista).slice().reverse();
@@ -4323,7 +4328,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-aplicacoes-tecnico, .btn-exportar-aplicacoes-pendentes, .btn-fechar-aplicacoes-material, .btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
+    const t = e.target.closest('.btn-lg-secao, .btn-aplicacoes-tecnico, .btn-exportar-aplicacoes-pendentes, .btn-fechar-aplicacoes-material, .btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
+    if(t.classList.contains('btn-lg-secao')) { selecionarSecaoLogistica(t.dataset.secao); }
     if(t.classList.contains('btn-aplicacoes-tecnico')) { abrirAprovacoesMaterialTecnico(t.dataset.tecnico); }
     if(t.classList.contains('btn-exportar-aplicacoes-pendentes')) { exportarListaAplicacoesPendentes(); }
     if(t.classList.contains('btn-fechar-aplicacoes-material')) { t.closest('dialog')?.close(); }
