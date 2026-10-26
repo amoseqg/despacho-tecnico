@@ -1883,7 +1883,7 @@ function numeroRamalChamado(c){
   return achado?numeroCircuito(achado[1]):'';
 }
 function chaveCircuitoReincidencia(c){
-  const origem=normalizarChaveEstoque(c?.abertura||c?.operadora||'').replace(/[^a-z0-9]/g,'');
+  const origem=normalizarChaveEstoque(c?.operadora||c?.abertura||'').replace(/[^a-z0-9]/g,'');
   if(skillChamado(c)==='voz'&&['vectra','metodo'].includes(origem))return 'ramal:'+numeroRamalChamado(c);
   return 'circuito:'+(numeroCircuito(c?.ci)||normalizarCircuito(c?.ci));
 }
@@ -1909,17 +1909,20 @@ function historicoAnteriorCircuito(c){
   return anteriores[0]||null;
 }
 function infoReincidencia(c){
+  const usaRamal=campoRamalNecessario(skillChamado(c),c?.operadora||c?.abertura);
+  const referencia=usaRamal?('ramal '+(numeroRamalChamado(c)||'não informado')):('circuito '+(c?.ci||'não informado'));
+  const semHistorico='<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para o mesmo '+esc(referencia)+' nos últimos 30 dias.</div>';
   if(Object.prototype.hasOwnProperty.call(c,'_reincidenciaServidor')){
     const h=c._reincidenciaServidor;
-    if(!h)return {reincidente:false,html:'<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para este circuito nos últimos 30 dias.</div>'};
+    if(!h)return {reincidente:false,html:semHistorico};
     const data=new Date(h.concluido_em).toLocaleDateString('pt-BR');
-    return {reincidente:true,anterior:h,html:`<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Chamado anterior:</b> ${esc(h.protocolo_anterior||'Não informado')}<br><b>Último técnico:</b> ${esc(h.tecnico_anterior||'Não informado')}<br><b>Último atendimento:</b> ${data}<br><b>Ação realizada:</b> ${valorInfo(h.acao_realizada)}</div>`};
+    return {reincidente:true,anterior:h,html:'<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Identificador usado:</b> '+esc(referencia)+'<br><b>Chamado anterior:</b> '+esc(h.protocolo_anterior||'Não informado')+'<br><b>Último técnico:</b> '+esc(h.tecnico_anterior||'Não informado')+'<br><b>Último atendimento:</b> '+data+'<br><b>Ação realizada:</b> '+valorInfo(h.acao_realizada)+'</div>'};
   }
   const anterior=historicoAnteriorCircuito(c);
-  if(!anterior)return {reincidente:false,html:'<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para este circuito nos últimos 30 dias.</div>'};
+  if(!anterior)return {reincidente:false,html:semHistorico};
   const a=anterior.chamado,acao=a.ex?.atv||a.ex?.relatorio||a.ex?.obs||'Ação não informada';
   const data=new Date(anterior.data).toLocaleDateString('pt-BR');
-  return {reincidente:true,anterior:a,html:`<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Último técnico:</b> ${esc(nt(a.te)||'Não informado')}<br><b>Último atendimento:</b> ${data}<br><b>Ação realizada:</b> ${valorInfo(acao)}</div>`};
+  return {reincidente:true,anterior:a,html:'<div class="trava" style="margin-top:8px;border-left:4px solid var(--r)"><b>⚠️ Reincidente em menos de 30 dias</b><br><b>Identificador usado:</b> '+esc(referencia)+'<br><b>Último técnico:</b> '+esc(nt(a.te)||'Não informado')+'<br><b>Último atendimento:</b> '+data+'<br><b>Ação realizada:</b> '+valorInfo(acao)+'</div>'};
 }
 
 let NF_PAINEL_CONFIG=null;
