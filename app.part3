@@ -4687,7 +4687,7 @@ async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
   await carregarConfigPainel();
-  const [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR,retR,movR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     sbTabelaCompleta('chamados','id'),
     sbTabelaCompleta('execucoes','chamado_id'),
@@ -4695,6 +4695,7 @@ async function sbLoadAll(){
     SB.from('chamado_transferencias').select('*').order('criado_em',{ascending:true}),
     SB.from('materiais').select('*').eq('ativo',true).order('nome'),
     SB.from('solicitacoes_material').select('*').order('solicitado_em',{ascending:true}),
+    SB.from('aplicacoes_materiais_tecnicos').select('*').order('solicitado_em',{ascending:true}),
     sbCarregarTodasEscolas(),
     SB.from('fotos_atividade').select('*').order('criado_em',{ascending:true}),
     SB.from('validacoes_encerramento').select('*'),
@@ -4702,7 +4703,7 @@ async function sbLoadAll(){
     SB.from('materiais_retirados').select('*').order('retirado_em',{ascending:false}),
     SB.from('movimentacoes_estoque').select('*').order('criado_em',{ascending:false}).limit(60)
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR,escR,fotoR,vR,xR,retR,movR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR]) if(r.error) throw r.error;
   SB_ESCOLAS=escR.data||[];
   SB_FOTOS_MAP=new Map();
   (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
@@ -4751,6 +4752,10 @@ async function sbLoadAll(){
 
   D.mat=(mR.data||[]).map(m=>({id:m.id,nome:m.nome,unidade:m.unidade,estoque:Number(m.estoque||0),c:m.criado_em}));
   D.mr=(sR.data||[]).map(r=>({id:r.id,chamadoId:r.chamado_id,tecnico:sbUserById(r.tecnico_id),materialId:r.material_id,qtdSolicitada:Number(r.quantidade_solicitada||0),qtdSeparada:Number(r.quantidade_separada||0),qtdEntregue:Number(r.quantidade_entregue||0),status:r.status,obs:r.observacao||'',data:r.solicitado_em,direcionadoEm:r.direcionado_em,separadoEm:r.separado_em,entregueEm:r.entregue_em,responsavel:sbNameById(r.responsavel_id),avulso:!!r.avulso,motivoSolicitacao:r.motivo_solicitacao||'',statusAprovacao:r.status_aprovacao||'nao_aplicavel',motivoReprovacao:r.motivo_reprovacao||''}));
+  D.aplicacoesMateriais=(amR.data||[]).map(a=>{
+    const c=D.ch.find(x=>String(x.id)===String(a.chamado_id)),m=materialById(a.material_id);
+    return {id:a.id,tecnico:sbUserById(a.tecnico_id),materialId:a.material_id,materialNome:m?.nome||'',unidade:m?.unidade||'',chamadoId:a.chamado_id,protocolo:c?.pr||'',site:c?.si||'',quantidade:Number(a.quantidade||0),localAplicacao:a.local_aplicacao||'',servicoNome:a.servico_nome||'',status:a.status,motivoReprovacao:a.motivo_reprovacao||'',solicitadoEm:a.solicitado_em,decididoPor:sbNameById(a.decidido_por),decididoEm:a.decidido_em};
+  });
   SB_RETIRADOS=(retR.data||[]).map(r=>({id:r.id,materialId:r.material_id,quantidade:Number(r.quantidade||0),sitePlanta:r.site_planta,protocoloOs:r.protocolo_os||'',condicao:r.condicao,observacao:r.observacao||'',status:r.status,retiradoPor:r.retirado_por,retiradoEm:r.retirado_em,recuperadoPor:r.recuperado_por,recuperadoEm:r.recuperado_em}));
   SB_MOVIMENTOS=(movR.data||[]).map(m=>({id:m.id,materialId:m.material_id,tipo:m.tipo,quantidade:Number(m.quantidade||0),estoqueAnterior:m.estoque_anterior,estoqueNovo:m.estoque_novo,observacao:m.observacao||'',realizadoPor:m.realizado_por,criadoEm:m.criado_em}));
 
@@ -5315,6 +5320,7 @@ document.addEventListener('DOMContentLoaded',()=>{
     .on('postgres_changes',{event:'*',schema:'public',table:'chamado_transferencias'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'aplicacoes_materiais_tecnicos'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'escolas'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'fotos_atividade'},sbRecarregarDados)
     .on('postgres_changes',{event:'*',schema:'public',table:'exclusoes_chamados_portal'},sbRecarregarDados)
