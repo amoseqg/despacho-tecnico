@@ -1740,12 +1740,21 @@ async function addCh() {
     if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
     const adminAtual=await sbExigirSessaoAdmin();
     if(novoChamado.dt)novoChamado.dt.admin=adminAtual.nome;
-    const {data:existentes,error:consultaDuplicidade}=await SB.from('chamados').select('id,status,tecnico_id').eq('protocolo',pr).limit(1);
+    const {data:existentes,error:consultaDuplicidade}=await SB.from('chamados').select('id,status,tecnico_id').eq('protocolo',pr);
     if(consultaDuplicidade)throw consultaDuplicidade;
-    if(existentes?.length){
-      const existente=D.ch.find(c=>String(c.id)===String(existentes[0].id));
+    let chamadosNaoArquivados=existentes||[];
+    if(chamadosNaoArquivados.length){
+      const idsExistentes=chamadosNaoArquivados.map(c=>c.id);
+      const {data:arquivamentos,error:erroArquivamentos}=await SB.from('chamados_arquivados').select('chamado_id').in('chamado_id',idsExistentes).eq('ativo',true);
+      if(erroArquivamentos)throw erroArquivamentos;
+      const idsArquivados=new Set((arquivamentos||[]).map(a=>String(a.chamado_id)));
+      chamadosNaoArquivados=chamadosNaoArquivados.filter(c=>c.status!=='cancelado'&&!idsArquivados.has(String(c.id)));
+    }
+    if(chamadosNaoArquivados.length){
+      const duplicado=chamadosNaoArquivados[0];
+      const existente=D.ch.find(c=>String(c.id)===String(duplicado.id));
       const responsavel=existente?.te?nt(existente.te):'um técnico já vinculado';
-      throw new Error(`O protocolo ${pr} já está cadastrado (${existentes[0].status}) com ${responsavel}. Localize o chamado existente para continuar, sem criar uma cópia.`);
+      throw new Error(`O protocolo ${pr} já está cadastrado (${duplicado.status}) com ${responsavel}. Localize o chamado existente para continuar, sem criar uma cópia.`);
     }
     // O cadastro auxiliar do site não deve impedir a abertura do chamado.
     const linha=sbChamadoRow(novoChamado);
