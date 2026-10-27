@@ -1358,6 +1358,14 @@ function selecionarSecaoLogistica(secao){
  document.querySelectorAll('#plog .lg-secao-logistica').forEach(p=>p.classList.toggle('hidden',p!==painel));
  document.querySelectorAll('#lg-nav .btn-lg-secao').forEach(b=>b.classList.toggle('a',b.dataset.secao===secao));
 }
+function rLogEnderecosTecnicos(){
+ const box=el('lg-endereco-resultados');if(!box)return;
+ const termo=normalizarChaveEstoque(el('lg-endereco-busca-tecnico')?.value||'');
+ if(!termo){box.innerHTML='<div class="empty">Digite o nome de um técnico para consultar o endereço.</div>';return;}
+ const encontrados=(D.tc||[]).filter(t=>t&&normalizarChaveEstoque((t.n||'')+' '+(t.u||'')).includes(termo)).sort((a,b)=>(a.n||'').localeCompare(b.n||'','pt-BR'));
+ if(!encontrados.length){box.innerHTML='<div class="empty">Nenhum técnico ativo encontrado com esse nome.</div>';return;}
+ box.innerHTML=encontrados.map(t=>{const d=enderecoEntregaTec(t)||{},endereco=[d.endereco,d.numero,d.bairro,d.complemento,d.cidade].filter(Boolean).join(', '),cep=d.cep?'CEP '+d.cep:'',contato=d.contato||'';return '<article class="os"><div class="os-h"><span class="os-id">'+escM(t.n||t.u||'Técnico')+'</span><span class="badge b-andamento">'+escM(t.r==='interior'?'Interior':t.r==='noronha'?'Fernando de Noronha':'Capital')+'</span></div><div class="os-r"><b>Endereço:</b> '+escM(endereco||'Endereço não cadastrado')+'</div>'+(cep?'<div class="os-r"><b>CEP:</b> '+escM(cep)+'</div>':'')+(contato?'<div class="os-r"><b>Contato:</b> '+escM(contato)+'</div>':'')+'</article>';}).join('');
+}
 function rLog(){
  const box=el('lg-list');if(!box)return;
  const list=D.mr.filter(materialVisivelNaLista).slice().reverse();
@@ -1373,6 +1381,7 @@ function rLog(){
  }).join(''):'<div class="empty"><h3>Nenhuma solicitação logística</h3></div>';
  rRastreioMateriais('lg-rastreio-lista');
  renderEstoqueTecnicos('lg-materiais-tecnicos-estoque','','lg-busca-estoque-tecnico');
+ rLogEnderecosTecnicos();
  renderAprovacoesAplicacoesMaterial('lg-aplicacoes-materiais-tecnicos');
  rLogEstoque();
 }
@@ -4240,6 +4249,7 @@ document.addEventListener('DOMContentLoaded', function() {
   el('btn-tm-avulso-solicitar')?.addEventListener('click',solicitarMaterialAvulso);
   el('ml-busca-estoque-tecnico')?.addEventListener('input',()=>renderEstoqueTecnicos('ml-materiais-tecnicos-estoque','','ml-busca-estoque-tecnico'));
   el('lg-busca-estoque-tecnico')?.addEventListener('input',()=>renderEstoqueTecnicos('lg-materiais-tecnicos-estoque','','lg-busca-estoque-tecnico'));
+  el('lg-endereco-busca-tecnico')?.addEventListener('input',rLogEnderecosTecnicos);
   let circuitoDescricaoTimer=null;
   el('c-descricao-colada').addEventListener('input',function(){
     clearTimeout(circuitoDescricaoTimer);
