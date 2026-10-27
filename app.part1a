@@ -730,6 +730,9 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
           <div class="form-group"><label class="label">SDM</label><input type="text" id="c-sdm" class="input" autocomplete="off" placeholder="Preenchido pela descrição ou digitado manualmente"></div>
         </div>
         <div class="grid-2">
+          <div class="form-group"><label class="label" for="c-protocolo-anterior">Protocolo do atendimento anterior (se houver)</label><input type="text" id="c-protocolo-anterior" class="input" autocomplete="off" placeholder="Informe para confirmar reincidência em até 30 dias"></div>
+        </div>
+        <div class="grid-2">
           <div class="form-group"><label class="label">Quem abriu o chamado</label><select id="c-abertura" class="select"><option value="">Selecione...</option><option value="Vectra">Vectra</option><option value="Método">Método</option><option value="Umtelecom">Umtelecom</option></select></div>
           <div class="form-group hidden" id="c-ramal-box"><label class="label" for="c-ramal">Número do ramal (Voz — Vectra/Método)</label><input type="text" id="c-ramal" class="input" inputmode="numeric" autocomplete="off" placeholder="Informe o ramal do atendimento"></div>
           <label class="form-group" style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="c-dispensa-ramal"> Vistoria, remanejamento ou readequação — dispensar número do ramal</label>
