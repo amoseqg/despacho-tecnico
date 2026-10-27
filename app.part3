@@ -2330,7 +2330,7 @@ function rAt() {
   const normalizarTecnico=valor=>String(valor||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const normalizarProtocolo=valor=>String(valor||'').toLocaleLowerCase('pt-BR');
   const visiveis=D.ch.filter(chamadoVisivel);
-  const chamadosUnicos=S?.t==='adm'?servicosPagamentoUnicos(visiveis,true):visiveis;
+  const chamadosUnicos=S?.t==='adm'?servicosPagamentoUnicos(visiveis.filter(c=>!c.ex?.pagamentoExcluido),true):visiveis;
   const emAtendimento=chamadosUnicos.filter(c=>c.st==='andamento');
   const concluidosUnicos=chamadosUnicos.filter(c=>c.st==='concluida'&&!c.ex?.pagamentoExcluido);
   const aguardandoAprovacao=concluidosUnicos.filter(c=>!c.ap||c.ap.status==='pendente');
@@ -2691,9 +2691,11 @@ function servicosPagamentoUnicos(chamados,agruparPorProtocolo=false) {
     const anterior = grupos.get(chave);
     const prioridade = item => item.ex?.pagamentoExcluido ? 3 :
       ['aprovado','rejeitado'].includes(item.ap?.status) ? 2 : 1;
-    // Preserva decisões registradas em vez de cópias sem análise.
+    const decisaoRegistrada = item => ['aprovado','rejeitado'].includes(item.ap?.status);
+    // Na fila por protocolo, uma decisão registrada prevalece sobre cópias pendentes.
     const dataMaisRecente=item=>Math.max(Date.parse(item.atualizadoEm)||0,Date.parse(item.ap?.data)||0,Date.parse(item.cc)||0,Date.parse(item.cr)||0);
-    if (!anterior || (agruparPorProtocolo&&dataMaisRecente(c)>dataMaisRecente(anterior)) ||
+    if (!anterior || (agruparPorProtocolo&&decisaoRegistrada(c)!==decisaoRegistrada(anterior)&&decisaoRegistrada(c)) ||
+        (agruparPorProtocolo&&decisaoRegistrada(c)===decisaoRegistrada(anterior)&&dataMaisRecente(c)>dataMaisRecente(anterior)) ||
         (agruparPorProtocolo&&dataMaisRecente(c)===dataMaisRecente(anterior)&&prioridade(c)>prioridade(anterior)) ||
         (!agruparPorProtocolo&&prioridade(c) > prioridade(anterior)) ||
         (!agruparPorProtocolo&&prioridade(c) === prioridade(anterior) &&
@@ -5541,7 +5543,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.40"></script>
+<script src="/release-info.js?v=2.5.42"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
