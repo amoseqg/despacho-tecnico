@@ -1977,7 +1977,8 @@ function atualizarCampoRamalChamado(){
 function historicoAnteriorCircuito(c){
   const chave=chaveCircuitoReincidencia(c);
   const abertura=dataChamadoMs(c);
-  if(!chave||chave==='ramal:'||chave==='circuito:'||!abertura)return null;
+  const temProtocolo=!!normalizarProtocoloReincidencia(c?.protocoloAnterior||'');
+  if((!temProtocolo&&(!chave||chave==='ramal:'||chave==='circuito:'))||!abertura)return null;
   const anteriores=D.ch.filter(x=>x.id!==c.id&&x.st==='concluida'&&mesmoIdentificadorReincidencia(c,x))
     .map(x=>({chamado:x,data:dataChamadoMs(x,true)}))
     .filter(x=>x.data&&x.data<=abertura&&abertura-x.data<JANELA_REINCIDENCIA_MS)
