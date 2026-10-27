@@ -5387,9 +5387,14 @@ function nfAbrirChamadoNotificado(){
 let SB_REFRESHING=false;
 let SB_REFRESH_PENDING=false;
 let SB_REFRESH_TIMER=null;
+let SB_REALTIME_ATIVO=false;
 function sbProgramarRecarregamento(delay=180){
   clearTimeout(SB_REFRESH_TIMER);
   SB_REFRESH_TIMER=setTimeout(()=>{void sbRecarregarDados();},delay);
+}
+function sbAgendarRecarregamentoRealtime(){
+  // Um evento em várias tabelas deve gerar uma única carga completa do estado.
+  sbProgramarRecarregamento(600);
 }
 function sbRenderizarTelas(){
   try{
@@ -5418,43 +5423,45 @@ document.addEventListener('DOMContentLoaded',()=>{
   S=null; lsRemove('ss');
   setTimeout(sbRestoreSession,0);
 
-  // Realtime: cada tabela operacional publicada dispara uma recarga do servidor.
+  // Realtime: agrupa eventos próximos antes de recarregar o estado do servidor.
   SB.channel('despacho-tecnico-realtime')
-    .on('postgres_changes',{event:'*',schema:'public',table:'perfis'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'perfis'},sbAgendarRecarregamentoRealtime)
     .on('postgres_changes',{event:'*',schema:'public',table:'solicitantes_chamados'},()=>{void carregarSolicitantesChamados();})
-    .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'validacoes_encerramento'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'aprovacoes'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'chamado_transferencias'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'aplicacoes_materiais_tecnicos'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'escolas'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'fotos_atividade'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'exclusoes_chamados_portal'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'materiais_retirados'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'movimentacoes_estoque'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_pendencia'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'nao_pendenciamentos_chamados'},sbRecarregarDados)
-    .on('postgres_changes',{event:'*',schema:'public',table:'pendencias_expediente_admin'},sbRecarregarDados)
+    .on('postgres_changes',{event:'*',schema:'public',table:'chamados'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'execucoes'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'validacoes_encerramento'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'aprovacoes'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'chamado_transferencias'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'materiais'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_material'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'aplicacoes_materiais_tecnicos'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'escolas'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'fotos_atividade'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'exclusoes_chamados_portal'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'materiais_retirados'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'movimentacoes_estoque'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'solicitacoes_pendencia'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'nao_pendenciamentos_chamados'},sbAgendarRecarregamentoRealtime)
+    .on('postgres_changes',{event:'*',schema:'public',table:'pendencias_expediente_admin'},sbAgendarRecarregamentoRealtime)
     .on('postgres_changes',{event:'*',schema:'public',table:'mensagens_chat'},nfChatEvento)
     .on('postgres_changes',{event:'*',schema:'public',table:'presenca_tecnicos'},nfEventoPresencaTecnico)
     .subscribe((status,error)=>{
       if(status==='SUBSCRIBED'){
+        SB_REALTIME_ATIVO=true;
         if(SB_PROFILE) sbSetConnectionBadge('Atualização em tempo real ativa',true);
       }else if(['CHANNEL_ERROR','TIMED_OUT','CLOSED'].includes(status)){
+        SB_REALTIME_ATIVO=false;
         console.warn('Canal Realtime indisponível; a sincronização periódica continuará ativa.',error||status);
         if(SB_PROFILE) sbSetConnectionBadge('Reconectando atualizações...',false);
         sbProgramarRecarregamento(500);
       }
     });
 
-  // Segurança adicional: os três perfis conferem o servidor a cada 10 segundos,
-  // mesmo quando o navegador não recebe um evento Realtime.
+  // Realtime mantém a atualização imediata. A consulta completa fica como
+  // contingência lenta, usada somente quando o canal não está conectado.
   setInterval(()=>{
-    if(SB_PROFILE && document.visibilityState!=='hidden') sbRecarregarDados();
-  },10000);
+    if(SB_PROFILE && !SB_REALTIME_ATIVO && document.visibilityState!=='hidden') sbRecarregarDados();
+  },60000);
   document.addEventListener('visibilitychange',()=>{
     if(document.visibilityState==='visible' && SB_PROFILE) sbRecarregarDados();
   });
