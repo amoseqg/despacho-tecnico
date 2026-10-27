@@ -1702,9 +1702,10 @@ async function addCh() {
   const de = el('c-de').value.trim();
   const descricaoRamal=[de,el('c-descricao-colada')?.value].filter(Boolean).join('\n');
   if(!ramal)ramal=extrairRamalDaDescricaoChamado(descricaoRamal);
+  const protocoloAnterior=String(el('c-protocolo-anterior')?.value||'').trim()||extrairProtocoloAnteriorDaDescricao(descricaoRamal);
   if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
-  if (campoRamalNecessario(skill,abertura,descricaoRamal,!!el('c-dispensa-ramal')?.checked) && !numeroCircuito(ramal)) { alert('Informe o número do ramal para chamado de voz aberto pela Vectra ou Método.'); el('c-ramal')?.focus(); return; }
+  if (campoRamalNecessario(skill,abertura,descricaoRamal,!!el('c-dispensa-ramal')?.checked) && !numeroCircuito(ramal) && !normalizarProtocoloReincidencia(protocoloAnterior)) { alert('Informe o número do ramal para chamado de voz aberto pela Vectra ou Método.'); el('c-ramal')?.focus(); return; }
   if (!site) {
     definirModoManualChamado(true);
     const statusCircuito=el('c-status');
@@ -1727,7 +1728,7 @@ async function addCh() {
   const dtexec = el('c-dtexec').value;
   const novoChamado = {
     id: 'CH-'+Date.now(), pr, sdm, si, ci, re, skill, area: re === 'capital' ? area : '', en, de, dtexec,
-    abertura, ramal, protocoloAnterior:String(el('c-protocolo-anterior')?.value||'').trim()||extrairProtocoloAnteriorDaDescricao(descricaoRamal),
+    abertura, ramal, protocoloAnterior,
     regiaoOperacional: el('c-regiao-planilha').value, tecnicosIndicados: el('c-tecnicos-planilha').value,
     cid: el('c-cd').value, contato: el('c-co').value, horario: el('c-ho').value,
     velocidade: el('c-ve').value, prtm: el('c-pt').value, pvfTotal: el('c-pv').value,
@@ -1971,7 +1972,7 @@ function atualizarCampoRamalChamado(){
   if(mostrar&&!campo.value.trim())campo.value=extrairRamalDaDescricaoChamado(descricao);
   const protocoloAnterior=el('c-protocolo-anterior');
   if(protocoloAnterior&&!protocoloAnterior.value.trim())protocoloAnterior.value=extrairProtocoloAnteriorDaDescricao(descricao);
-  box.classList.toggle('hidden',!mostrar);campo.required=mostrar&&!numeroCircuito(campo.value);
+  box.classList.toggle('hidden',!mostrar);campo.required=mostrar&&!numeroCircuito(campo.value)&&!normalizarProtocoloReincidencia(protocoloAnterior?.value);
   if(!mostrar)campo.value='';
 }
 function historicoAnteriorCircuito(c){
