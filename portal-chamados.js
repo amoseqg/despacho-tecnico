@@ -13,13 +13,11 @@
   function normalizar(v){return texto(v).normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
   function numero(v){return (texto(v).match(/\d+/g)||[]).join('');}
   function extrairRamal(textoInformado){const m=String(textoInformado||'').match(/\b(?:(?:n[uú]mero|num)\s+do\s+)?(?:ramal|extens[aã]o)(?:\s+reclamad[oa])?\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);return m?numero(m[1]):'';}
-  function extrairProtocoloAnterior(textoInformado){const m=String(textoInformado||'').match(/\b(?:protocolo\s+(?:do\s+)?(?:atendimento\s+)?anterior|atendimento\s+anterior)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9._/-]{2,39})/i);return m?m[1].trim():'';}
   function atualizarIdentificadoresPortal(){
     const descricao=$('observacoes')?.value||'';
     if($('ramal')&&!$('ramal').value.trim())$('ramal').value=extrairRamal(descricao);
-    if($('protocolo-anterior')&&!$('protocolo-anterior').value.trim())$('protocolo-anterior').value=extrairProtocoloAnterior(descricao);
     const mostrar=['VECTRA','METODO'].includes(normalizar(solicitante?.operadora||''));
-    if($('ramal'))$('ramal').required=mostrar&&!texto($('protocolo-anterior')?.value);
+    if($('ramal'))$('ramal').required=false;
   }
   function dataLocal(v){return v?new Date(v).toLocaleString('pt-BR'):'—';}
   function escapar(v){const d=document.createElement('div');d.textContent=texto(v);return d.innerHTML;}
@@ -40,7 +38,7 @@
     const operadora=normalizar(solicitante?.operadora||'');
     const mostrar=['VECTRA','METODO'].includes(operadora);
     $('ramal-box')?.classList.toggle('oculto',!mostrar);
-    if($('ramal')){$('ramal').required=mostrar&&!texto($('protocolo-anterior')?.value);if(!mostrar)$('ramal').value='';}
+    if($('ramal')){$('ramal').required=false;if(!mostrar)$('ramal').value='';}
     atualizarIdentificadoresPortal();
   }
   function regiaoDoSite(site){return ['NORTE','SUL','LESTE','OESTE'].includes(texto(site?.regiao_operacional).toUpperCase())?'capital':'interior';}
@@ -134,9 +132,7 @@
     bloquear(botao,true,'Enviando...');
     try{
       const ramal=texto($('ramal')?.value||'');
-      const protocoloAnterior=texto($('protocolo-anterior')?.value||'')||extrairProtocoloAnterior(texto($('observacoes').value));
-      if(['VECTRA','METODO'].includes(normalizar(solicitante.operadora))&&!numero(ramal)&&!protocoloAnterior){status($('chamado-status'),'Informe o número do ramal para chamados de voz da Vectra ou Método.');$('ramal')?.focus();return;}
-      const linha={protocolo:'GERADO-AUTOMATICAMENTE',sdm:texto($('sdm').value),site_id:siteSelecionado.id,circuito:siteSelecionado.circuito,numero_ramal:ramal||null,protocolo_anterior:protocoloAnterior||null,site_nome:siteSelecionado.site||null,cidade:siteSelecionado.cidade||null,endereco:siteSelecionado.endereco||null,contato:texto($('contato').value),horario_expediente:siteSelecionado.horario_expediente||null,regiao:regiaoDoSite(siteSelecionado),skill:'voz',descricao:texto($('observacoes').value)||null,status:'aberto',solicitante_id:solicitante.user_id,vencimento_em:vencimento.toISOString()};
+      const linha={protocolo:'GERADO-AUTOMATICAMENTE',sdm:texto($('sdm').value),site_id:siteSelecionado.id,circuito:siteSelecionado.circuito,numero_ramal:ramal||null,operadora:solicitante.operadora||null,site_nome:siteSelecionado.site||null,cidade:siteSelecionado.cidade||null,endereco:siteSelecionado.endereco||null,contato:texto($('contato').value),horario_expediente:siteSelecionado.horario_expediente||null,regiao:regiaoDoSite(siteSelecionado),skill:'voz',descricao:texto($('observacoes').value)||null,status:'aberto',solicitante_id:solicitante.user_id,vencimento_em:vencimento.toISOString()};
       const {data,error}=await sb.from('chamados').insert(linha).select('id,protocolo,status,criado_em,vencimento_em').single();if(error)throw error;
       $('protocolo-gerado').textContent=data.protocolo;$('confirmacao').showModal();$('form-chamado').reset();definirModoNovoCircuito(false);$('aberto-por').value=solicitante.nome;atualizarDataAbertura();definirVencimentoInicial();buscarCircuito();await carregarChamados();
     }catch(e){status($('chamado-status'),'Não foi possível abrir o chamado: '+e.message);}
