@@ -1688,7 +1688,7 @@ async function addCh() {
   const sdm = el('c-sdm').value.trim();
   const siteEncontrado = MODO_MANUAL_CHAMADO ? null : buscarCircuito();
   const abertura = el('c-abertura').value;
-  const ramal = String(el('c-ramal')?.value||'').trim();
+  let ramal = String(el('c-ramal')?.value||'').trim();
   const si = el('c-si').value.trim();
   const ci = MODO_MANUAL_CHAMADO ? String(el('c-ci-manual')?.value||'').trim() : el('c-ci').value.trim();
   const site = MODO_MANUAL_CHAMADO && ci ? (siteEncontrado || {manual:true}) : siteEncontrado;
@@ -1700,9 +1700,11 @@ async function addCh() {
   const liberarArea = el('c-liberar-area').checked;
   const en = el('c-en').value.trim();
   const de = el('c-de').value.trim();
+  const descricaoRamal=[de,el('c-descricao-colada')?.value].filter(Boolean).join('\n');
+  if(!ramal)ramal=extrairRamalDaDescricaoChamado(descricaoRamal);
   if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
   if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
-  if (campoRamalNecessario(skill,abertura) && !numeroCircuito(ramal)) { alert('Informe o número do ramal para chamado de voz aberto pela Vectra ou Método.'); el('c-ramal')?.focus(); return; }
+  if (campoRamalNecessario(skill,abertura,descricaoRamal,!!el('c-dispensa-ramal')?.checked) && !numeroCircuito(ramal)) { alert('Informe o número do ramal para chamado de voz aberto pela Vectra ou Método.'); el('c-ramal')?.focus(); return; }
   if (!site) {
     definirModoManualChamado(true);
     const statusCircuito=el('c-status');
@@ -1739,6 +1741,13 @@ async function addCh() {
     if(btn){btn.disabled=true;btn.textContent='Salvando no servidor...';}
     const adminAtual=await sbExigirSessaoAdmin();
     if(novoChamado.dt)novoChamado.dt.admin=adminAtual.nome;
+    const {data:existentes,error:consultaDuplicidade}=await SB.from('chamados').select('id,status,tecnico_id').eq('protocolo',pr).limit(1);
+    if(consultaDuplicidade)throw consultaDuplicidade;
+    if(existentes?.length){
+      const existente=D.ch.find(c=>String(c.id)===String(existentes[0].id));
+      const responsavel=existente?.te?nt(existente.te):'um técnico já vinculado';
+      throw new Error(`O protocolo ${pr} já está cadastrado (${existentes[0].status}) com ${responsavel}. Localize o chamado existente para continuar, sem criar uma cópia.`);
+    }
     // O cadastro auxiliar do site não deve impedir a abertura do chamado.
     const linha=sbChamadoRow(novoChamado);
     linha.criado_por=adminAtual.id;
@@ -1762,7 +1771,7 @@ async function addCh() {
     SB_LOADED_CH.add(data.id);
     lsSet('dd',D);
 
-    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; if(el('c-ramal'))el('c-ramal').value=''; atualizarCampoRamalChamado(); el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
+    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; if(el('c-ramal'))el('c-ramal').value=''; if(el('c-dispensa-ramal'))el('c-dispensa-ramal').checked=false; atualizarCampoRamalChamado(); el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
     el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
     el('c-de').value = ''; el('c-dtexec').value = '';
     el('c-sk').value = ''; el('c-area').value = ''; atualizarRotulosSlaRegiao();
@@ -1924,20 +1933,31 @@ function numeroRamalChamado(c){
   const achado=texto.match(/\b(?:ramal|extens[aã]o)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
   return achado?numeroCircuito(achado[1]):'';
 }
+function extrairRamalDaDescricaoChamado(texto){
+  const achado=String(texto||'').match(/\b(?:ramal|extens[aã]o)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
+  return achado?numeroCircuito(achado[1]):'';
+}
+function chamadoDispensaRamal(skill,descricao=''){
+  if(String(skill||'').toLowerCase()==='vistoria')return true;
+  const texto=String(descricao||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+  return /\b(vistoria|remanejamento|readequacao)\b/.test(texto);
+}
 function chaveCircuitoReincidencia(c){
   const origem=normalizarChaveEstoque(c?.operadora||c?.abertura||'').replace(/[^a-z0-9]/g,'');
   if(skillChamado(c)==='voz'&&['vectra','metodo'].includes(origem))return 'ramal:'+numeroRamalChamado(c);
   return 'circuito:'+(numeroCircuito(c?.ci)||normalizarCircuito(c?.ci));
 }
-function campoRamalNecessario(skill,abertura){
+function campoRamalNecessario(skill,abertura,descricao='',dispensar=false){
   const origem=normalizarChaveEstoque(abertura||'').replace(/[^a-z0-9]/g,'');
-  return skill==='voz'&&['vectra','metodo'].includes(origem);
+  return skill==='voz'&&['vectra','metodo'].includes(origem)&&!dispensar&&!chamadoDispensaRamal(skill,descricao);
 }
 function atualizarCampoRamalChamado(){
   const box=el('c-ramal-box'),campo=el('c-ramal');
   if(!box||!campo)return;
-  const mostrar=campoRamalNecessario(el('c-sk')?.value,el('c-abertura')?.value);
-  box.classList.toggle('hidden',!mostrar);campo.required=mostrar;
+  const descricao=[el('c-de')?.value,el('c-descricao-colada')?.value].filter(Boolean).join('\n');
+  const mostrar=campoRamalNecessario(el('c-sk')?.value,el('c-abertura')?.value,descricao,!!el('c-dispensa-ramal')?.checked);
+  if(mostrar&&!campo.value.trim())campo.value=extrairRamalDaDescricaoChamado(descricao);
+  box.classList.toggle('hidden',!mostrar);campo.required=mostrar&&!numeroCircuito(campo.value);
   if(!mostrar)campo.value='';
 }
 function historicoAnteriorCircuito(c){
@@ -2309,10 +2329,12 @@ function rAt() {
   const administrador=SB_PROFILE?.tipo==='admin'||S?.t==='adm';
   const normalizarTecnico=valor=>String(valor||'').toLocaleLowerCase('pt-BR').normalize('NFD').replace(/[\u0300-\u036f]/g,'');
   const normalizarProtocolo=valor=>String(valor||'').toLocaleLowerCase('pt-BR');
-  const list = D.ch.filter(chamadoVisivel).filter(c =>
-    c.st === 'andamento' ||
-    (S?.t === 'adm' && c.st === 'concluida' && !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente'))
-  ).filter(c=>{
+  const visiveis=D.ch.filter(chamadoVisivel);
+  const chamadosUnicos=S?.t==='adm'?servicosPagamentoUnicos(visiveis,true):visiveis;
+  const emAtendimento=chamadosUnicos.filter(c=>c.st==='andamento');
+  const concluidosUnicos=chamadosUnicos.filter(c=>c.st==='concluida'&&!c.ex?.pagamentoExcluido);
+  const aguardandoAprovacao=concluidosUnicos.filter(c=>!c.ap||c.ap.status==='pendente');
+  const list = [...emAtendimento,...aguardandoAprovacao].filter(c=>{
     if(!filtroTecnico) return true;
     const nome=nt(c.te)||D.tc.find(t=>t.u===c.te)?.n||c.te||'';
     return normalizarTecnico(nome).includes(filtroTecnico);
@@ -2323,8 +2345,8 @@ function rAt() {
   }).filter(c=>{
     if(!filtroAcao) return true;
     const emAtendimento=c.st==='andamento';
-    const aguardandoAprovacao=c.st==='concluida';
-    if(filtroAcao==='aprovar') return aguardandoAprovacao;
+    const estaAguardandoAprovacao=c.st==='concluida'&&(!c.ap||c.ap.status==='pendente');
+    if(filtroAcao==='aprovar') return estaAguardandoAprovacao;
     if(filtroAcao==='redirecionar'||filtroAcao==='rastreamento') return emAtendimento;
     if(filtroAcao==='suporte') return administrador&&emAtendimento;
     if(filtroAcao==='encerrar') return emAtendimento&&!c.solicitanteId;
@@ -2338,7 +2360,7 @@ function rAt() {
     const t = aguardandoEncerramento ? null : tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
     const marcador=aguardandoEncerramento
-      ? '<span class="badge b-pag-pendente">Concluído aguardando encerramento</span>'
+      ? '<span class="badge b-pag-pendente">Concluído, aguardando aprovação</span>'
       : `<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span>`;
     const administrador=SB_PROFILE?.tipo==='admin'||S?.t==='adm';
     const pendenciaAdmin=administrador&&c.st==='andamento'
@@ -2348,7 +2370,7 @@ function rAt() {
       ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
       : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${administrador?`<button class="btn btn-p btn-suporte-tec" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">🤝 Suporte técnico</button>`:''}${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
     return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando encerramento</td></tr>';
+  }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando aprovação</td></tr>';
   tb.onclick=event=>{
     if(event.target.closest('button,a,input,select,textarea,[role="button"]')) return;
     const linha=event.target.closest('tr[data-at-chamado-id]');
@@ -2660,18 +2682,23 @@ function limparCardsRelatorio() {
 }
 
 // Cards, detalhes e exportações devem considerar os mesmos serviços.
-function servicosPagamentoUnicos(chamados) {
+function servicosPagamentoUnicos(chamados,agruparPorProtocolo=false) {
   const grupos = new Map();
   for (const c of chamados) {
     const protocolo = String(c.pr || '').trim().toLocaleLowerCase('pt-BR');
-    const chave = JSON.stringify([c.te, protocolo || `id:${c.id}`]);
+    const suporte=String(c.informacoesAdicionais||'').includes('[SUPORTE_TECNICO_ORIGEM:');
+    const chave = suporte ? `suporte:${c.id}` : (agruparPorProtocolo ? (protocolo||`id:${c.id}`) : JSON.stringify([c.te, protocolo || `id:${c.id}`]));
     const anterior = grupos.get(chave);
     const prioridade = item => item.ex?.pagamentoExcluido ? 3 :
       ['aprovado','rejeitado'].includes(item.ap?.status) ? 2 : 1;
     // Preserva decisões registradas em vez de cópias sem análise.
-    if (!anterior || prioridade(c) > prioridade(anterior) ||
-        (prioridade(c) === prioridade(anterior) &&
-         (Date.parse(c.ap?.data) || 0) > (Date.parse(anterior.ap?.data) || 0))) {
+    const dataMaisRecente=item=>Math.max(Date.parse(item.atualizadoEm)||0,Date.parse(item.ap?.data)||0,Date.parse(item.cc)||0,Date.parse(item.cr)||0);
+    if (!anterior || (agruparPorProtocolo&&dataMaisRecente(c)>dataMaisRecente(anterior)) ||
+        (agruparPorProtocolo&&dataMaisRecente(c)===dataMaisRecente(anterior)&&prioridade(c)>prioridade(anterior)) ||
+        (!agruparPorProtocolo&&prioridade(c) > prioridade(anterior)) ||
+        (!agruparPorProtocolo&&prioridade(c) === prioridade(anterior) &&
+        Math.max(Date.parse(c.ap?.data)||0,Date.parse(c.atualizadoEm)||0,Date.parse(c.cc)||0) >
+        Math.max(Date.parse(anterior.ap?.data)||0,Date.parse(anterior.atualizadoEm)||0,Date.parse(anterior.cc)||0))) {
       grupos.set(chave, c);
     }
   }
@@ -4190,9 +4217,10 @@ document.addEventListener('DOMContentLoaded', function() {
   let circuitoDescricaoTimer=null;
   el('c-descricao-colada').addEventListener('input',function(){
     clearTimeout(circuitoDescricaoTimer);
-    circuitoDescricaoTimer=setTimeout(buscarCircuitoNaDescricao,180);
+    circuitoDescricaoTimer=setTimeout(()=>{buscarCircuitoNaDescricao();atualizarCampoRamalChamado();},180);
   });
-  el('c-descricao-colada').addEventListener('change',buscarCircuitoNaDescricao);
+  el('c-descricao-colada').addEventListener('change',()=>{buscarCircuitoNaDescricao();atualizarCampoRamalChamado();});
+  el('c-de')?.addEventListener('input',atualizarCampoRamalChamado);
   el('c-manual-toggle')?.addEventListener('click',()=>definirModoManualChamado(!MODO_MANUAL_CHAMADO));
   el('c-ci-manual')?.addEventListener('input',function(){el('c-ci').value=this.value.trim();});
   el('c-ci-manual')?.addEventListener('change',buscarCircuito);
@@ -4214,6 +4242,7 @@ document.addEventListener('DOMContentLoaded', function() {
   el('c-area').addEventListener('change', atualizarTecnicosChamado);
   el('c-abertura')?.addEventListener('change',atualizarCampoRamalChamado);
   el('c-sk')?.addEventListener('change',atualizarCampoRamalChamado);
+  el('c-dispensa-ramal')?.addEventListener('change',atualizarCampoRamalChamado);
   atualizarCampoRamalChamado();
   el('c-liberar-area').addEventListener('change', atualizarTecnicosChamado);
   atualizarCamposRegiao();
@@ -4819,7 +4848,7 @@ async function sbLoadAll(){
   D.ch=(cR.data||[]).map(c=>{
     const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
-      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'',
+      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'', atualizadoEm:c.atualizado_em||'',
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
@@ -5039,15 +5068,7 @@ async function sbSyncAll(){
       const old=c.id; const {data,error}=await SB.from('chamados').insert(sbChamadoRow(c)).select('id').single(); if(error) throw error; c.id=data.id;
       (D.mr||[]).forEach(r=>{if(r.chamadoId===old) r.chamadoId=data.id;});
     }
-    if(SB_PROFILE.tipo==='admin'){
-      const chRows=D.ch.filter(x=>sbUUID(x.id)).map(c=>({id:c.id,...sbChamadoRow(c)}));
-      if(chRows.length){
-        // Não propaga técnico de uma cópia antiga da aba.
-        const syncRows=chRows.map(row=>{const {tecnico_id,...seguro}=row;return seguro;});
-        const {error}=await SB.from('chamados').upsert(syncRows,{onConflict:'id'});
-        if(error) throw error;
-      }
-    }else{
+    if(SB_PROFILE.tipo!=='admin'){
       for(const c of D.ch.filter(x=>sbUUID(x.id) && x.te===SB_PROFILE.usuario)){
         const {error}=await SB.from('chamados').update({
           status:c.st||'pendente',
@@ -5064,17 +5085,9 @@ async function sbSyncAll(){
       // Exclusão física desativada: chamados são arquivados em chamados_arquivados.
     }
 
-    // Execuções e aprovações.
-    const exRows=[];
-    for(const c of D.ch){
-      if(!sbUUID(c.id)) continue;
-      if(c.ex) exRows.push({chamado_id:c.id,tecnico_id:sbIdByUser(c.te),cidade_origem:c.ex.co||null,cidade_destino:c.ex.cd||null,cidade_retorno:c.ex.cr||null,origem_escola_id:c.ex.esco||null,destino_escola_id:c.ex.escd||null,retorno_escola_id:c.ex.escr||null,deslocamento_cobrado:c.ex.cobrarKm===true,km_total:sbNum(c.ex.km),valor_km:sbNum(c.ex.vkm),atividade:c.ex.atv||null,valor_atividade:sbNum(c.ex.vatv),valor_avulso:sbNum(c.ex.avulso),utp_metros:sbNum(c.ex.utp),cci_metros:sbNum(c.ex.cci),canaleta_metros:sbNum(c.ex.can),materiais_utilizados:normalizarMateriaisUtilizados(c.ex),valor_materiais:sbNum(c.ex.tmat),observacao:c.ex.obs||null,relatorio_encerramento:c.ex.relatorio||null,valor_total:sbNum(c.ex.total),atualizado_em:new Date().toISOString()});
-      const start=Number(c._trLoadedCount||0); const novos=(c.tr||[]).slice(start);
-      for(const tr of novos){ const {error}=await SB.from('chamado_transferencias').insert({chamado_id:c.id,de_tecnico_id:sbIdByUser(tr.de),para_tecnico_id:sbIdByUser(tr.para),motivo:tr.m||null,realizado_por:tr.adminId||SB_PROFILE.id,criado_em:sbIso(tr.d)||new Date().toISOString()}); if(error) throw error; }
-      c._trLoadedCount=(c.tr||[]).length;
-    }
-    if(exRows.length){ const {error}=await SB.from('execucoes').upsert(exRows,{onConflict:'chamado_id'}); if(error) throw error; }
-    // Aprovações são gravadas somente na ação explícita sbPersistirAprovacoes.
+    // Estados de chamados, execuções, aprovações e transferências são salvos
+    // pelas ações específicas. Uma sincronização ampla de uma aba antiga poderia
+    // restaurar o status ou o responsável anterior no banco.
 
     // Materiais: novos e existentes.
     for(const m of D.mat.filter(x=>!sbUUID(x.id))){
@@ -5521,7 +5534,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.39"></script>
+<script src="/release-info.js?v=2.5.40"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
