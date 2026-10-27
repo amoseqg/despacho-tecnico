@@ -1661,7 +1661,7 @@ async function addOsServico() {
     const adminAtual=await sbExigirSessaoAdmin();
     const linha=sbChamadoRow(novoChamado);
     linha.criado_por=adminAtual.id;
-    const {data,error}=await SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em,atualizado_em').single();
+    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em,atualizado_em').single());
     if(error)throw error;
     if(!data?.id||data.status!=='pendente'||data.tecnico_id!==linha.tecnico_id)throw new Error('O servidor não confirmou a OS de Serviços e o técnico selecionado.');
     novoChamado.id=data.id;novoChamado.st=data.status;novoChamado.cr=data.criado_em||novoChamado.cr;
@@ -1742,9 +1742,9 @@ async function addCh() {
     // O cadastro auxiliar do site não deve impedir a abertura do chamado.
     const linha=sbChamadoRow(novoChamado);
     linha.criado_por=adminAtual.id;
-    const {data,error}=await SB.from('chamados').insert(linha)
+    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('chamados').insert(linha)
       .select('id,status,tecnico_id,criado_em,atualizado_em')
-      .single();
+      .single());
     if(error) throw error;
     if(!data?.id || data.status!=='pendente' || data.tecnico_id!==linha.tecnico_id){
       throw new Error('O servidor não confirmou corretamente o chamado e o técnico selecionado.');
@@ -2437,7 +2437,7 @@ async function criarChamadoSuporteTecnico(chamadoId,tecnicoUser,atividade,dialog
     };
     const linha=sbChamadoRow(chamadoSuporte);
     linha.criado_por=admin.id;
-    const {data,error}=await SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em').single();
+    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('chamados').insert(linha).select('id,status,tecnico_id,criado_em').single());
     if(error)throw error;
     if(!data?.id||data.status!=='pendente'||data.tecnico_id!==tecnicoId)throw new Error('O servidor não confirmou o chamado de suporte para o técnico selecionado.');
     chamadoSuporte.id=data.id;
@@ -4658,43 +4658,90 @@ function nfSolicitarEncerramento(c){
 }
 function sbShowError(prefix, err){ console.error(prefix, err); nfToast(prefix + (err?.message ? ': '+err.message : ''),'erro'); }
 
-async function sbExigirSessaoAdmin(){
-  let {data:{user},error:userErr}=await SB.auth.getUser();
-  if(userErr || !user){
-    // Se a verificacao remota falhar, tenta renovar a sessao armazenada uma vez
-    // antes de impedir o salvamento do chamado.
-    const {data:{session},error:sessionErr}=await SB.auth.getSession();
-    if(!sessionErr && session?.refresh_token){
-      const {data,error}=await SB.auth.refreshSession(session);
-      if(!error && data?.user){user=data.user;userErr=null;}
-      else userErr=error||sessionErr||userErr;
-    }else if(sessionErr){
-      userErr=sessionErr;
+function sbErroSessaoAutenticacao(err){
+  const codigo=String(err?.code||'').toLowerCase();
+  const mensagem=String(err?.message||'').toLowerCase();
+  return Number(err?.status||0)===401 ||
+    /^(pgrst301|jwt_expired|invalid_jwt|session_not_found)$/.test(codigo) ||
+    /jwt.{0,30}expired|expired.{0,30}jwt|invalid.{0,20}(jwt|token)|token.{0,20}expired|session.{0,20}(expired|missing)|refresh token.{0,40}(invalid|expired|already used)/.test(codigo+' '+mensagem);
+}
+
+async function sbRenovarSessaoAdmin({forcar=false}={}){
+  const {data:{session},error}=await SB.auth.getSession();
+  if(error)throw error;
+  if(!session?.refresh_token)throw new Error('Não existe uma sessão ativa para renovar. Entre novamente na área Administrador; os dados do formulário foram mantidos.');
+  const agora=Math.floor(Date.now()/1000);
+  if(!forcar&&session.expires_at&&session.expires_at>agora+180)return session;
+  const tokenAnterior=session.access_token;
+  const {data,error:erroRenovacao}=await SB.auth.refreshSession();
+  if(!erroRenovacao&&data?.session)return data.session;
+  // Outra chamada da mesma aba pode ter renovado o token enquanto esta espera.
+  const {data:{session:sessaoAtualizada},error:erroLeitura}=await SB.auth.getSession();
+  if(sessaoAtualizada?.access_token&&sessaoAtualizada.access_token!==tokenAnterior&&
+    Number(sessaoAtualizada.expires_at||0)>Math.floor(Date.now()/1000))return sessaoAtualizada;
+  throw erroRenovacao||erroLeitura||new Error('Não foi possível renovar a sessão.');
+}
+
+async function sbExecutarComSessaoAdmin(operacao){
+  await sbExigirSessaoAdmin();
+  let resposta=await operacao();
+  if(!resposta?.error||!sbErroSessaoAutenticacao(resposta.error))return resposta;
+  // Só repete quando a API confirma erro de token; erros de rede ou permissão não
+  // são reenviados, para evitar duplicar um chamado que já tenha sido gravado.
+  await sbExigirSessaoAdmin({renovar:true});
+  resposta=await operacao();
+  return resposta;
+}
+
+async function sbExigirSessaoAdmin({renovar=false}={}){
+  let usuario=null,erroUsuario=null,renovacaoTentada=false;
+  try{
+    const {data:{session},error}=await SB.auth.getSession();
+    if(error)throw error;
+    if(session?.refresh_token&&
+      (renovar||!session.expires_at||session.expires_at<=Math.floor(Date.now()/1000)+180)){
+      await sbRenovarSessaoAdmin({forcar:true});
+      renovacaoTentada=true;
+    }
+  }catch(err){
+    erroUsuario=err;
+    renovacaoTentada=true;
+  }
+  let resultado=await SB.auth.getUser();
+  usuario=resultado?.data?.user||null;
+  erroUsuario=resultado?.error||erroUsuario;
+  if((!usuario||erroUsuario)&&sbErroSessaoAutenticacao(erroUsuario)&&!renovacaoTentada){
+    try{
+      await sbRenovarSessaoAdmin({forcar:true});
+      renovacaoTentada=true;
+      resultado=await SB.auth.getUser();
+      usuario=resultado?.data?.user||null;
+      erroUsuario=resultado?.error||null;
+    }catch(err){
+      erroUsuario=err;
+      usuario=null;
     }
   }
-  if(!user){
-    const codigo=String(userErr?.code||'').toLowerCase();
-    const statusHttp=Number(userErr?.status||0);
-    const sessaoInvalida=!userErr||statusHttp===400||statusHttp===401||
-      /session.?missing|session.?expired|refresh.?token|invalid.?grant|user.?not.?found/.test(codigo+' '+String(userErr?.message||'').toLowerCase());
-    if(sessaoInvalida) throw new Error('Sua sessão expirou ou não está mais válida. Entre novamente na área Administrador. Os dados do formulário foram mantidos.');
-    throw new Error('Não foi possível confirmar sua sessão com o Supabase. Verifique a conexão e tente novamente; os dados do formulário foram mantidos. '+(userErr?.message||''));
+  if(!usuario){
+    const codigo=String(erroUsuario?.code||'').toLowerCase();
+    const statusHttp=Number(erroUsuario?.status||0);
+    const sessaoInvalida=!erroUsuario||statusHttp===400||statusHttp===401||
+      /session.?missing|session.?expired|refresh.?token|invalid.?grant|user.?not.?found/.test(codigo+' '+String(erroUsuario?.message||'').toLowerCase());
+    if(sessaoInvalida)throw new Error('Sua sessão expirou ou não está mais válida. Entre novamente na área Administrador. Os dados do formulário foram mantidos.');
+    throw new Error('Não foi possível confirmar sua sessão com o Supabase. Verifique a conexão e tente novamente; os dados do formulário foram mantidos. '+(erroUsuario?.message||''));
   }
   const {data:perfil,error:perfilErr}=await SB.from('perfis')
     .select('id,nome,usuario,tipo,admin_geral,ativo')
-    .eq('id',user.id)
+    .eq('id',usuario.id)
     .single();
-  if(perfilErr || !perfil || perfil.tipo!=='admin' || !perfil.ativo){
-    throw new Error('O usuario conectado nao possui permissao ativa de administrador.');
+  if(perfilErr||!perfil||perfil.tipo!=='admin'||!perfil.ativo){
+    throw new Error('O usuário conectado não possui permissão ativa de administrador.');
   }
-  // A sessao do Supabase e a fonte de verdade. Recupera o perfil quando a aba
-  // ficou aberta por muito tempo ou o carregamento local ainda nao terminou.
   SB_PROFILE={...(SB_PROFILE||{}),...perfil};
   S={t:'adm',n:perfil.nome,u:perfil.usuario,p:!!perfil.admin_geral,_id:perfil.id};
   ss();
   return perfil;
 }
-
 function sbSetConnectionBadge(text, ok=true){
   document.dispatchEvent(new CustomEvent('nf-connection',{detail:{ok}}));
   let b=document.getElementById('supabase-status-badge');
@@ -5474,7 +5521,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.34"></script>
+<script src="/release-info.js?v=2.5.39"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
