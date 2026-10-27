@@ -1727,7 +1727,7 @@ async function addCh() {
   const dtexec = el('c-dtexec').value;
   const novoChamado = {
     id: 'CH-'+Date.now(), pr, sdm, si, ci, re, skill, area: re === 'capital' ? area : '', en, de, dtexec,
-    abertura, ramal,
+    abertura, ramal, protocoloAnterior:String(el('c-protocolo-anterior')?.value||'').trim()||extrairProtocoloAnteriorDaDescricao(descricaoRamal),
     regiaoOperacional: el('c-regiao-planilha').value, tecnicosIndicados: el('c-tecnicos-planilha').value,
     cid: el('c-cd').value, contato: el('c-co').value, horario: el('c-ho').value,
     velocidade: el('c-ve').value, prtm: el('c-pt').value, pvfTotal: el('c-pv').value,
@@ -1771,7 +1771,7 @@ async function addCh() {
     SB_LOADED_CH.add(data.id);
     lsSet('dd',D);
 
-    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; el('c-abertura').value = ''; if(el('c-ramal'))el('c-ramal').value=''; if(el('c-dispensa-ramal'))el('c-dispensa-ramal').checked=false; atualizarCampoRamalChamado(); el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
+    el('c-descricao-colada').value = ''; el('c-pr').value = ''; el('c-sdm').value = ''; if(el('c-protocolo-anterior'))el('c-protocolo-anterior').value=''; el('c-abertura').value = ''; if(el('c-ramal'))el('c-ramal').value=''; if(el('c-dispensa-ramal'))el('c-dispensa-ramal').checked=false; atualizarCampoRamalChamado(); el('c-ci').value = ''; if(el('c-ci-manual'))el('c-ci-manual').value=''; definirModoManualChamado(false); limparSite();
     el('c-regiao-planilha').value = ''; el('c-tecnicos-planilha').value = '';
     el('c-de').value = ''; el('c-dtexec').value = '';
     el('c-sk').value = ''; el('c-area').value = ''; atualizarRotulosSlaRegiao();
@@ -1927,14 +1927,19 @@ function dataChamadoMs(c, preferirConclusao=false){
   const ms=new Date(valor||0).getTime();
   return Number.isFinite(ms)?ms:0;
 }
+function normalizarProtocoloReincidencia(v){return String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+function extrairProtocoloAnteriorDaDescricao(texto){
+  const achado=String(texto||'').match(/\b(?:protocolo\s+(?:do\s+)?(?:atendimento\s+)?anterior|atendimento\s+anterior)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([A-Z0-9][A-Z0-9._/-]{2,39})/i);
+  return achado?achado[1].trim():'';
+}
 function numeroRamalChamado(c){
   const informado=String(c?.ramal||'').trim();if(informado)return numeroCircuito(informado);
   const texto=String(c?.de||'')+'\n'+String(c?.informacoesAdicionais||'');
-  const achado=texto.match(/\b(?:ramal|extens[aã]o)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
+  const achado=texto.match(/\b(?:(?:n[uú]mero|num)\s+do\s+)?(?:ramal|extens[aã]o)(?:\s+reclamad[oa])?\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
   return achado?numeroCircuito(achado[1]):'';
 }
 function extrairRamalDaDescricaoChamado(texto){
-  const achado=String(texto||'').match(/\b(?:ramal|extens[aã]o)\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
+  const achado=String(texto||'').match(/\b(?:(?:n[uú]mero|num)\s+do\s+)?(?:ramal|extens[aã]o)(?:\s+reclamad[oa])?\s*(?:n[ºo.]*)?\s*[:#-]?\s*([0-9][0-9\s().-]{0,20})/i);
   return achado?numeroCircuito(achado[1]):'';
 }
 function chamadoDispensaRamal(skill,descricao=''){
@@ -1947,6 +1952,13 @@ function chaveCircuitoReincidencia(c){
   if(skillChamado(c)==='voz'&&['vectra','metodo'].includes(origem))return 'ramal:'+numeroRamalChamado(c);
   return 'circuito:'+(numeroCircuito(c?.ci)||normalizarCircuito(c?.ci));
 }
+function mesmoIdentificadorReincidencia(atual,anterior){
+  const protocolo=normalizarProtocoloReincidencia(atual?.protocoloAnterior||'');
+  if(protocolo&&protocolo===normalizarProtocoloReincidencia(anterior?.pr||''))return true;
+  const chaveAtual=chaveCircuitoReincidencia(atual),chaveAnterior=chaveCircuitoReincidencia(anterior);
+  if(chaveAtual==='ramal:')return false;
+  return !!chaveAtual&&chaveAtual===chaveAnterior;
+}
 function campoRamalNecessario(skill,abertura,descricao='',dispensar=false){
   const origem=normalizarChaveEstoque(abertura||'').replace(/[^a-z0-9]/g,'');
   return skill==='voz'&&['vectra','metodo'].includes(origem)&&!dispensar&&!chamadoDispensaRamal(skill,descricao);
@@ -1957,6 +1969,8 @@ function atualizarCampoRamalChamado(){
   const descricao=[el('c-de')?.value,el('c-descricao-colada')?.value].filter(Boolean).join('\n');
   const mostrar=campoRamalNecessario(el('c-sk')?.value,el('c-abertura')?.value,descricao,!!el('c-dispensa-ramal')?.checked);
   if(mostrar&&!campo.value.trim())campo.value=extrairRamalDaDescricaoChamado(descricao);
+  const protocoloAnterior=el('c-protocolo-anterior');
+  if(protocoloAnterior&&!protocoloAnterior.value.trim())protocoloAnterior.value=extrairProtocoloAnteriorDaDescricao(descricao);
   box.classList.toggle('hidden',!mostrar);campo.required=mostrar&&!numeroCircuito(campo.value);
   if(!mostrar)campo.value='';
 }
@@ -1964,7 +1978,7 @@ function historicoAnteriorCircuito(c){
   const chave=chaveCircuitoReincidencia(c);
   const abertura=dataChamadoMs(c);
   if(!chave||chave==='ramal:'||chave==='circuito:'||!abertura)return null;
-  const anteriores=D.ch.filter(x=>x.id!==c.id&&x.st==='concluida'&&chaveCircuitoReincidencia(x)===chave)
+  const anteriores=D.ch.filter(x=>x.id!==c.id&&x.st==='concluida'&&mesmoIdentificadorReincidencia(c,x))
     .map(x=>({chamado:x,data:dataChamadoMs(x,true)}))
     .filter(x=>x.data&&x.data<=abertura&&abertura-x.data<JANELA_REINCIDENCIA_MS)
     .sort((a,b)=>b.data-a.data);
@@ -1972,7 +1986,8 @@ function historicoAnteriorCircuito(c){
 }
 function infoReincidencia(c){
   const usaRamal=campoRamalNecessario(skillChamado(c),c?.operadora||c?.abertura);
-  const referencia=usaRamal?('ramal '+(numeroRamalChamado(c)||'não informado')):('circuito '+(c?.ci||'não informado'));
+  const protocoloAnterior=String(c?.protocoloAnterior||'').trim();
+  const referencia=protocoloAnterior?('protocolo anterior '+protocoloAnterior):(usaRamal?('ramal '+(numeroRamalChamado(c)||'não informado')):('circuito '+(c?.ci||'não informado')));
   const semHistorico='<div class="info" style="margin-top:8px;border-left:4px solid var(--g)"><b>Reincidência:</b> Não — nenhum atendimento concluído para o mesmo '+esc(referencia)+' nos últimos 30 dias.</div>';
   if(Object.prototype.hasOwnProperty.call(c,'_reincidenciaServidor')){
     const h=c._reincidenciaServidor;
@@ -4850,7 +4865,7 @@ async function sbLoadAll(){
   D.ch=(cR.data||[]).map(c=>{
     const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
-      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'', atualizadoEm:c.atualizado_em||'',
+      id:c.id, pr:c.protocolo, protocoloAnterior:c.protocolo_anterior||'', sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'', atualizadoEm:c.atualizado_em||'',
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
@@ -4944,7 +4959,7 @@ function sbChamadoRow(c){
     pvf_total:c.pvfTotal===''?null:Number(c.pvfTotal)||null, regiao_operacional:c.regiaoOperacional||null, tecnicos_indicados:c.tecnicosIndicados||null,
     regiao:c.re, skill:c.skill, area:c.re==='capital'?(c.area||null):null, tecnico_id:sbIdByUser(c.te), criado_por:SB_PROFILE?.id||null,
     descricao:c.de||null, informacoes_adicionais:c.informacoesAdicionais??null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
-    solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, numero_ramal:c.ramal||null, vencimento_em:sbIso(c.vencimento),
+    solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, numero_ramal:c.ramal||null, protocolo_anterior:c.protocoloAnterior||null, vencimento_em:sbIso(c.vencimento),
     tipo_os:c.tipoOs==='servico'?'servico':'manutencao', os_pe_conectado:c.osPeConectado||null, atividade_servico:c.atividadeServico||null,
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:sbIso(c.cr)||new Date().toISOString(), aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
