@@ -7,12 +7,12 @@
  function botao(c){
   if(typeof SB_PROFILE==='undefined'||SB_PROFILE?.tipo!=='admin'||!['aberto','pendente','andamento'].includes(c.st))return '';
   const r=ativo(c.id);
-  return r?`<button type="button" class="btn btn-g nf-liberar-expediente" data-id="${safe(r.id)}">▶ Liberar chamado</button><span class="badge b-pendente">⏸ Horário de atendimento</span>`:c.pendenciaAtiva?'':`<button type="button" class="btn btn-y nf-pendenciar-expediente" data-id="${safe(c.id)}">⏸ Pendenciar por horário</button>`;
+  return r?`<button type="button" class="btn btn-g nf-liberar-expediente" data-id="${safe(r.id)}">▶ Liberar chamado</button><button type="button" class="btn btn-y nf-reaprazar-expediente" data-id="${safe(r.id)}">🗓️ Reaprazar prazo</button><span class="badge b-pendente">⏸ Horário de atendimento</span>`:c.pendenciaAtiva?'':`<button type="button" class="btn btn-y nf-pendenciar-expediente" data-id="${safe(c.id)}">⏸ Pendenciar por horário</button>`;
  }
  function renderizar(){
   const box=e('nf-lista-expediente');if(!box||typeof SB_PROFILE==='undefined'||SB_PROFILE?.tipo!=='admin')return;
   const visiveis=registros.filter(r=>{const c=D.ch.find(c=>c.id===r.chamado_id);return c&&chamadoVisivel(c);});
-  box.innerHTML='<h3>Pendências por horário de atendimento</h3>'+ (visiveis.map(r=>{const c=D.ch.find(c=>c.id===r.chamado_id);return `<div class="os"><div class="os-h"><b>${safe(c.pr)} — ${safe(c.si)}</b><span class="badge b-${r.status==='pausado'?'pendente':'concluida'}">${r.status==='pausado'?'Prazo pausado':r.status==='liberado'?'Liberado':'Finalizado'}</span></div><p>${safe(r.motivo)}</p><div class="os-r"><b>Administrador:</b> ${safe(r.administrador_nome)}<br><b>Retorno programado:</b> ${data(r.retorno_em)}<br><b>Prazo após liberação:</b> ${data(r.vencimento_reprogramado)}<br><b>Tempo restante preservado:</b> ${Math.floor(r.prazo_restante_segundos/3600)}h ${Math.floor(r.prazo_restante_segundos%3600/60)}min<br><b>Expediente:</b> ${safe(r.inicio_expediente)} às ${safe(r.fim_expediente)}${r.liberado_em?`<br><b>Liberado em:</b> ${data(r.liberado_em)}`:''}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${r.status==='pausado'?`<button class="btn btn-g nf-liberar-expediente" data-id="${safe(r.id)}">▶ Liberar chamado</button>`:''}<button class="btn btn-r nf-pendencia-excluir" data-id="${safe(c.id)}">Excluir chamado da lista</button></div></div>`;}).join('')||'<div class="empty">Nenhuma pendência administrativa por expediente.</div>');
+  box.innerHTML='<h3>Pendências por horário de atendimento</h3>'+ (visiveis.map(r=>{const c=D.ch.find(c=>c.id===r.chamado_id);return `<div class="os"><div class="os-h"><b>${safe(c.pr)} — ${safe(c.si)}</b><span class="badge b-${r.status==='pausado'?'pendente':'concluida'}">${r.status==='pausado'?'Prazo pausado':r.status==='liberado'?'Liberado':'Finalizado'}</span></div><p>${safe(r.motivo)}</p><div class="os-r"><b>Administrador:</b> ${safe(r.administrador_nome)}<br><b>Retorno programado:</b> ${data(r.retorno_em)}<br><b>Prazo após liberação:</b> ${data(r.vencimento_reprogramado)}<br><b>Tempo restante preservado:</b> ${Math.floor(r.prazo_restante_segundos/3600)}h ${Math.floor(r.prazo_restante_segundos%3600/60)}min<br><b>Expediente:</b> ${safe(r.inicio_expediente)} às ${safe(r.fim_expediente)}${r.liberado_em?`<br><b>Liberado em:</b> ${data(r.liberado_em)}`:''}</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${r.status==='pausado'?`<button class="btn btn-g nf-liberar-expediente" data-id="${safe(r.id)}">▶ Liberar chamado</button><button class="btn btn-y nf-reaprazar-expediente" data-id="${safe(r.id)}">🗓️ Reaprazar prazo</button>`:''}<button class="btn btn-r nf-pendencia-excluir" data-id="${safe(c.id)}">Excluir chamado da lista</button></div></div>`;}).join('')||'<div class="empty">Nenhuma pendência administrativa por expediente.</div>');
  }
  async function carregar(){
   if(ocupado||typeof SB_PROFILE==='undefined'||!SB_PROFILE)return;ocupado=true;const dono=SB_PROFILE.id;
@@ -63,12 +63,38 @@
    }catch(err){erro.textContent=err.message;if(String(err?.message||'').includes('O prazo já venceu'))opcaoReaprazar.style.display='block';}finally{b.disabled=false;}
   };
  }
+ async function reaprazarAtiva(id,b){
+  if(SB_PROFILE?.tipo!=='admin')return;
+  const r=registros.find(x=>x.id===id&&x.status==='pausado');
+  if(!r||!r.retorno_em||!r.vencimento_reprogramado)return;
+  const c=D.ch.find(x=>x.id===r.chamado_id);if(!c)return;
+  const minimo=campoLocalBrasil(new Date(Math.max(Date.parse(r.vencimento_reprogramado),Date.now())+60000));
+  const dialog=document.createElement('dialog');dialog.style.cssText='width:min(560px,calc(100% - 24px));max-height:90vh;overflow:auto;border:0;border-radius:16px;padding:24px;box-shadow:0 20px 60px #0005';
+  dialog.innerHTML=`<form><h3>Reaprazar prazo do chamado</h3><div class="info"><b>${safe(c.pr)} — ${safe(c.si)}</b><br>Retorno programado: ${data(r.retorno_em)}<br>Vencimento atual: ${data(r.vencimento_reprogramado)}</div><label style="display:block;margin:16px 0">Novo vencimento do atendimento (horário de Brasília)<input class="input" type="datetime-local" name="novoVencimento" min="${minimo}" required></label><label style="display:block">Motivo do reaprazamento<textarea class="input" name="motivo" rows="3" required minlength="3" maxlength="1000" placeholder="Informe o motivo para conceder prazo adicional."></textarea></label><p class="erro" role="alert" style="color:#b91c1c"></p><div style="display:flex;justify-content:flex-end;gap:12px;margin-top:16px"><button class="btn btn-s cancelar" type="button">Cancelar</button><button class="btn btn-y salvar" type="submit">Confirmar reaprazamento</button></div></form>`;
+  document.body.append(dialog);dialog.showModal();dialog.querySelector('.cancelar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  const form=dialog.querySelector('form'),salvar=form.querySelector('.salvar'),erro=form.querySelector('.erro');
+  form.onsubmit=async ev=>{
+   ev.preventDefault();if(salvar.disabled)return;
+   const novoVencimentoISO=new Date(form.elements.novoVencimento.value+':00-03:00').toISOString();
+   if(Date.parse(novoVencimentoISO)<=Math.max(Date.parse(r.vencimento_reprogramado),Date.now())){erro.textContent='O novo vencimento deve ser posterior ao prazo atual.';return;}
+   salvar.disabled=true;b.disabled=true;
+   try{
+    await sbExigirSessaoAdmin();
+    const {data:atualizada,error}=await SB.rpc('reaprazar_pendencia_expediente_admin',{p_pendencia_id:id,p_novo_vencimento:novoVencimentoISO,p_motivo_reaprazamento:form.elements.motivo.value.trim()});
+    if(error)throw error;if(!atualizada?.id)throw new Error('O servidor não confirmou o reaprazamento.');
+    registros=registros.map(x=>x.id===atualizada.id?atualizada:x);
+    c.vencimento=atualizada.vencimento_reprogramado;
+    dialog.close();await sbRecarregarDados();await carregar();renderizar();rCh();rAt();rDb();
+    nfToast('Novo vencimento registrado. O chamado continua pausado até a liberação.','sucesso');
+   }catch(err){erro.textContent=err?.message||'Não foi possível reaprazar o prazo.';salvar.disabled=false;b.disabled=false;}
+  };
+ }
  async function liberar(id,b){
   if(SB_PROFILE?.tipo!=='admin')return;if(!confirm('Liberar o chamado agora e retomar o prazo restante? A liberação será validada pelo expediente cadastrado.'))return;
   b.disabled=true;try{await sbExigirSessaoAdmin();const {data:r,error}=await SB.rpc('liberar_expediente_admin',{p_pendencia_id:id});if(error)throw error;if(r?.status!=='liberado')throw new Error('O servidor não confirmou a liberação.');registros=registros.map(x=>x.id===id?r:x);await sbRecarregarDados();renderizar();nfToast('Chamado liberado com o prazo restante preservado.','sucesso');}catch(err){sbShowError('Não foi possível liberar o chamado',err);}finally{b.disabled=false;}
  }
  function resumo(id){const r=ativo(id);return r?`<div class="info"><b>Prazo pausado pelo administrador — horário de atendimento</b><br>${safe(r.motivo)}<br>Retorno programado: ${data(r.retorno_em)}<br>Vencimento reprogramado: ${data(r.vencimento_reprogramado)}</div>`:'';}
- document.addEventListener('click',async ev=>{const p=ev.target.closest('.nf-pendenciar-expediente'),l=ev.target.closest('.nf-liberar-expediente'),x=ev.target.closest('.nf-pendencia-excluir');if(p)abrir(p.dataset.id);if(l)liberar(l.dataset.id,l);if(x){await excluirChamado(x.dataset.id);window.NexoFieldPendencias?.renderAdmin();renderizar();}});
+ document.addEventListener('click',async ev=>{const p=ev.target.closest('.nf-pendenciar-expediente'),l=ev.target.closest('.nf-liberar-expediente'),a=ev.target.closest('.nf-reaprazar-expediente'),x=ev.target.closest('.nf-pendencia-excluir');if(p)abrir(p.dataset.id);if(l)liberar(l.dataset.id,l);if(a)reaprazarAtiva(a.dataset.id,a);if(x){await excluirChamado(x.dataset.id);window.NexoFieldPendencias?.renderAdmin();renderizar();}});
  document.addEventListener('DOMContentLoaded',()=>{setTimeout(carregar,1800);setInterval(()=>{if(typeof SB_PROFILE!=='undefined'&&SB_PROFILE){if(perfil!==SB_PROFILE.id)registros=[];carregar();}},30000);});
  if(typeof SB!=='undefined')SB.channel('expediente-administrador').on('postgres_changes',{event:'*',schema:'public',table:'pendencias_expediente_admin'},async()=>{await sbRecarregarDados();carregar();}).subscribe();
  window.NexoFieldExpediente={botao,abrir,carregar,renderizar,resumo};
