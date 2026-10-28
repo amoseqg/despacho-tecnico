@@ -4441,6 +4441,14 @@ document.addEventListener('DOMContentLoaded', function() {
     else if (S.t === 'tec') enterTec();
   }
 });
+// Filtro de período do relatório: vincula fora da inicialização geral,
+// para continuar disponível mesmo se outro listener falhar durante o setup.
+document.getElementById('btn-fil-rl')?.addEventListener('click', function() {
+  const dt1 = document.getElementById('rl-dt1')?.value || '';
+  const dt2 = document.getElementById('rl-dt2')?.value || '';
+  rRl(dt1, dt2, true);
+});
+
 </script>
 
 <script id="base-material-planilha-v9">
@@ -5579,13 +5587,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=2.5.0"></script>\n<script src="/health-monitor.js?v=2.1.0">
-// Filtro de período do relatório: vincula fora da inicialização geral,
-// para continuar disponível mesmo se outro listener falhar durante o setup.
-document.getElementById('btn-fil-rl')?.addEventListener('click', function() {
-  const dt1 = document.getElementById('rl-dt1')?.value || '';
-  const dt2 = document.getElementById('rl-dt2')?.value || '';
-  rRl(dt1, dt2, true);
-});
 </script>
 </body>
 </html>
