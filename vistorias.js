@@ -104,7 +104,7 @@ async function enviarVistoriaEmail(id,botao){
  try{
   const {data,error}=await SB.storage.from('relatorios-vistoria').download(r.caminho);if(error)throw error;
   const arquivo=new File([data],r.nome_original||'relatorio-vistoria.pdf',{type:'application/pdf'});
-  await prepararEmailAssistido({prefixo:'vistoria',assunto:`NexoField — Relatório de vistoria ${c?.pr||''}`.trim(),corpo:`Segue o relatório de vistoria.\\nChamado: ${c?.pr||'Não informado'}\\nSite: ${c?.si||'Não informado'}\\nTécnico: ${sbNameById(r.tecnico_id)||'Não informado'}`,arquivos:[arquivo],outlookWindow});
+  await prepararEmailAssistido({prefixo:'vistoria',assunto:`NexoField — Relatório de vistoria ${c?.pr||''}`.trim(),corpo:`Segue o relatório de vistoria.\nChamado: ${c?.pr||'Não informado'}\nSite: ${c?.si||'Não informado'}\nTécnico: ${sbNameById(r.tecnico_id)||'Não informado'}`,arquivos:[arquivo],outlookWindow});
  }catch(err){
   if(!outlookWindow.closed)outlookWindow.close();
   throw err;
