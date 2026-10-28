@@ -415,7 +415,7 @@ function selecionarCircuitoDaDescricao(valor){
   el('c-status').style.color='var(--g)';
 }
 
-function nomeAtividadeOsServico(c){return ({instalacao:'Instalação',alteracao:'Alteração',mudanca_endereco:'Mudança de endereço',vistoria:'Vistoria'})[c.atividadeServico]||'Serviço';}
+function nomeAtividadeOsServico(c){return ({instalacao:'Instalação',alteracao:'Alteração',mudanca_endereco:'Mudança de endereço',vistoria:'Vistoria',retirada:'Retirada'})[c.atividadeServico]||'Serviço';}
 function identificacaoOs(c){return c?.tipoOs==='servico'?'OS de Serviço • '+(c.pr||'Sem identificador'):(c?.pr||'—');}
 function seloTipoOs(c){return c?.tipoOs==='servico'?'<span class="badge b-andamento">🛠️ OS de Serviços</span>':'';}
 function dadosSite(c) {
@@ -4095,7 +4095,7 @@ function exportarConsolidadoPagamentos() {
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,wsTotal,'TOTAL');
   abas.forEach(a=>XLSX.utils.book_append_sheet(wb,criarAbaPagamento(a.nome,a.chamados),a.aba));
-  const lpu=[['LPU - PECONECTADO II','','','','','MATERIAIS - INCIDENTE',''],['LOCALIDADE','ATIVIDADE PADRONIZADA','VALOR','TIPO','','MATERIAL','VALOR POR METRO'],['RMR','INCIDENTE DE VOZ CAPITAL',100,'FIXO','','CABO UTP (INCIDENTE)',1.95],['RMR','INCIDENTE DE DADOS CAPITAL',120,'FIXO','','CABO CCI (INCIDENTE)',1],['INTERIOR','INCIDENTE VOZ INTERIOR',150,'FIXO'],['INTERIOR','INCIDENTE DE DADOS INTERIOR',150,'FIXO'],['GERAL','INSTALAÇÃO',150,'FIXO'],['GERAL','ALTERAÇÃO',150,'FIXO'],['GERAL','SERVIÇO DE ANALISTA CENTRAIS',200,'FIXO'],['GERAL','SERVIÇOS MAIORES','','A COMBINAR']];
+  const lpu=[['LPU - PECONECTADO II','','','','','MATERIAIS - INCIDENTE',''],['LOCALIDADE','ATIVIDADE PADRONIZADA','VALOR','TIPO','','MATERIAL','VALOR POR METRO'],['RMR','INCIDENTE DE VOZ CAPITAL',100,'FIXO','','CABO UTP (INCIDENTE)',1.95],['RMR','INCIDENTE DE DADOS CAPITAL',120,'FIXO','','CABO CCI (INCIDENTE)',1],['INTERIOR','INCIDENTE VOZ INTERIOR',150,'FIXO'],['INTERIOR','INCIDENTE DE DADOS INTERIOR',150,'FIXO'],['GERAL','INSTALAÇÃO',150,'FIXO'],['GERAL','ALTERAÇÃO',150,'FIXO'],['GERAL','RETIRADA',75,'FIXO'],['GERAL','SERVIÇO DE ANALISTA CENTRAIS',200,'FIXO'],['GERAL','SERVIÇOS MAIORES','','A COMBINAR']];
   const wsLpu=XLSX.utils.aoa_to_sheet(lpu);wsLpu['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}},{s:{r:0,c:5},e:{r:0,c:6}}];wsLpu['!cols']=[{wch:22},{wch:42},{wch:14},{wch:16},{wch:3},{wch:28},{wch:18}];
   XLSX.utils.book_append_sheet(wb,wsLpu,'LPU');
   XLSX.writeFile(wb,'Consolidado_Pagamentos_'+(dt1||'inicio')+'_a_'+(dt2||'fim')+'.xlsx');
@@ -5628,7 +5628,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.42"></script>
+<script src="/release-info.js?v=2.5.52"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.0"></script>
 <script src="/appearance.js?v=1"></script>
