@@ -5628,9 +5628,9 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.52"></script>
+<script src="/release-info.js?v=2.5.53"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
-<script src="/expediente-admin.js?v=2.5.0"></script>
+<script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=2.5.0"></script>\n<script src="/health-monitor.js?v=2.1.0"></script>
 </body>
