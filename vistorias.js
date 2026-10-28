@@ -88,12 +88,26 @@ async function baixarVistoria(id,botao){
 }
 async function enviarVistoriaEmail(id,botao){
  const r=NF_VISTORIAS.find(item=>item.id===id),c=r&&D.ch.find(item=>item.id===r.chamado_id);if(!r)return;
+ const campoDestinatario=el('email-vistoria-destinatario');
+ let destinatario=(campoDestinatario?.value||'').trim().toLowerCase();
+ if(!emailValido(destinatario)){
+  const informado=prompt('Informe o e-mail do destinatário:',destinatario);
+  if(informado===null){campoDestinatario?.focus();return;}
+  destinatario=informado.trim().toLowerCase();
+  if(!emailValido(destinatario)){campoDestinatario?.focus();throw new Error('Informe um endereço de e-mail válido para o destinatário.');}
+  if(campoDestinatario)campoDestinatario.value=destinatario;
+ }
+ dadosEmailSecao('vistoria');
+ const outlookWindow=window.open('about:blank','_blank');
+ if(!outlookWindow)throw new Error('O navegador bloqueou a janela do e-mail. Permita pop-ups para este site e tente novamente.');
  botao.disabled=true;
  try{
-  dadosEmailSecao('vistoria');
   const {data,error}=await SB.storage.from('relatorios-vistoria').download(r.caminho);if(error)throw error;
   const arquivo=new File([data],r.nome_original||'relatorio-vistoria.pdf',{type:'application/pdf'});
-  await prepararEmailAssistido({prefixo:'vistoria',assunto:`NexoField — Relatório de vistoria ${c?.pr||''}`.trim(),corpo:`Segue o relatório de vistoria.\nChamado: ${c?.pr||'Não informado'}\nSite: ${c?.si||'Não informado'}\nTécnico: ${sbNameById(r.tecnico_id)||'Não informado'}`,arquivos:[arquivo]});
+  await prepararEmailAssistido({prefixo:'vistoria',assunto:`NexoField — Relatório de vistoria ${c?.pr||''}`.trim(),corpo:`Segue o relatório de vistoria.\nChamado: ${c?.pr||'Não informado'}\nSite: ${c?.si||'Não informado'}\nTécnico: ${sbNameById(r.tecnico_id)||'Não informado'}`,arquivos:[arquivo],outlookWindow});
+ }catch(err){
+  if(!outlookWindow.closed)outlookWindow.close();
+  throw err;
  }finally{botao.disabled=false;}
 }
 document.addEventListener('DOMContentLoaded',()=>{
