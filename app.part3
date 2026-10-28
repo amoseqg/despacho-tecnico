@@ -5296,10 +5296,10 @@ doLogin = async function(){
     const temLogistica=p.tipo==='admin'||p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
     if(loginType==='adm' && p.tipo!=='admin') throw new Error('Este usuário não possui perfil de administrador.');
     if(loginType==='log' && !temLogistica) throw new Error('Este usuário não possui acesso à área logística.');
-    if(loginType==='tec' && p.tipo!=='tecnico') throw new Error('Este usuário não possui perfil de técnico.');
-    SB_PROFILE=p;await sbSeedMaterialsIfNeeded();await sbSeedSitesIfNeeded();await sbSeedSchoolsIfNeeded();await sbLoadAll();
+    if(loginType==='tec' && p.tipo!=='tecnico'&&p.tambem_tecnico!==true) throw new Error('Este usuário não possui perfil de técnico.');
+    SB_PROFILE=loginType==='tec'&&p.tipo!=='tecnico'?{...p,tipo:'tecnico'}:p;await sbSeedMaterialsIfNeeded();await sbSeedSitesIfNeeded();await sbSeedSchoolsIfNeeded();await sbLoadAll();
     if(loginType==='log') S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
-    else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
+    else if(loginType==='adm') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
     localStorage.setItem('dt_portal',loginType);ss();
     if(S.t==='log')enterLog();else if(S.t==='adm')enterAdm();else {enterTec();nfAbrirChamadoNotificado();}
@@ -5506,10 +5506,12 @@ async function sbRestoreSession(){
     const {data:{session}}=await SB.auth.getSession();
     if(!session){ S=null; lsRemove('ss'); sbSetConnectionBadge('Aguardando login', true); return; }
     const {data:p,error}=await SB.from('perfis').select('*').eq('id',session.user.id).single(); if(error) throw error;
-    SB_PROFILE=p; await sbLoadAll();
-    const temLogistica=p.tipo==='admin'||p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
     const portal=localStorage.getItem('dt_portal');
+    const modoTecnico=portal==='tec'&&(p.tipo==='tecnico'||p.tambem_tecnico===true);
+    SB_PROFILE=modoTecnico&&p.tipo!=='tecnico'?{...p,tipo:'tecnico'}:p; await sbLoadAll();
+    const temLogistica=p.tipo==='admin'||p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
     if(portal==='log'&&temLogistica) S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
+    else if(modoTecnico) S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
     else if(p.tipo==='admin') S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
     else if(p.tipo==='logistica') S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
@@ -5696,7 +5698,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.57"></script>
+<script src="/release-info.js?v=2.5.58"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
