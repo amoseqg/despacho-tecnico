@@ -1694,6 +1694,48 @@ async function addOsServico() {
   }finally{if(btn){btn.disabled=false;btn.innerHTML=textoBtn||'🛠️ Criar e enviar OS de Serviço';}}
 }
 
+function confirmarLiberacaoProtocolo(protocolo, status, responsavel) {
+  return new Promise(resolve => {
+    const dialog = document.createElement('dialog');
+    dialog.setAttribute('aria-labelledby', 'nf-protocolo-dialog-title');
+    dialog.style.cssText = 'border:0;border-radius:14px;padding:0;width:min(520px,calc(100vw - 32px));box-shadow:0 24px 70px rgba(15,23,42,.3);color:#172033;';
+    const painel = document.createElement('div');
+    painel.style.cssText = 'padding:24px;font-family:inherit;';
+    const titulo = document.createElement('h2');
+    titulo.id = 'nf-protocolo-dialog-title';
+    titulo.textContent = 'Protocolo já cadastrado';
+    titulo.style.cssText = 'margin:0 0 12px;font-size:1.1rem;';
+    const detalhe = document.createElement('p');
+    detalhe.textContent = `O protocolo ${protocolo} já possui um chamado (${status}) com ${responsavel}.`;
+    detalhe.style.cssText = 'margin:0 0 10px;line-height:1.5;';
+    const pergunta = document.createElement('p');
+    pergunta.textContent = 'Deseja liberar um novo atendimento usando o mesmo protocolo?';
+    pergunta.style.cssText = 'margin:0 0 20px;line-height:1.5;font-weight:600;';
+    const acoes = document.createElement('div');
+    acoes.style.cssText = 'display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;';
+    const nao = document.createElement('button');
+    nao.type = 'button';
+    nao.className = 'btn btn-s';
+    nao.textContent = 'Não, manter bloqueado';
+    nao.addEventListener('click', () => dialog.close('nao'));
+    const sim = document.createElement('button');
+    sim.type = 'button';
+    sim.className = 'btn btn-p';
+    sim.textContent = 'Sim, liberar novo atendimento';
+    sim.addEventListener('click', () => dialog.close('sim'));
+    acoes.append(nao, sim);
+    painel.append(titulo, detalhe, pergunta, acoes);
+    dialog.append(painel);
+    dialog.addEventListener('close', () => {
+      dialog.remove();
+      resolve(dialog.returnValue === 'sim');
+    }, { once: true });
+    document.body.append(dialog);
+    dialog.showModal();
+    nao.focus();
+  });
+}
+
 async function addCh() {
   const pr = el('c-pr').value.trim();
   const sdm = el('c-sdm').value.trim();
@@ -1765,7 +1807,11 @@ async function addCh() {
       const duplicado=chamadosNaoArquivados[0];
       const existente=D.ch.find(c=>String(c.id)===String(duplicado.id));
       const responsavel=existente?.te?nt(existente.te):'um técnico já vinculado';
-      throw new Error(`O protocolo ${pr} já está cadastrado (${duplicado.status}) com ${responsavel}. Localize o chamado existente para continuar, sem criar uma cópia.`);
+      const liberado=await confirmarLiberacaoProtocolo(pr,duplicado.status,responsavel);
+      if(!liberado){
+        nfToast('Novo atendimento não liberado. Os dados foram mantidos para nova tentativa.','aviso');
+        return;
+      }
     }
     // O cadastro auxiliar do site não deve impedir a abertura do chamado.
     const linha=sbChamadoRow(novoChamado);
