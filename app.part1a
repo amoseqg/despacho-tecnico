@@ -788,7 +788,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
           </select></div>
         </div>
         <div style="overflow-x:auto"><table class="table">
-          <thead><tr><th>Protocolo / OS interna</th><th>Site / Cliente</th><th>Técnico</th><th>Região</th><th>Prazo restante</th><th>Ações</th></tr></thead>
+          <thead><tr><th>Protocolo / OS interna</th><th>Site / Cliente</th><th>Técnico</th><th>Incluído em</th><th>Região</th><th>Prazo restante</th><th>Ações</th></tr></thead>
           <tbody id="tb-at"></tbody>
         </table></div>
       </div>

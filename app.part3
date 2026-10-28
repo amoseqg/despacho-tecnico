@@ -2448,8 +2448,8 @@ function rAt() {
     const acao=aguardandoEncerramento
       ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
       : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${administrador?`<button class="btn btn-p btn-suporte-tec" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">🤝 Suporte técnico</button>`:''}${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
-    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
-  }).join('') || '<tr><td colspan="6" class="empty">Nenhum chamado em atendimento ou aguardando aprovação</td></tr>';
+    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td style='white-space:nowrap'>${c.cr?new Date(c.cr).toLocaleString('pt-BR'):'—'}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty">Nenhum chamado em atendimento ou aguardando aprovação</td></tr>';
   tb.onclick=event=>{
     if(event.target.closest('button,a,input,select,textarea,[role="button"]')) return;
     const linha=event.target.closest('tr[data-at-chamado-id]');
