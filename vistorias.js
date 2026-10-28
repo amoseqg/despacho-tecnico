@@ -102,23 +102,24 @@ async function enviarVistoriaEmail(id,botao){
  if(!outlookWindow)throw new Error('O navegador bloqueou a janela do e-mail. Permita pop-ups para este site e tente novamente.');
  botao.disabled=true;
  try{
-  const {data,error}=await SB.storage.from('relatorios-vistoria').download(r.caminho);if(error)throw error;
-  const arquivo=new File([data],r.nome_original||'relatorio-vistoria.pdf',{type:'application/pdf'});
-  await prepararEmailAssistido({prefixo:'vistoria',assunto:`NexoField — Relatório de vistoria ${c?.pr||''}`.trim(),corpo:`Segue o relatório de vistoria.\nChamado: ${c?.pr||'Não informado'}\nSite: ${c?.si||'Não informado'}\nTécnico: ${sbNameById(r.tecnico_id)||'Não informado'}`,arquivos:[arquivo],outlookWindow});
- }catch(err){
-  if(!outlookWindow.closed)outlookWindow.close();
-  throw err;
- }
- const preparadoEm=new Date().toISOString();
- const {data:atualizado,error:statusError}=await SB.from('relatorios_vistoria').update({email_destinatario:destinatario,email_preparado_em:preparadoEm}).eq('id',r.id).select('id').maybeSingle();
- if(statusError||!atualizado){
-  console.error('E-mail aberto no Outlook, mas não foi possível registrar o destinatário:',statusError);
-  nfToast('O rascunho abriu, mas o status do destinatário não foi salvo.','erro');
-  return;
- }
- r.email_destinatario=destinatario;r.email_preparado_em=preparadoEm;
- renderVistorias();
- nfToast(`Rascunho aberto no Outlook para ${destinatario}.`,'sucesso');
+  try{
+   const {data,error}=await SB.storage.from('relatorios-vistoria').download(r.caminho);if(error)throw error;
+   const arquivo=new File([data],r.nome_original||'relatorio-vistoria.pdf',{type:'application/pdf'});
+   await prepararEmailAssistido({prefixo:'vistoria',assunto:`NexoField — Relatório de vistoria ${c?.pr||''}`.trim(),corpo:`Segue o relatório de vistoria.\nChamado: ${c?.pr||'Não informado'}\nSite: ${c?.si||'Não informado'}\nTécnico: ${sbNameById(r.tecnico_id)||'Não informado'}`,arquivos:[arquivo],outlookWindow});
+  }catch(err){
+   if(!outlookWindow.closed)outlookWindow.close();
+   throw err;
+  }
+  const preparadoEm=new Date().toISOString();
+  const {data:atualizado,error:statusError}=await SB.from('relatorios_vistoria').update({email_destinatario:destinatario,email_preparado_em:preparadoEm}).eq('id',r.id).select('id').maybeSingle();
+  if(statusError||!atualizado){
+   console.error('E-mail aberto no Outlook, mas não foi possível registrar o destinatário:',statusError);
+   nfToast('O rascunho abriu, mas o status do destinatário não foi salvo.','erro');
+   return;
+  }
+  r.email_destinatario=destinatario;r.email_preparado_em=preparadoEm;
+  renderVistorias();
+  nfToast(`Rascunho aberto no Outlook para ${destinatario}.`,'sucesso');
  }finally{botao.disabled=false;}
 }
 document.addEventListener('DOMContentLoaded',()=>{
