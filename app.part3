@@ -2845,6 +2845,10 @@ function rRl(dt1, dt2, forcarExibicao) {
     const ativos = t.chamados.filter(c => !c.ex?.pagamentoExcluido);
     const aprovados = ativos.filter(c => c.ap?.status === 'aprovado').length;
     const naoAprovados = ativos.length - aprovados;
+    const validadosTec=ativos.filter(c=>statusValidacaoTecnica(c)==='validado').length;
+    const aguardandoTec=ativos.filter(c=>statusValidacaoTecnica(c)==='aguardando_validacao').length;
+    const naoValidadosTec=ativos.filter(c=>statusValidacaoTecnica(c)==='nao_validado').length;
+    const validacaoTecnicaHtml='<div style="line-height:1.8;white-space:nowrap"><div>✅ Validado: '+validadosTec+'</div><div>⏳ Aguardando validação: '+aguardandoTec+'</div>'+(naoValidadosTec?'<button type="button" class="btn btn-rl-validacao-nao" data-u="'+esc(u)+'" style="border:0;background:none;padding:0;color:#b91c1c;font:inherit;cursor:pointer;text-decoration:underline">❌ Não validado: '+naoValidadosTec+'</button>':'<div>❌ Não validado: 0</div>')+'</div>';
     let totalVal = 0;
     ativos.forEach(c => {
       if (c.ex?.total) {
@@ -2864,13 +2868,13 @@ function rRl(dt1, dt2, forcarExibicao) {
       <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
       <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
       <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
-      <td>${regBadge}</td>
+      <td>${validacaoTecnicaHtml}</td> <td>${regBadge}</td>
     </tr>`;
   }).join('');
 
   container.innerHTML = `<div style="overflow-x:auto">
-    <table class="table" style="width:100%;min-width:680px;font-size:12px">
-      <thead><tr><th>Técnico</th><th>Valor</th><th>Serviços aprovados</th><th>Serviços não aprovados</th><th>Localidade</th></tr></thead>
+    <table class="table" style="width:100%;min-width:900px;font-size:12px">
+      <thead><tr><th>Técnico</th><th>Valor</th><th>Serviços aprovados</th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
@@ -3349,6 +3353,70 @@ function reabrirAjuste(id) {
   opEx(id);
 }
 
+function statusValidacaoTecnica(c){return c?.ex?.validacaoTecnicaStatus||'aguardando_validacao';}
+function htmlValidacaoTecnica(c){
+  const ex=c?.ex||{},id=esc(c?.id||''),status=statusValidacaoTecnica(c);
+  if(!ex.execucaoId)return '<span class="badge b-pag-pendente">Execução indisponível</span>';
+  if(status==='validado')return '<span class="badge b-aprovado">Validado</span>'+(ex.validacaoTecnicaEm?'<small style="display:block;margin-top:4px">'+esc(new Date(ex.validacaoTecnicaEm).toLocaleString('pt-BR'))+'</small>':'');
+  if(status==='nao_validado')return '<span class="badge b-rejeitado">Não validado</span>'+(ex.validacaoTecnicaMotivo?'<small style="display:block;margin-top:4px">Motivo: '+esc(ex.validacaoTecnicaMotivo)+'</small>':'')+'<button type="button" class="btn btn-p btn-validacao-tecnica-reenviar" data-id="'+id+'" style="display:block;margin-top:6px;padding:5px 8px">🛠️ Correção realizada — reenviar</button>';
+  return '<span class="badge b-pag-pendente">Aguardando validação</span><div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn btn-g btn-validacao-tecnica-validar" data-id="'+id+'" style="padding:5px 8px">✅ Validar</button><button type="button" class="btn btn-r btn-validacao-tecnica-nao-validar" data-id="'+id+'" style="padding:5px 8px">❌ Não validar</button></div>';
+}
+async function salvarValidacaoTecnica(chamadoId,status,motivo=''){
+  if(S?.t!=='tec'||!SB_PROFILE?.id)throw new Error('A validação está disponível somente no perfil do técnico.');
+  const c=D.ch.find(x=>x.id===chamadoId&&x.te===S.u&&x.st==='concluida'&&!x.ex?.pagamentoExcluido),ex=c?.ex;
+  if(!c||!ex?.execucaoId)throw new Error('Não foi possível localizar o registro deste serviço.');
+  const atual=statusValidacaoTecnica(c),revisao=Number(ex.validacaoTecnicaRevisao||0);
+  if(status==='aguardando_validacao'&&atual!=='nao_validado')throw new Error('Só é possível reenviar para validação um serviço não validado.');
+  if(['validado','nao_validado'].includes(status)&&atual!=='aguardando_validacao')throw new Error('Este serviço não está aguardando validação.');
+  if(!['validado','nao_validado','aguardando_validacao'].includes(status))throw new Error('Status de validação inválido.');
+  motivo=String(motivo||'').trim();
+  if(status==='nao_validado'&&motivo.length<3)throw new Error('Informe o motivo da não validação.');
+  const em=new Date().toISOString(),novaRevisao=revisao+1;
+  const {data,error}=await SB.from('execucoes').update({
+    validacao_tecnica_status:status,
+    validacao_tecnica_motivo:status==='validado'?null:(status==='nao_validado'?motivo:(ex.validacaoTecnicaMotivo||null)),
+    validacao_tecnica_em:em,
+    validacao_tecnica_revisao:novaRevisao,
+    atualizado_em:em
+  }).eq('id',ex.execucaoId).eq('tecnico_id',SB_PROFILE.id).eq('validacao_tecnica_status',atual).eq('validacao_tecnica_revisao',revisao)
+    .select('id,validacao_tecnica_status,validacao_tecnica_motivo,validacao_tecnica_em,validacao_tecnica_revisao').maybeSingle();
+  if(error)throw error;
+  if(!data)throw new Error('O serviço mudou em outra sessão. Atualize a tela e tente novamente.');
+  Object.assign(ex,{validacaoTecnicaStatus:data.validacao_tecnica_status,validacaoTecnicaMotivo:data.validacao_tecnica_motivo||'',validacaoTecnicaEm:data.validacao_tecnica_em||'',validacaoTecnicaRevisao:Number(data.validacao_tecnica_revisao||0)});
+  lsSet('dd',D);
+  rTar(el('ar-dt1')?.value||'',el('ar-dt2')?.value||'');
+  if(S?.t==='adm')rRl(RL_DT1_ATUAL,RL_DT2_ATUAL);
+  nfToast(status==='validado'?'Serviço validado pelo técnico.':status==='nao_validado'?'Serviço não validado. Motivo registrado.':'Correção reenviada para nova validação.','sucesso');
+}
+function abrirDialogoNaoValidarTecnica(chamadoId){
+  const c=D.ch.find(x=>x.id===chamadoId&&x.te===S?.u&&x.st==='concluida'&&!x.ex?.pagamentoExcluido);
+  if(!c||statusValidacaoTecnica(c)!=='aguardando_validacao'||S?.t!=='tec')return;
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(560px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 70px #0005;color:#16324f';
+  dialog.innerHTML='<form><h3 style="margin:0 0 8px">Não validar serviço</h3><p style="margin:0 0 12px"><b>OS '+esc(c.pr||'—')+'</b> — '+esc(c.si||'—')+'</p><label style="display:block">Motivo da não validação<textarea name="motivo" class="input" required minlength="3" maxlength="2000" style="display:block;width:100%;margin-top:6px;min-height:110px" placeholder="Explique o que precisa ser corrigido"></textarea></label><p class="erro" role="alert" style="color:#b91c1c;margin-top:8px"></p><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn btn-s cancelar">Cancelar</button><button type="submit" class="btn btn-r salvar">Registrar não validação</button></div></form>';
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  dialog.querySelector('.cancelar').onclick=()=>dialog.close();
+  dialog.querySelector('form').onsubmit=async e=>{
+    e.preventDefault();const motivo=dialog.querySelector('[name=motivo]').value.trim(),btn=dialog.querySelector('.salvar'),erro=dialog.querySelector('.erro');
+    if(motivo.length<3){erro.textContent='Informe o motivo da não validação.';return;}
+    btn.disabled=true;btn.textContent='Salvando...';
+    try{await salvarValidacaoTecnica(chamadoId,'nao_validado',motivo);dialog.close();}
+    catch(err){erro.textContent=err?.message||'Não foi possível salvar a validação.';btn.disabled=false;btn.textContent='Registrar não validação';}
+  };
+  document.body.append(dialog);dialog.showModal();dialog.querySelector('[name=motivo]').focus();
+}
+function abrirMotivosValidacaoTecnica(usuario){
+  if(S?.t!=='adm')return;
+  let chamados=servicosPagamentoUnicos(D.ch.filter(c=>c.te===usuario&&c.st==='concluida'&&!c.ex?.pagamentoExcluido));
+  if(RL_DT1_ATUAL)chamados=chamados.filter(c=>dataBrasilISO(dataEncerramentoChamado(c))>=RL_DT1_ATUAL&&!!dataEncerramentoChamado(c));
+  if(RL_DT2_ATUAL)chamados=chamados.filter(c=>dataBrasilISO(dataEncerramentoChamado(c))<=RL_DT2_ATUAL&&!!dataEncerramentoChamado(c));
+  const lista=chamados.filter(c=>statusValidacaoTecnica(c)==='nao_validado');
+  const tec=D.tc.find(t=>t.u===usuario),dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(760px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 70px #0005;color:#16324f';
+  const itens=lista.map(c=>'<article style="padding:12px 0;border-bottom:1px solid #dbe3ee"><b>OS '+esc(c.pr||'—')+'</b> — '+esc(c.si||'—')+'<p style="margin:6px 0 0"><b>Motivo:</b> '+esc(c.ex?.validacaoTecnicaMotivo||'Motivo não informado')+'</p></article>').join('');
+  dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3 style="margin:0">Não validados — '+esc(tec?.n||nt(usuario))+'</h3><button type="button" class="btn btn-s fechar">Fechar</button></div>'+(itens||'<p class="empty">Nenhum serviço não validado neste período.</p>');
+  dialog.querySelector('.fechar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
+}
 function rTar(dt1, dt2) {
   const tb = el('tb-ar-body');
   if(!tb) return;
@@ -3360,7 +3428,7 @@ function rTar(dt1, dt2) {
     list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c));
   }
   if (list.length === 0) {
-    tb.innerHTML = '<tr><td colspan="17" class="empty">Nenhuma atividade realizada no período</td></tr>';
+    tb.innerHTML = '<tr><td colspan="18" class="empty">Nenhuma atividade realizada no período</td></tr>';
     return;
   }
   let totalGeral = 0;
@@ -3382,10 +3450,11 @@ function rTar(dt1, dt2) {
       if (!isNaN(v)) totalGeral += v;
     }
     const nf=(SB_FOTOS_MAP.get(c.id)||[]).length;
-    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td>${valorInfo(ex.relatorio || ex.obs)}${nf?`<br><button class="btn btn-p btn-fotos" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">📷 ${nf} foto(s)</button>`:''}</td><td>${apBadge}</td></tr>`;
+    const validacaoTecnica=htmlValidacaoTecnica(c);
+    return `<tr><td>${c.pr}</td><td>${c.si}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td>${valorInfo(ex.relatorio || ex.obs)}${nf?`<br><button class="btn btn-p btn-fotos" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">📷 ${nf} foto(s)</button>`:''}</td><td>${validacaoTecnica}</td><td>${apBadge}</td></tr>`;
   }).join('');
   const totalStr = 'R$ ' + totalGeral.toFixed(2).replace('.', ',');
-  tb.innerHTML = rows + `<tr style="background:#e8f5e9;font-weight:700"><td colspan="14" style="text-align:right">VALOR TOTAL:</td><td>${totalStr}</td><td colspan="2"></td></tr>`;
+  tb.innerHTML = rows + `<tr style="background:#e8f5e9;font-weight:700"><td colspan="14" style="text-align:right">VALOR TOTAL:</td><td>${totalStr}</td><td colspan="3"></td></tr>`;
 }
 
 // ========== AÇÕES TÉCNICO ==========
@@ -4507,7 +4576,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-lg-secao, .btn-aplicacoes-tecnico, .btn-exportar-aplicacoes-pendentes, .btn-fechar-aplicacoes-material, .btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
+    const t = e.target.closest('.btn-lg-secao, .btn-aplicacoes-tecnico, .btn-exportar-aplicacoes-pendentes, .btn-fechar-aplicacoes-material, .btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-rl-validacao-nao, .btn-validacao-tecnica-validar, .btn-validacao-tecnica-nao-validar, .btn-validacao-tecnica-reenviar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
     if(t.classList.contains('btn-lg-secao')) { selecionarSecaoLogistica(t.dataset.secao); }
     if(t.classList.contains('btn-aplicacoes-tecnico')) { abrirAprovacoesMaterialTecnico(t.dataset.tecnico); }
     if(t.classList.contains('btn-exportar-aplicacoes-pendentes')) { exportarListaAplicacoesPendentes(); }
@@ -4517,7 +4586,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-rl-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'aprovados'); }
-    if(t.classList.contains('btn-rl-nao-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'nao-aprovados'); }
+    if(t.classList.contains('btn-rl-nao-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'nao-aprovados'); } if(t.classList.contains('btn-rl-validacao-nao')) { abrirMotivosValidacaoTecnica(t.dataset.u); } if(t.classList.contains('btn-validacao-tecnica-validar')) { salvarValidacaoTecnica(t.dataset.id,'validado').catch(err=>sbShowError('Não foi possível validar o serviço',err)); } if(t.classList.contains('btn-validacao-tecnica-nao-validar')) { abrirDialogoNaoValidarTecnica(t.dataset.id); } if(t.classList.contains('btn-validacao-tecnica-reenviar')) { if(confirm('Confirma que a correção foi realizada e deseja enviar novamente para validação?'))salvarValidacaoTecnica(t.dataset.id,'aguardando_validacao').catch(err=>sbShowError('Não foi possível reenviar para validação',err)); }
     if(t.classList.contains('btn-rl-aprovar')) { t.closest('dialog')?.close(); opApv('aprovado',t.dataset.id); }
     if(t.classList.contains('btn-rl-rejeitar')) { t.closest('dialog')?.close(); opApv('rejeitado',t.dataset.id); }
     if(t.classList.contains('btn-aplicar-material')) { abrirRegistroAplicacaoMaterial(t.dataset.materialId); }
@@ -5012,7 +5081,7 @@ async function sbLoadAll(){
       exclusaoPortal:exclusaoPortal?{nome:exclusaoPortal.excluido_por_nome,email:exclusaoPortal.excluido_por_email,data:exclusaoPortal.excluido_em,statusAnterior:exclusaoPortal.status_anterior}:null
     };
     legacy._trLoadedCount=legacy.tr.length;
-    if(ex) legacy.ex={co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',cobrarKm:ex.deslocamento_cobrado===true,km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),materiais:normalizarMateriaisUtilizados(ex),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
+    if(ex) legacy.ex={execucaoId:ex.id,validacaoTecnicaStatus:ex.validacao_tecnica_status||'aguardando_validacao',validacaoTecnicaMotivo:ex.validacao_tecnica_motivo||'',validacaoTecnicaEm:ex.validacao_tecnica_em||'',validacaoTecnicaRevisao:Number(ex.validacao_tecnica_revisao||0),co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',cobrarKm:ex.deslocamento_cobrado===true,km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),materiais:normalizarMateriaisUtilizados(ex),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
     return legacy;
   });
