@@ -4068,6 +4068,32 @@ function chamadosPagamentoPeriodo(dt1, dt2) {
   return servicosPagamentoUnicos(list);
 }
 
+function preservarTextosLongosExcel(wb) {
+  const limiteCelula=32767,limiteParte=32000,usadas=new Set(wb.SheetNames);
+  const nomeAba=nomeAbaExcel('TEXTOS LONGOS',usadas);
+  const linhas=[['ABA DE ORIGEM','CÉLULA','PARTE','TEXTO COMPLETO']];
+  for(const nomeOrigem of wb.SheetNames.slice()){
+    const ws=wb.Sheets[nomeOrigem];
+    for(const [referencia,celula] of Object.entries(ws)){
+      if(referencia.startsWith('!')||typeof celula?.v!=='string'||celula.v.length<=limiteCelula)continue;
+      const partes=[];let parte='',tamanho=0;
+      for(const caractere of celula.v){
+        if(tamanho+caractere.length>limiteParte){partes.push(parte);parte='';tamanho=0;}
+        parte+=caractere;tamanho+=caractere.length;
+      }
+      if(parte)partes.push(parte);
+      const aviso='Texto dividido por limite do Excel. Conteúdo completo na aba "'+nomeAba+'", célula '+nomeOrigem+'!'+referencia+'.';
+      celula.v=aviso;celula.t='s';
+      partes.forEach((texto,i)=>linhas.push([nomeOrigem,referencia,(i+1)+'/'+partes.length,texto]));
+    }
+  }
+  if(linhas.length>1){
+    const wsLongos=XLSX.utils.aoa_to_sheet(linhas);
+    wsLongos['!cols']=[{wch:24},{wch:16},{wch:12},{wch:60}];
+    XLSX.utils.book_append_sheet(wb,wsLongos,nomeAba);
+  }
+}
+
 function gerarConsolidadoPagamentos() {
   const dt1 = el('rl-dt1') ? el('rl-dt1').value : '';
   const dt2 = el('rl-dt2') ? el('rl-dt2').value : '';
@@ -4100,6 +4126,7 @@ function gerarConsolidadoPagamentos() {
   const lpu=[['LPU - PECONECTADO II','','','','','MATERIAIS - INCIDENTE',''],['LOCALIDADE','ATIVIDADE PADRONIZADA','VALOR','TIPO','','MATERIAL','VALOR POR METRO'],['RMR','INCIDENTE DE VOZ CAPITAL',100,'FIXO','','CABO UTP (INCIDENTE)',1.95],['RMR','INCIDENTE DE DADOS CAPITAL',120,'FIXO','','CABO CCI (INCIDENTE)',1],['INTERIOR','INCIDENTE VOZ INTERIOR',150,'FIXO'],['INTERIOR','INCIDENTE DE DADOS INTERIOR',150,'FIXO'],['GERAL','INSTALAÇÃO',150,'FIXO'],['GERAL','ALTERAÇÃO',150,'FIXO'],['GERAL','RETIRADA',75,'FIXO'],['GERAL','SERVIÇO DE ANALISTA CENTRAIS',200,'FIXO'],['GERAL','SERVIÇOS MAIORES','','A COMBINAR']];
   const wsLpu=XLSX.utils.aoa_to_sheet(lpu);wsLpu['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}},{s:{r:0,c:5},e:{r:0,c:6}}];wsLpu['!cols']=[{wch:22},{wch:42},{wch:14},{wch:16},{wch:3},{wch:28},{wch:18}];
   XLSX.utils.book_append_sheet(wb,wsLpu,'LPU');
+  preservarTextosLongosExcel(wb);
   const arquivo = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([arquivo], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -5669,7 +5696,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.56"></script>
+<script src="/release-info.js?v=2.5.57"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
