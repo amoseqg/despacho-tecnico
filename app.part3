@@ -4352,14 +4352,6 @@ document.addEventListener('DOMContentLoaded', function() {
   el('btn-email-chamados')?.addEventListener('click',()=>enviarChamadosRealizadosEmail().catch(err=>sbShowError('Não foi possível preparar o e-mail',err)));
   document.querySelectorAll('.nf-email-remetente').forEach(campo=>campo.addEventListener('focus',preencherRemetentesEmail));
 
-  // Filtros de período - Admin
-  const btnFilRl = el('btn-fil-rl');
-  if(btnFilRl) btnFilRl.addEventListener('click', function() {
-    const dt1 = el('rl-dt1').value;
-    const dt2 = el('rl-dt2').value;
-    rRl(dt1, dt2, true);
-  });
-
   // Filtros de período - Técnico
   const btnExpArXlsx = el('btn-exp-ar-xlsx');
   if(btnExpArXlsx) btnExpArXlsx.addEventListener('click', exportarAtividadesExcel);
@@ -4449,6 +4441,14 @@ document.addEventListener('DOMContentLoaded', function() {
     else if (S.t === 'tec') enterTec();
   }
 });
+// Filtro de período do relatório: vincula fora da inicialização geral,
+// para continuar disponível mesmo se outro listener falhar durante o setup.
+document.getElementById('btn-fil-rl')?.addEventListener('click', function() {
+  const dt1 = document.getElementById('rl-dt1')?.value || '';
+  const dt2 = document.getElementById('rl-dt2')?.value || '';
+  rRl(dt1, dt2, true);
+});
+
 </script>
 
 <script id="base-material-planilha-v9">
