@@ -4068,7 +4068,7 @@ function chamadosPagamentoPeriodo(dt1, dt2) {
   return servicosPagamentoUnicos(list);
 }
 
-function exportarConsolidadoPagamentos() {
+function gerarConsolidadoPagamentos() {
   const dt1 = el('rl-dt1') ? el('rl-dt1').value : '';
   const dt2 = el('rl-dt2') ? el('rl-dt2').value : '';
   if (dt1 && dt2 && new Date(dt1) > new Date(dt2)) { alert('A data inicial não pode ser maior que a data final.'); return; }
@@ -4100,7 +4100,46 @@ function exportarConsolidadoPagamentos() {
   const lpu=[['LPU - PECONECTADO II','','','','','MATERIAIS - INCIDENTE',''],['LOCALIDADE','ATIVIDADE PADRONIZADA','VALOR','TIPO','','MATERIAL','VALOR POR METRO'],['RMR','INCIDENTE DE VOZ CAPITAL',100,'FIXO','','CABO UTP (INCIDENTE)',1.95],['RMR','INCIDENTE DE DADOS CAPITAL',120,'FIXO','','CABO CCI (INCIDENTE)',1],['INTERIOR','INCIDENTE VOZ INTERIOR',150,'FIXO'],['INTERIOR','INCIDENTE DE DADOS INTERIOR',150,'FIXO'],['GERAL','INSTALAÇÃO',150,'FIXO'],['GERAL','ALTERAÇÃO',150,'FIXO'],['GERAL','RETIRADA',75,'FIXO'],['GERAL','SERVIÇO DE ANALISTA CENTRAIS',200,'FIXO'],['GERAL','SERVIÇOS MAIORES','','A COMBINAR']];
   const wsLpu=XLSX.utils.aoa_to_sheet(lpu);wsLpu['!merges']=[{s:{r:0,c:0},e:{r:0,c:3}},{s:{r:0,c:5},e:{r:0,c:6}}];wsLpu['!cols']=[{wch:22},{wch:42},{wch:14},{wch:16},{wch:3},{wch:28},{wch:18}];
   XLSX.utils.book_append_sheet(wb,wsLpu,'LPU');
-  XLSX.writeFile(wb,'Consolidado_Pagamentos_'+(dt1||'inicio')+'_a_'+(dt2||'fim')+'.xlsx');
+  const arquivo = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([arquivo], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = 'Consolidado_Pagamentos_' + (dt1 || 'inicio') + '_a_' + (dt2 || 'fim') + '.xlsx';
+  link.style.display = 'none';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function exportarConsolidadoPagamentos() {
+  const btn = el('btn-exp-consolidado');
+  const textoOriginal = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = '⏳ Gerando arquivo...';
+  }
+  try {
+    if (!window.XLSX?.utils?.book_new || typeof window.XLSX.write !== 'function') {
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+        script.onload = () => window.XLSX?.utils?.book_new ? resolve() : reject(new Error('Biblioteca Excel indisponível'));
+        script.onerror = () => reject(new Error('Não foi possível carregar a biblioteca Excel'));
+        document.head.appendChild(script);
+      });
+    }
+    gerarConsolidadoPagamentos();
+  } catch (err) {
+    console.error('Falha ao exportar consolidado de pagamentos:', err);
+    alert('Não foi possível gerar o Excel consolidado. Verifique a conexão e tente novamente.');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = textoOriginal || '📊 Exportar Consolidado Excel';
+    }
+  }
 }
 
 function exportarAtividadesExcel() {
