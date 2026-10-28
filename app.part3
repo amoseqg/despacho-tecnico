@@ -452,7 +452,7 @@ function nt(u) { const t = D.tc.find(x => x.u === u); return t ? t.n : u; }
 function adminGeral() { return !!(S && S.t === 'adm' && D.ad.some(a => a.u === S.u && a.p)); }
 function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
-function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra', vistoria: 'Vistoria' })[v] || 'Não definida'; }
+function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra', wifi: 'WiFi', vistoria: 'Vistoria' })[v] || 'Não definida'; }
 function nomeArea(v) { return ({ norte: 'Norte', leste: 'Leste', sul: 'Sul', oeste: 'Oeste', interior: 'Interior', noronha: 'Fernando de Noronha' })[v] || 'Não definida'; }
 function nomeRegiao(v) { return ({ capital: '🏙️ Capital', interior: '🌾 Interior', noronha: '🏝️ Fernando de Noronha' })[v] || 'Região não definida'; }
 function slaRegiao(v,skill='') { return skill==='vistoria'?'48h':(v === 'interior' ? '8h' : '6h'); }
