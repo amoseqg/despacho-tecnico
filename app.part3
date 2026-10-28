@@ -1880,7 +1880,7 @@ function renderTc() {
     const sk = ['voz','dados','infra'].every(x => skTec.includes(x)) ? 'Multi-skill (Voz, Dados e Infra)' : skTec.map(nomeSkill).join(', ');
     const ar = areasTec(t).map(nomeArea).join(', ');
     const end=enderecoEntregaTexto(t)||((t.r==='interior'||t.r==='noronha')?'Não cadastrado':'Não se aplica');
-    return `<tr><td>${escM(t.n)}</td><td>${escM(t.u)}</td><td>${escM(t.e || 'Não cadastrado')}</td><td>${r}</td><td>${escM(end)}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-endereco-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Cadastrar ou alterar endereço de entrega">📍 Endereço</button><button class="btn btn-s btn-reset-senha" data-u="${escM(t.u)}" data-email="${escM(t.e || '')}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button><button class="btn btn-r btn-rm-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Excluir técnico">🗑️</button></div></td></tr>`;
+    return `<tr><td>${escM(t.n)}${t.tipo==='admin'?' <span class="badge b-andamento">Administrador + Técnico</span>':''}</td><td>${escM(t.u)}</td><td>${escM(t.e || 'Não cadastrado')}</td><td>${r}</td><td>${escM(end)}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-endereco-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Cadastrar ou alterar endereço de entrega">📍 Endereço</button><button class="btn btn-s btn-reset-senha" data-u="${escM(t.u)}" data-email="${escM(t.e || '')}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${t.tipo==='tecnico'?'<button class="btn btn-r btn-rm-tec" data-u="'+escM(t.u)+'" style="padding:4px 8px;font-size:.6rem" title="Excluir técnico">🗑️</button>':'<span class="badge b-andamento">Perfil administrativo preservado</span>'}</div></td></tr>`;
   }).join('') || '<tr><td colspan="9" class="empty">Nenhum técnico encontrado</td></tr>';
 }
 async function rTc() {
@@ -1891,10 +1891,10 @@ async function rTc() {
   TC_CARREGANDO=true;
   if(!D.tc.length)tb.innerHTML='<tr><td colspan="9" class="empty">Carregando técnicos do Supabase...</td></tr>';
   try{
-    const [{data,error},{data:enderecos,error:enderecosError}]=await Promise.all([SB.from('perfis').select('*').eq('tipo','tecnico').eq('ativo',true).order('nome'),SB.from('tecnico_enderecos_logistica').select('*')]);
+    const [{data,error},{data:enderecos,error:enderecosError}]=await Promise.all([SB.from('perfis').select('*').eq('ativo',true).or('tipo.eq.tecnico,tambem_tecnico.eq.true').order('nome'),SB.from('tecnico_enderecos_logistica').select('*')]);
     if(error)throw error;if(enderecosError)throw enderecosError;
     const endMap=new Map((enderecos||[]).map(x=>[String(x.tecnico_id),{cep:x.cep||'',endereco:x.endereco||'',numero:x.numero||'',bairro:x.bairro||'',complemento:x.complemento||'',cidade:[x.cidade,x.uf].filter(Boolean).join(' - '),contato:x.contato||''}]));
-    D.tc=(data||[]).map(p=>({_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],entrega:endMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,c:p.criado_em}));
+    D.tc=(data||[]).map(p=>({_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],entrega:endMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,tecnicoAtivo:p.tipo==='tecnico'||p.tambem_tecnico===true,c:p.criado_em}));
     lsSet('dd',D);
     renderTc();
     if(!D.tc.length)tb.innerHTML='<tr><td colspan="9" class="empty">Nenhum técnico ativo foi retornado pelo Supabase.</td></tr>';
@@ -2653,7 +2653,7 @@ function nfAbrirChat(){
   const tecnico=SB_PROFILE.tipo==='tecnico' && S.t==='tec';
   if(!administrador && !tecnico) { nfToast('O chat está disponível para administradores, técnicos e Logística.','erro'); return; }
   if(NF_CHAT_DIALOG?.open) NF_CHAT_DIALOG.close();
-  const tecnicos=(D.tc||[]).filter(t=>t.tipo==='tecnico' && t._id);
+  const tecnicos=(D.tc||[]).filter(t=>(t.tipo==='tecnico'||t.tecnicoAtivo) && t._id);
   const tecnicoId=tecnico?SB_PROFILE.id:(tecnicos[0]?._id||'');
   const dialog=document.createElement('dialog');
   dialog.style.cssText='width:min(720px,calc(100% - 24px));height:min(720px,88vh);max-height:88vh;border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';
@@ -4960,8 +4960,8 @@ async function sbLoadAll(){
   D.tc=[]; D.ad=[];
   const enderecosTecMap=new Map((endR.data||[]).map(x=>[String(x.tecnico_id),{cep:x.cep||'',endereco:x.endereco||'',numero:x.numero||'',bairro:x.bairro||'',complemento:x.complemento||'',cidade:[x.cidade,x.uf].filter(Boolean).join(' - '),contato:x.contato||''}]));
   (pR.data||[]).forEach(p=>{
-    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],entrega:enderecosTecMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,c:p.criado_em};
-    if(p.tipo==='admin'||p.tipo==='logistica') D.ad.push(x); else D.tc.push(x);
+    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],entrega:enderecosTecMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,tecnicoAtivo:p.tipo==='tecnico'||p.tambem_tecnico===true,c:p.criado_em};
+    if(p.tipo==='admin'||p.tipo==='logistica') D.ad.push(x); if(p.tipo==='tecnico'||p.tambem_tecnico===true) D.tc.push(x);
   });
 
   const exMap=new Map((eR.data||[]).map(x=>[x.chamado_id,x]));
@@ -5669,7 +5669,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.54"></script>
+<script src="/release-info.js?v=2.5.55"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
