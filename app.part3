@@ -4124,8 +4124,8 @@ async function exportarConsolidadoPagamentos() {
     if (!window.XLSX?.utils?.book_new || typeof window.XLSX.write !== 'function') {
       await new Promise((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
-        script.onload = () => window.XLSX?.utils?.book_new ? resolve() : reject(new Error('Biblioteca Excel indisponível'));
+        script.src = '/xlsx.full.min.js?v=0.18.5';
+        script.onload = () => window.XLSX?.utils?.book_new && typeof window.XLSX.write === 'function' ? resolve() : reject(new Error('Biblioteca Excel local carregou sem os recursos necessários'));
         script.onerror = () => reject(new Error('Não foi possível carregar a biblioteca Excel'));
         document.head.appendChild(script);
       });
@@ -4133,7 +4133,7 @@ async function exportarConsolidadoPagamentos() {
     gerarConsolidadoPagamentos();
   } catch (err) {
     console.error('Falha ao exportar consolidado de pagamentos:', err);
-    alert('Não foi possível gerar o Excel consolidado. Verifique a conexão e tente novamente.');
+    alert('Não foi possível gerar o Excel consolidado: ' + (err?.message || 'erro desconhecido') + '. Tente novamente.');
   } finally {
     if (btn) {
       btn.disabled = false;
@@ -5669,7 +5669,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.0"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.55"></script>
+<script src="/release-info.js?v=2.5.56"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
