@@ -53,8 +53,8 @@ function renderVistorias(){
   if(SB_PROFILE?.tipo!==tipo){box.innerHTML='';continue;}
   const busca=(el('busca-vistorias-'+tipo)?.value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
   if(tipo==='admin'&&!busca.trim()){box.innerHTML='<div class="empty">Os relatórios estão ocultos. Digite um chamado, site ou técnico para pesquisar.</div>';continue;}
-  const lista=NF_VISTORIAS.filter(r=>tipo==='admin'||r.tecnico_id===SB_PROFILE.id).map(r=>({r,c:D.ch.find(c=>c.id===r.chamado_id)})).filter(({r,c})=>`${c?.pr||''} ${c?.si||''} ${sbNameById(r.tecnico_id)} ${r.nome_original}`.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(busca)).sort((a,b)=>b.r.criado_em.localeCompare(a.r.criado_em));
-  box.innerHTML=lista.map(({r,c})=>`<div class="os"><strong>${esc(c?.pr||'Chamado registrado')} — ${esc(c?.si||'')}</strong><div class="os-r">Técnico: ${esc(sbNameById(r.tecnico_id)||'Técnico responsável')} • ${new Date(r.criado_em).toLocaleString('pt-BR')}</div><div class="os-r">${esc(r.nome_original)} • ${(r.tamanho_bytes/1024/1024).toFixed(2)} MB</div>${c?.ex?.obs?`<div class="os-r"><b>Observação do relatório:</b> ${esc(c.ex.obs)}</div>`:''}<div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn btn-p nf-baixar-vistoria" data-id="${esc(r.id)}">Baixar PDF</button>${tipo==='admin'?`<button type="button" class="btn btn-s nf-email-vistoria" data-id="${esc(r.id)}">✉️ Enviar por e-mail</button>`:''}</div></div>`).join('')||'<div class="empty">Nenhum relatório de vistoria encontrado.</div>';
+  const lista=NF_VISTORIAS.filter(r=>tipo==='admin'||r.tecnico_id===SB_PROFILE.id).map(r=>({r,c:D.ch.find(c=>c.id===r.chamado_id)})).filter(({r,c})=>[c?.pr,c?.sdm,c?.si,sbNameById(r.tecnico_id),r.nome_original,r.chamado_id].filter(Boolean).join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().includes(busca)).sort((a,b)=>b.r.criado_em.localeCompare(a.r.criado_em));
+  box.innerHTML=lista.map(({r,c})=>`<div class="os"><strong>${esc(c?.pr||'Chamado registrado')} — ${esc(c?.si||'')}</strong><div class="os-r">Técnico: ${esc(sbNameById(r.tecnico_id)||'Técnico responsável')} • ${new Date(r.criado_em).toLocaleString('pt-BR')}</div><div class="os-r">${esc(r.nome_original)} • ${(r.tamanho_bytes/1024/1024).toFixed(2)} MB</div>${c?.ex?.obs?`<div class="os-r"><b>Observação do relatório:</b> ${esc(c.ex.obs)}</div>`:''}<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><button type="button" class="btn btn-p nf-baixar-vistoria" data-id="${esc(r.id)}">Baixar PDF</button>${tipo==='admin'?`<button type="button" class="btn btn-s nf-email-vistoria" data-id="${esc(r.id)}">✉️ Enviar por e-mail</button>`:''}${tipo==='admin'&&r.email_destinatario?`<span style='display:inline-flex;align-items:center;gap:4px;padding:6px 9px;border-radius:999px;background:#ecfdf5;color:#047857;font-size:12px;font-weight:600'>📨 Preparado no Outlook para ${esc(r.email_destinatario)}${r.email_preparado_em?' • '+new Date(r.email_preparado_em).toLocaleString('pt-BR'):''}</span>`:''}</div></div>`).join('')||'<div class="empty">Nenhum relatório de vistoria encontrado.</div>';
  }
 }
 async function enviarVistoria(event){
@@ -108,6 +108,17 @@ async function enviarVistoriaEmail(id,botao){
  }catch(err){
   if(!outlookWindow.closed)outlookWindow.close();
   throw err;
+ }
+ const preparadoEm=new Date().toISOString();
+ const {data:atualizado,error:statusError}=await SB.from('relatorios_vistoria').update({email_destinatario:destinatario,email_preparado_em:preparadoEm}).eq('id',r.id).select('id').maybeSingle();
+ if(statusError||!atualizado){
+  console.error('E-mail aberto no Outlook, mas não foi possível registrar o destinatário:',statusError);
+  nfToast('O rascunho abriu, mas o status do destinatário não foi salvo.','erro');
+  return;
+ }
+ r.email_destinatario=destinatario;r.email_preparado_em=preparadoEm;
+ renderVistorias();
+ nfToast(`Rascunho aberto no Outlook para ${destinatario}.`,'sucesso');
  }finally{botao.disabled=false;}
 }
 document.addEventListener('DOMContentLoaded',()=>{
