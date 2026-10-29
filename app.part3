@@ -5665,9 +5665,12 @@ let SB_REFRESHING=false;
 let SB_REFRESH_PENDING=false;
 let SB_REFRESH_TIMER=null;
 let SB_REALTIME_ATIVO=false;
+let SB_ULTIMA_ATUALIZACAO=0;
+const SB_INTERVALO_MINIMO_ATUALIZACAO=2500;
 function sbProgramarRecarregamento(delay=180){
   clearTimeout(SB_REFRESH_TIMER);
-  SB_REFRESH_TIMER=setTimeout(()=>{void sbRecarregarDados();},delay);
+  const restante=Math.max(0,SB_INTERVALO_MINIMO_ATUALIZACAO-(Date.now()-SB_ULTIMA_ATUALIZACAO));
+  SB_REFRESH_TIMER=setTimeout(()=>{void sbRecarregarDados();},Math.max(delay,restante));
 }
 function sbAgendarRecarregamentoRealtime(){
   // Um evento em várias tabelas deve gerar uma única carga completa do estado.
@@ -5712,7 +5715,7 @@ async function sbRecarregarDados(){
   if(!SB_PROFILE) return;
   if(SB_SYNCING || SB_REFRESHING || limpezaEntreguesEmCurso){SB_REFRESH_PENDING=true;return;}
   SB_REFRESHING=true;
-  try{await sbLoadAll();sbRenderizarTelas();}
+  try{await sbLoadAll();SB_ULTIMA_ATUALIZACAO=Date.now();sbRenderizarTelas();}
   catch(err){console.error('Erro ao recarregar dados:',err);sbSetConnectionBadge('Erro ao atualizar dados',false);}
   finally{
     SB_REFRESHING=false;
