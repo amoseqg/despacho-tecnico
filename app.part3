@@ -3585,13 +3585,28 @@ function calcAtv() {
   const esc = el('ex-atv').value;
   const box = el('ex-avulso-box');
   const sobDemanda=esc.startsWith('Serviços sob demanda|');
-  el('ex-comprovante-box')?.classList.toggle('hidden',!sobDemanda);const rotulo=el('ex-avulso-box')?.querySelector('label');if(rotulo)rotulo.textContent=sobDemanda?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';
-  if(!sobDemanda&&EX_COMPROVANTE){EX_COMPROVANTE=null;el('ex-comprovante').value='';atualizarPreviewComprovante();}
+  atualizarFormularioSobDemanda(sobDemanda);
+  const rotulo=el('ex-avulso-box')?.querySelector('label');if(rotulo)rotulo.textContent=sobDemanda?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';
   if (!esc) { el('ex-vatv').value = ''; box.classList.add('hidden'); calcTotal(); return; }
   const [nome, valor] = esc.split('|');
   if (valor === '0') { el('ex-vatv').value = ''; box.classList.remove('hidden'); }
   else { box.classList.add('hidden'); el('ex-vatv').value = valor; }
   calcTotal();
+}
+
+function atividadeSobDemanda(){return String(el('ex-atv')?.value||'').startsWith('Serviços sob demanda|');}
+function atualizarFormularioSobDemanda(sobDemanda=atividadeSobDemanda()){
+  el('ex-relatorio-extra')?.classList.toggle('hidden',sobDemanda);
+  el('ex-validacao-status')?.classList.toggle('hidden',sobDemanda);
+  el('form-vistoria')?.classList.toggle('hidden',sobDemanda);
+  for(const campo of [el('ex-causa'),el('ex-solucao')])if(campo)campo.required=!sobDemanda;
+  if(sobDemanda){
+    const rel=el('ex-relatorio');
+    if(rel&&rel.value)rel.value=removerCamposExcluidosDaMascara(rel.value);
+  }
+}
+function removerCamposExcluidosDaMascara(texto){
+  return String(texto||'').split(/\r?\n/).filter(l=>!/^\s*(?:VALIDA[CÇ][AÃ]O\s+VECTRA|SENHA\s*:|USU[AÁ]RIO\s+QUE\s+VALIDOU\s*:)/i.test(l)).join('\n');
 }
 
 function usarAvulso() {
@@ -3648,7 +3663,8 @@ function mascaraEncerramento(c) {
   const agora = new Date();
   const data = agora.toLocaleDateString('pt-BR');
   const horario = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-  return `NUMERO SDM : ${c.sdm || ''}\nNUMERO MÉTODO: ${c.pr || ''}\nCLIENTE: ${c.si || ''}\nTÉCNICO: ${S && S.n ? S.n : ''}\nCAUSA RAÍZ: \nSOLUÇÃO TECNICA: \nDATA ENCERRAMENTO: ${data}\nHORARIO: ${horario}\nLOCAL: ${c.en || c.cid || ''}\nVALIDAÇÃO VECTRA : \nSENHA: \nUSUÁRIO QUE VALIDOU: \nMATERIAL: `;
+  const base=`NUMERO SDM : ${c.sdm || ''}\nNUMERO MÉTODO: ${c.pr || ''}\nCLIENTE: ${c.si || ''}\nTÉCNICO: ${S && S.n ? S.n : ''}\nCAUSA RAÍZ: \nSOLUÇÃO TECNICA: \nDATA ENCERRAMENTO: ${data}\nHORARIO: ${horario}\nLOCAL: ${c.en || c.cid || ''}`;
+  return atividadeSobDemanda()?`${base}\nMATERIAL: `:`${base}\nVALIDAÇÃO VECTRA : \nSENHA: \nUSUÁRIO QUE VALIDOU: \nMATERIAL: `;
 }
 
 // Corrige somente os identificadores da máscara; preserva o relato técnico.
@@ -3670,13 +3686,14 @@ function corrigirIdentificadoresEncerramento(texto,c) {
 }
 
 function camposObrigatoriosEncerramento() {
-  return [
+  const campos=[
     {id:'ex-causa',label:'CAUSA RAÍZ',re:/^CAUSA RA[IÍ]Z[ \t]*:/i},
     {id:'ex-solucao',label:'SOLUÇÃO TECNICA',re:/^SOLU[CÇ][AÃ]O T[EÉ]CNICA[ \t]*:/i},
     {id:'ex-validacao',label:'VALIDAÇÃO VECTRA/UMTELECOM',re:/^VALIDA[CÇ][AÃ]O (?:VECTRA(?:\s*\/\s*UMTELECOM)?|UMTELECOM)[ \t]*:/i},
     {id:'ex-senha',label:'SENHA',re:/^SENHA[ \t]*:/i},
     {id:'ex-usuario-validacao',label:'USUÁRIO QUE VALIDOU',re:/^USU[AÁ]RIO QUE VALIDOU[ \t]*:/i}
   ];
+  return atividadeSobDemanda()?campos.filter(c=>['ex-causa','ex-solucao'].includes(c.id)):campos;
 }
 function camposTecnicosEncerramento(){return camposObrigatoriosEncerramento().filter(c=>['ex-causa','ex-solucao'].includes(c.id));}
 function trechoCampoEncerramento(texto,campo) {
@@ -3703,9 +3720,11 @@ function sincronizarCamposEncerramento() {
     if(trecho.inicio<0)texto+='\n'+linha;
     else {trecho.linhas.splice(trecho.inicio,trecho.fim-trecho.inicio,linha);texto=trecho.linhas.join('\n');}
   }
+  if(atividadeSobDemanda())texto=removerCamposExcluidosDaMascara(texto);
   el('ex-relatorio').value=texto;
 }
 function validarCamposEncerramento(campos=camposTecnicosEncerramento()) {
+  if(atividadeSobDemanda())return true;
   for(const campo of campos){
     const input=el(campo.id);
     const valido=input.value.trim()&&(campo.id!=='ex-causa'||['Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso','Vistoria'].includes(input.value));
@@ -3860,14 +3879,14 @@ function abrirBancoFotosRascunho(){
 async function gravarFotosRascunho(){
   if(!EID)return;const db=await abrirBancoFotosRascunho();const tx=db.transaction('fotos','readwrite');
   const serializar=f=>f?({nome:f.name,tipo:f.type,ultimaModificacao:f.lastModified,blob:f}):null;
-  tx.objectStore('fotos').put({chave:chaveRascunhoExecucao(),fotos:EX_FOTOS_NOVAS.map(serializar),comprovante:serializar(EX_COMPROVANTE)});
+  tx.objectStore('fotos').put({chave:chaveRascunhoExecucao(),fotos:EX_FOTOS_NOVAS.map(serializar)});
   await new Promise((resolve,reject)=>{tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();
 }
 async function lerFotosRascunho(id){
   const db=await abrirBancoFotosRascunho();const tx=db.transaction('fotos','readonly');const req=tx.objectStore('fotos').get(chaveRascunhoExecucao(id));
   const registro=await new Promise((resolve,reject)=>{req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});db.close();
   const restaurar=f=>f?new File([f.blob],f.nome,{type:f.tipo,lastModified:f.ultimaModificacao}):null;
-  return {fotos:(registro?.fotos||[]).map(restaurar),comprovante:restaurar(registro?.comprovante)};
+  return {fotos:(registro?.fotos||[]).map(restaurar)};
 }
 async function apagarFotosRascunho(id){
   const db=await abrirBancoFotosRascunho();const tx=db.transaction('fotos','readwrite');tx.objectStore('fotos').delete(chaveRascunhoExecucao(id));
@@ -3885,29 +3904,15 @@ function salvarRascunhoExecucao(){
 function agendarRascunhoExecucao(){clearTimeout(EX_DRAFT_TIMER);EX_DRAFT_TIMER=setTimeout(salvarRascunhoExecucao,150);}
 async function restaurarRascunhoExecucao(c){
   let draft=null;try{draft=JSON.parse(localStorage.getItem(chaveRascunhoExecucao(c.id))||'null');}catch(_e){}
-  if(draft?.campos){for(const [id,valor] of Object.entries(draft.campos)){const campo=el(id);if(!campo)continue;if(id==='ex-materiais-json'){try{EX_MATERIAIS=normalizarMateriaisUtilizados(JSON.parse(valor||'[]'));}catch(_e){EX_MATERIAIS=[];}renderMateriaisUtilizados();}else if(id==='ex-total')campo.textContent=valor;else if(id==='ex-cobrar-km')campo.checked=valor===true;else campo.value=valor;}el('ex-esc-d').dataset.id=draft.campos.escd||'';el('ex-avulso-box').classList.toggle('hidden',!(el('ex-atv').value||'').endsWith('|0'));el('ex-comprovante-box')?.classList.toggle('hidden',!String(el('ex-atv').value||'').startsWith('Serviços sob demanda|'));const rotulo=el('ex-avulso-box')?.querySelector('label');if(rotulo)rotulo.textContent=String(el('ex-atv').value||'').startsWith('Serviços sob demanda|')?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';preencherCamposEncerramento();}
-  try{const arquivos=await lerFotosRascunho(c.id);EX_FOTOS_NOVAS=arquivos.fotos;EX_COMPROVANTE=arquivos.comprovante;}catch(err){console.warn('Fotos do rascunho não puderam ser recuperadas',err);EX_FOTOS_NOVAS=[];EX_COMPROVANTE=null;}atualizarPreviewFotos();atualizarPreviewComprovante();
+  if(draft?.campos){for(const [id,valor] of Object.entries(draft.campos)){const campo=el(id);if(!campo)continue;if(id==='ex-materiais-json'){try{EX_MATERIAIS=normalizarMateriaisUtilizados(JSON.parse(valor||'[]'));}catch(_e){EX_MATERIAIS=[];}renderMateriaisUtilizados();}else if(id==='ex-total')campo.textContent=valor;else if(id==='ex-cobrar-km')campo.checked=valor===true;else campo.value=valor;}el('ex-esc-d').dataset.id=draft.campos.escd||'';el('ex-avulso-box').classList.toggle('hidden',!(el('ex-atv').value||'').endsWith('|0'));const rotulo=el('ex-avulso-box')?.querySelector('label');if(rotulo)rotulo.textContent=atividadeSobDemanda()?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';atualizarFormularioSobDemanda();preencherCamposEncerramento();}
+  try{const arquivos=await lerFotosRascunho(c.id);EX_FOTOS_NOVAS=arquivos.fotos;}catch(err){console.warn('Fotos do rascunho não puderam ser recuperadas',err);EX_FOTOS_NOVAS=[];}atualizarPreviewFotos();
 }
 async function limparRascunhoExecucao(id){
   localStorage.removeItem(chaveRascunhoExecucao(id));if(localStorage.getItem(chaveExecucaoAtiva())===String(id))localStorage.removeItem(chaveExecucaoAtiva());
   try{await apagarFotosRascunho(id);}catch(err){console.warn('Rascunho de fotos não pôde ser removido',err);}
 }
 function prepararFotos(){
-  EX_FOTOS_NOVAS=[];EX_COMPROVANTE=null;if(EX_COMPROVANTE_URL)URL.revokeObjectURL(EX_COMPROVANTE_URL);EX_COMPROVANTE_URL='';el('ex-fotos').value='';el('ex-galeria').value='';el('ex-comprovante').value='';el('ex-fotos-preview').innerHTML='';el('ex-comprovante-preview').innerHTML='';
-}
-function atualizarPreviewComprovante(){
-  const box=el('ex-comprovante-preview');if(!box)return;
-  if(EX_COMPROVANTE_URL)URL.revokeObjectURL(EX_COMPROVANTE_URL);EX_COMPROVANTE_URL='';
-  if(!EX_COMPROVANTE){box.innerHTML='';return;}
-  const url=URL.createObjectURL(EX_COMPROVANTE);EX_COMPROVANTE_URL=url;
-  box.innerHTML=`<div style="display:flex;align-items:center;gap:8px"><img src="${url}" alt="Prévia do comprovante" style="width:90px;height:72px;object-fit:cover;border-radius:7px"><span style="font-size:.7rem">${esc(EX_COMPROVANTE.name)}</span><button type="button" class="btn btn-r" id="ex-comprovante-remover" aria-label="Remover comprovante">Remover</button></div>`;
-  el('ex-comprovante-remover').onclick=async()=>{EX_COMPROVANTE=null;el('ex-comprovante').value='';atualizarPreviewComprovante();try{await gravarFotosRascunho();}catch(err){console.warn('Comprovante não pôde ser removido do rascunho',err);}salvarRascunhoExecucao();};
-}
-async function selecionarComprovante(file){
-  if(!file)return;
-  if(!['image/jpeg','image/png','image/webp'].includes(file.type)){nfToast('O comprovante deve ser uma imagem JPEG, PNG ou WebP.','erro');el('ex-comprovante').value='';return;}
-  if(file.size>8*1024*1024){nfToast('O comprovante ultrapassa o limite de 8 MB.','erro');el('ex-comprovante').value='';return;}
-  EX_COMPROVANTE=file;atualizarPreviewComprovante();try{await gravarFotosRascunho();}catch(err){console.warn('Comprovante não pôde ser salvo no rascunho',err);}salvarRascunhoExecucao();
+  EX_FOTOS_NOVAS=[];el('ex-fotos').value='';el('ex-galeria').value='';el('ex-fotos-preview').innerHTML='';
 }
 function atualizarPreviewFotos(){
   EX_PREVIEW_URLS.forEach(URL.revokeObjectURL);EX_PREVIEW_URLS=[];
@@ -3925,7 +3930,7 @@ function reabrirExecucaoRascunho(){
   const chamado=D.ch.find(c=>String(c.id)===String(id)&&c.st!=='concluida'&&c.te===S.u);if(chamado)setTimeout(()=>opEx(chamado.id),120);
 }
 async function sbEnviarFotos(c){
-  if(!EX_FOTOS_NOVAS.length&&!EX_COMPROVANTE)return [];
+  if(!EX_FOTOS_NOVAS.length)return [];
   if(EX_FOTOS_NOVAS.length>8)throw new Error('Selecione no máximo 8 fotos.');
   const enviadas=[];
   for(const f of EX_FOTOS_NOVAS){
@@ -3936,18 +3941,6 @@ async function sbEnviarFotos(c){
     const {error:upErr}=await SB.storage.from('fotos-atividades').upload(caminho,f,{contentType:f.type,upsert:false});
     if(upErr)throw upErr;
     const {data,error}=await SB.from('fotos_atividade').insert({chamado_id:c.id,tecnico_id:SB_PROFILE.id,caminho,nome_original:f.name,tipo_mime:f.type,tamanho_bytes:f.size}).select('*').single();
-    if(error){await SB.storage.from('fotos-atividades').remove([caminho]);throw error;}
-    enviadas.push(data);
-  }
-  if(EX_COMPROVANTE){
-    const f=EX_COMPROVANTE;
-    if(f.size>8*1024*1024)throw new Error('O comprovante ultrapassa o limite de 8 MB.');
-    if(!['image/jpeg','image/png','image/webp'].includes(f.type))throw new Error('O comprovante deve ser uma imagem JPEG, PNG ou WebP.');
-    const ext=(f.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
-    const caminho=`${SB_PROFILE.id}/${c.id}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
-    const {error:upErr}=await SB.storage.from('fotos-atividades').upload(caminho,f,{contentType:f.type,upsert:false});
-    if(upErr)throw upErr;
-    const {data,error}=await SB.from('fotos_atividade').insert({chamado_id:c.id,tecnico_id:SB_PROFILE.id,caminho,nome_original:'Comprovante do serviço sob demanda — '+f.name,tipo_mime:f.type,tamanho_bytes:f.size}).select('*').single();
     if(error){await SB.storage.from('fotos-atividades').remove([caminho]);throw error;}
     enviadas.push(data);
   }
@@ -4064,10 +4057,11 @@ async function opEx(id) {
   el('ex-atv').value = atividadeExecucao; el('ex-vatv').value = anterior.vatv || '';
   el('ex-avulso').value = anterior.avulso || '';
   el('ex-avulso-box').classList.toggle('hidden', !(atividadeExecucao && atividadeExecucao.endsWith('|0')));
-  el('ex-comprovante-box').classList.toggle('hidden',!String(atividadeExecucao).startsWith('Serviços sob demanda|'));const rotuloAvulso=el('ex-avulso-box')?.querySelector('label');if(rotuloAvulso)rotuloAvulso.textContent=String(atividadeExecucao).startsWith('Serviços sob demanda|')?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';
+  atualizarFormularioSobDemanda(String(atividadeExecucao).startsWith('Serviços sob demanda|'));const rotuloAvulso=el('ex-avulso-box')?.querySelector('label');if(rotuloAvulso)rotuloAvulso.textContent=String(atividadeExecucao).startsWith('Serviços sob demanda|')?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';
   ['ex-material-nome','ex-material-unidade','ex-material-qtd','ex-material-valor-unit'].forEach(id=>el(id).value='');EX_MATERIAIS=normalizarMateriaisUtilizados(anterior);renderMateriaisUtilizados();
   el('ex-tmat').value=anterior.tmat||moedaMaterial(EX_MATERIAIS.reduce((s,m)=>s+m.total,0));el('ex-obs').value=anterior.obs||'';
   el('ex-relatorio').value = corrigirIdentificadoresEncerramento(anterior.relatorio || mascaraEncerramento(c),c);
+  if(String(atividadeExecucao).startsWith('Serviços sob demanda|'))el('ex-relatorio').value=removerCamposExcluidosDaMascara(el('ex-relatorio').value);
   preencherCamposEncerramento();
   el('ex-total').textContent = anterior.total || 'R$ 0,00';
   el('ex-dist-info').classList.add('hidden');
@@ -4105,7 +4099,6 @@ async function cfEx() {
   if(String(el('ex-atv').value||'').startsWith('Serviços sob demanda|')){
     const valor=Number(el('ex-avulso').value);
     if(!Number.isFinite(valor)||valor<=0){nfToast('Informe um valor maior que zero para o serviço sob demanda.','erro');el('ex-avulso').focus();return;}
-    if(!EX_COMPROVANTE){nfToast('Anexe a foto do comprovante para enviar o serviço à aprovação da gestão.','erro');el('ex-comprovante').focus();return;}
   }
   atualizarCobrancaKm();
   finalizarMascaraEncerramento();
@@ -4592,7 +4585,6 @@ document.addEventListener('DOMContentLoaded', function() {
   el('ex-materiais-lista').addEventListener('click',event=>{const b=event.target.closest('.ex-material-remover');if(b)removerMaterialExecucao(Number(b.dataset.index));});
   el('ex-fotos').addEventListener('change',async e=>{await adicionarFotosExecucao(e.target.files);e.target.value='';});
   el('ex-galeria').addEventListener('change',async e=>{await adicionarFotosExecucao(e.target.files);e.target.value='';});
-  el('ex-comprovante').addEventListener('change',async e=>{await selecionarComprovante(e.target.files?.[0]);});
   el('m-ex').addEventListener('input',agendarRascunhoExecucao);
   el('m-ex').addEventListener('change',agendarRascunhoExecucao);
   el('btn-calc-dist').addEventListener('click', calcDist);
@@ -4963,8 +4955,6 @@ let SB_LOADED_MR = new Set();
 let SB_ESCOLAS = [];
 let SB_FOTOS_MAP = new Map();
 let EX_FOTOS_NOVAS = [];
-let EX_COMPROVANTE = null;
-let EX_COMPROVANTE_URL = '';
 let SB_SOLICITANTES_CHAMADOS = [];
 let SB_CARREGANDO_SOLICITANTES = false;
 let SB_RETIRADOS = [];

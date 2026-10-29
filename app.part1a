@@ -1196,13 +1196,12 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
             <option value="Vistoria|150.00">Vistoria - R$ 150,00</option>
             <option value="Retirada|75.00">Retirada - R$ 75,00</option>
             <option value="Serviços maiores|0">Serviços maiores (informar valor abaixo)</option>
-            <option value="Serviços sob demanda|0">Serviços sob demanda (informar valor e anexar comprovante)</option>
+            <option value="Serviços sob demanda|0">Serviços sob demanda (informar valor para aprovação da gestão)</option>
           </select>
         </div>
         <div class="form-group"><label class="label">Valor do Serviço (R$)</label><input type="number" step="0.01" id="ex-vatv" class="input" readonly></div>
       </div>
       <div class="form-group hidden" id="ex-avulso-box"><label class="label">Valor do Serviço Maior (R$)</label><input type="number" step="0.01" id="ex-avulso" class="input"></div>
-      <div class="form-group hidden" id="ex-comprovante-box"><label class="label" for="ex-comprovante">Comprovante do serviço sob demanda (foto obrigatória)</label><input type="file" id="ex-comprovante" class="input" accept="image/jpeg,image/png,image/webp" capture="environment"><small>Anexe uma foto do comprovante para a gestão analisar junto com o valor informado. Até 8 MB.</small><div id="ex-comprovante-preview" style="margin-top:8px"></div></div>
       <div style="font-size:.68rem;color:var(--metodo-escuro);font-weight:800;margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">📦 Materiais Utilizados</div>
       <div class="nf-exec-materials" id="ex-material-form">
         <div class="form-group"><label class="label" for="ex-material-nome">Material</label><input type="text" id="ex-material-nome" class="input" maxlength="160" placeholder="Nome do material"></div>
@@ -1214,15 +1213,15 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
       </div>
       <div id="ex-materiais-lista" aria-live="polite"></div>
       <div class="form-group" style="margin-top:10px"><label class="label" for="ex-tmat">Total dos materiais</label><input type="text" id="ex-tmat" class="input" readonly style="font-weight:700;color:var(--metodo-escuro)"></div>
-      <div style="font-size:.6rem;color:var(--gr);margin:10px 0 8px;text-transform:uppercase;letter-spacing:.5px">📋 Relatório de Encerramento</div>
-      <p>Preencha a causa e a solução. Depois, envie a máscara ao operador para validação.</p>
-      <div class="form-group"><label class="label" for="ex-causa">Causa raiz *</label><select id="ex-causa" class="input" required onchange="sincronizarCamposEncerramento()"><option value="">Selecione...</option><option>Infracliente</option><option>Elétrica cliente</option><option>Elétrica concessionária</option><option>Mau uso</option><option>Vistoria</option></select></div>
-      <div class="form-group"><label class="label" for="ex-solucao">Solução técnica *</label><textarea id="ex-solucao" class="input" rows="3" required oninput="sincronizarCamposEncerramento()"></textarea></div>
-      <div class="form-group"><label class="label" for="ex-validacao">Validação Vectra/UM Telecom (se informada)</label><input id="ex-validacao" class="input" oninput="sincronizarCamposEncerramento()" placeholder="Informe se disponível"></div>
-      <div class="form-group"><label class="label" for="ex-senha">Senha de encerramento (se informada)</label><input id="ex-senha" class="input" oninput="sincronizarCamposEncerramento()" autocomplete="off" placeholder="Informe se disponível"></div>
-      <div class="form-group"><label class="label" for="ex-usuario-validacao">Nome do usuário que validou o atendimento</label><input id="ex-usuario-validacao" class="input" oninput="sincronizarCamposEncerramento()" maxlength="200" placeholder="Informe o nome de quem validou o atendimento"></div>
+      <div id="ex-relatorio-extra">
+        <div class="form-group" data-campo-encerramento="tecnico"><label class="label" for="ex-causa">Causa raiz *</label><select id="ex-causa" class="input" required onchange="sincronizarCamposEncerramento()"><option value="">Selecione...</option><option>Infracliente</option><option>Elétrica cliente</option><option>Elétrica concessionária</option><option>Mau uso</option><option>Vistoria</option></select></div>
+        <div class="form-group" data-campo-encerramento="tecnico"><label class="label" for="ex-solucao">Solução técnica *</label><textarea id="ex-solucao" class="input" rows="3" required oninput="sincronizarCamposEncerramento()"></textarea></div>
+        <div class="form-group" data-campo-encerramento="validacao"><label class="label" for="ex-validacao">Validação Vectra/UM Telecom (se informada)</label><input id="ex-validacao" class="input" oninput="sincronizarCamposEncerramento()" placeholder="Informe se disponível"></div>
+        <div class="form-group" data-campo-encerramento="validacao"><label class="label" for="ex-senha">Senha de encerramento (se informada)</label><input id="ex-senha" class="input" oninput="sincronizarCamposEncerramento()" autocomplete="off" placeholder="Informe se disponível"></div>
+        <div class="form-group" data-campo-encerramento="validacao"><label class="label" for="ex-usuario-validacao">Nome do usuário que validou o atendimento</label><input id="ex-usuario-validacao" class="input" oninput="sincronizarCamposEncerramento()" maxlength="200" placeholder="Informe o nome de quem validou o atendimento"></div>
+      </div>
       <div id="ex-validacao-status" class="info" style="margin-bottom:10px">Preencha os dados técnicos e envie ao operador.</div>
-      <div class="form-group"><label class="label">Máscara de encerramento</label><textarea id="ex-relatorio" oninput="preencherCamposEncerramento()" class="input" rows="13" style="font-family:monospace;line-height:1.45" placeholder="Preencha o relatório de encerramento..."></textarea></div>
+      <div class="form-group"><label class="label">Máscara de encerramento</label><textarea id="ex-relatorio" oninput="preencherCamposEncerramento()" class="input" rows="13" style="font-family:monospace;line-height:1.45" placeholder="Máscara de encerramento (opcional)"></textarea></div>
       <div class="form-group">
         <label class="label">📷 Fotos da execução</label>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
