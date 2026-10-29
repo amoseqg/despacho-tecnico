@@ -307,11 +307,56 @@ function preencherDadosDaDescricao(texto){
   return dados;
 }
 
+function extrairCamposOperacionaisDaDescricao(texto){
+  const conteudo=String(texto||'');
+  const normalizar=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/wi[\s-]?fi/g,'wifi');
+  const linhaOperadora=conteudo.match(/(?:operadora|quem abriu(?: o chamado)?|aberto por)\s*[:=\-]\s*([^\r\n]+)/i);
+  const op=normalizar(linhaOperadora?.[1]||'');
+  let abertura='';
+  if(op.includes('vectra'))abertura='Vectra';
+  else if(op.includes('umtelecom')||op.includes('um telecom'))abertura='Umtelecom';
+  else if(op.includes('metodo'))abertura='Método';
+
+  const linhaSkill=conteudo.match(/(?:skill(?:\s+necess[aá]ria)?|habilidade)\s*[:=\-]\s*([^\r\n]+)/i);
+  const fonte=normalizar(linhaSkill?.[1]||conteudo);
+  const vistoria=/\bvistoria\b/.test(fonte),wifi=/\bwifi\b/.test(fonte),voz=/\bvoz\b/.test(fonte),dados=/\bdados\b/.test(fonte),infra=/\binfra(?:estrutura)?\b/.test(fonte);
+  let skill='';
+  if(vistoria&&wifi)skill='vistoria_wifi';
+  else if(vistoria&&voz)skill='vistoria_voz';
+  else if(vistoria&&dados)skill='dados_vistoria';
+  else if(vistoria)skill='vistoria';
+  else if(wifi)skill='wifi';
+  else if(voz)skill='voz';
+  else if(dados)skill='dados';
+  else if(infra)skill='infra';
+  return {abertura,skill};
+}
+
+function aplicarCapturaCampoDescricao(id,valor){
+  const campo=el(id);if(!campo)return false;
+  if(valor){
+    if(campo.dataset.preenchimento!=='manual'){
+      campo.value=valor;campo.dataset.preenchimento='automatico';return true;
+    }
+  }else if(campo.dataset.preenchimento==='automatico'){
+    campo.value='';delete campo.dataset.preenchimento;return true;
+  }
+  return false;
+}
+
 function buscarCircuitoNaDescricao() {
   const campo=el('c-descricao-colada');
   const texto=String(campo?.value||'').trim();
   const status=el('c-status'), opcoes=el('c-opcoes');
   const campoProtocolo=el('c-pr'), campoSdm=el('c-sdm');
+  const camposOperacionais=extrairCamposOperacionaisDaDescricao(texto);
+  const aberturaAtualizada=aplicarCapturaCampoDescricao('c-abertura',camposOperacionais.abertura);
+  const skillAtualizada=aplicarCapturaCampoDescricao('c-sk',camposOperacionais.skill);
+  if(aberturaAtualizada||skillAtualizada){
+    atualizarRotulosSlaRegiao();
+    atualizarTecnicosChamado();
+    atualizarCampoRamalChamado();
+  }
   if(!MODO_MANUAL_CHAMADO){el('c-ci').value='';if(el('c-ci-manual'))el('c-ci-manual').value='';}
   limparSite();
   opcoes.classList.add('hidden');
@@ -452,10 +497,10 @@ function nt(u) { const t = D.tc.find(x => x.u === u); return t ? t.n : u; }
 function adminGeral() { return !!(S && S.t === 'adm' && D.ad.some(a => a.u === S.u && a.p)); }
 function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
-function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra', wifi: 'WiFi', vistoria: 'Vistoria' })[v] || 'Não definida'; }
+function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra', wifi: 'WiFi', vistoria: 'Vistoria', vistoria_wifi: 'Vistoria / WiFi', vistoria_voz: 'Vistoria / Voz', dados_vistoria: 'Dados / Vistoria' })[v] || 'Não definida'; }
 function nomeArea(v) { return ({ norte: 'Norte', leste: 'Leste', sul: 'Sul', oeste: 'Oeste', interior: 'Interior', noronha: 'Fernando de Noronha' })[v] || 'Não definida'; }
 function nomeRegiao(v) { return ({ capital: '🏙️ Capital', interior: '🌾 Interior', noronha: '🏝️ Fernando de Noronha' })[v] || 'Região não definida'; }
-function slaRegiao(v,skill='') { return skill==='vistoria'?'48h':(v === 'interior' ? '8h' : '6h'); }
+function slaRegiao(v,skill='') { return String(skill||'').split('_').includes('vistoria')?'48h':(v === 'interior' ? '8h' : '6h'); }
 function atualizarRotulosSlaRegiao(){const campo=el('c-re');if(!campo)return;const skill=el('c-sk')?.value||'';const nomes={capital:'🏙️ Capital',interior:'🌾 Interior',noronha:'🏝️ Fernando de Noronha'};Array.from(campo.options).forEach(op=>{if(op.value)op.textContent=`${nomes[op.value]||op.value} — SLA ${slaRegiao(op.value,skill).replace(/h$/,' horas')}`;});}
 function skillChamado(c){return c?.atividadeServico==='vistoria'?'vistoria':(c?.skill||'');}
 function skillsTec(t) { return t.sk && t.sk.length ? t.sk : ['voz','dados','infra']; }
@@ -478,7 +523,9 @@ function areasTec(t) {
 function enderecoEntregaTexto(t){const d=enderecoEntregaTec(t);return [d.endereco,d.numero,d.bairro,d.complemento,d.cidade,d.cep&&('CEP '+d.cep)].filter(Boolean).join(', ');}
 function tecnicoCompativel(t, c) {
   const areaChamado = c.re === 'interior' ? 'interior' : c.area;
-  return t.r === c.re && (!c.skill || skillsTec(t).includes(c.skill)) && (!areaChamado || areasTec(t).includes(areaChamado));
+  const requisitos={vistoria_wifi:['vistoria','wifi'],vistoria_voz:['vistoria','voz'],dados_vistoria:['dados','vistoria']}[c.skill]||[c.skill].filter(Boolean);
+  const temSkills=requisitos.every(skill=>skillsTec(t).includes(skill));
+  return t.r === c.re && (!c.skill || temSkills) && (!areaChamado || areasTec(t).includes(areaChamado));
 }
 const AREAS_CAPITAL_PLANILHA = new Set(['norte','leste','sul','oeste']);
 const CIDADES_CAPITAL = new Set(['recife','olinda','jaboatao dos guararapes','paulista','camaragibe','cabo de santo agostinho','abreu e lima','igarassu','ipojuca','moreno','sao lourenco da mata']);
@@ -1757,7 +1804,6 @@ async function addCh() {
   const descricaoRamal=[de,el('c-descricao-colada')?.value].filter(Boolean).join('\n');
   if(!ramal)ramal=extrairRamalDaDescricaoChamado(descricaoRamal);
   if (!pr) { alert('Informe o número do protocolo. Se ele não for identificado na descrição, digite-o no campo Protocolo.'); el('c-pr').focus(); return; }
-  if (!abertura) { alert('Selecione quem abriu o chamado'); return; }
   if (!site) {
     definirModoManualChamado(true);
     const statusCircuito=el('c-status');
@@ -1766,7 +1812,6 @@ async function addCh() {
     el('c-ci-manual')?.focus();
     return;
   }
-  if (!skill) { alert('Selecione a skill necessária para o chamado'); return; }
   if (re === 'capital' && !area) { alert('Selecione a área de atendimento da capital'); return; }
   if (!tecnico) { alert('Selecione um técnico com cadastro ativo que atenderá o chamado'); return; }
   const tecnicoSelecionado = D.tc.find(t => String(t.u || '').trim() === tecnico);
@@ -4468,9 +4513,9 @@ document.addEventListener('DOMContentLoaded', function() {
     el('t-multi').checked = Array.from(document.querySelectorAll('input[name="t-sk"]')).every(i => i.checked);
   }));
   el('c-re').addEventListener('change', atualizarCamposRegiao);
-  el('c-sk').addEventListener('change',()=>{atualizarRotulosSlaRegiao();atualizarTecnicosChamado();});
+  el('c-sk').addEventListener('change',function(){if(this.dataset.preenchimento!=='automatico')this.dataset.preenchimento='manual';atualizarRotulosSlaRegiao();atualizarTecnicosChamado();atualizarCampoRamalChamado();});
   el('c-area').addEventListener('change', atualizarTecnicosChamado);
-  el('c-abertura')?.addEventListener('change',atualizarCampoRamalChamado);
+  el('c-abertura')?.addEventListener('change',function(){if(this.dataset.preenchimento!=='automatico')this.dataset.preenchimento='manual';atualizarCampoRamalChamado();});
   el('c-sk')?.addEventListener('change',atualizarCampoRamalChamado);
   el('c-dispensa-ramal')?.addEventListener('change',atualizarCampoRamalChamado);
   atualizarCampoRamalChamado();
