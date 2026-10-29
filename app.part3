@@ -4513,9 +4513,9 @@ document.addEventListener('DOMContentLoaded', function() {
     el('t-multi').checked = Array.from(document.querySelectorAll('input[name="t-sk"]')).every(i => i.checked);
   }));
   el('c-re').addEventListener('change', atualizarCamposRegiao);
-  el('c-sk').addEventListener('change',function(){if(this.dataset.preenchimento!=='automatico')this.dataset.preenchimento='manual';atualizarRotulosSlaRegiao();atualizarTecnicosChamado();atualizarCampoRamalChamado();});
+  el('c-sk').addEventListener('change',function(){this.dataset.preenchimento='manual';atualizarRotulosSlaRegiao();atualizarTecnicosChamado();atualizarCampoRamalChamado();});
   el('c-area').addEventListener('change', atualizarTecnicosChamado);
-  el('c-abertura')?.addEventListener('change',function(){if(this.dataset.preenchimento!=='automatico')this.dataset.preenchimento='manual';atualizarCampoRamalChamado();});
+  el('c-abertura')?.addEventListener('change',function(){this.dataset.preenchimento='manual';atualizarCampoRamalChamado();});
   el('c-sk')?.addEventListener('change',atualizarCampoRamalChamado);
   el('c-dispensa-ramal')?.addEventListener('change',atualizarCampoRamalChamado);
   atualizarCampoRamalChamado();
