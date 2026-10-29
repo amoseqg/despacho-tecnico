@@ -2223,7 +2223,7 @@ function rCh() {
     <div class="os-r"><b>Técnico:</b> ${nt(c.te)}</div>
     <div class="os-r"><b>Motivo:</b> ${c.mr}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${(SB_PROFILE?.tipo==='admin'||S?.t==='adm') ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado recusado</h3></div>';
 }
 function rDb() {
