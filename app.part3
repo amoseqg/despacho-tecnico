@@ -2878,6 +2878,17 @@ function rRl(dt1, dt2, forcarExibicao) {
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
+  container.querySelectorAll('.btn-rl-validacao-nao').forEach(button => {
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      try {
+        abrirMotivosValidacaoTecnica(button.dataset.u);
+      } catch (error) {
+        sbShowError('Não foi possível abrir os motivos da não validação', error);
+      }
+    });
+  });
 }
 
 function renderRelatoriosQualidade(){
