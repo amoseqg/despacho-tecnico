@@ -4367,19 +4367,14 @@ function expCSV() {
 let NF_LOOP_PRAZOS=null;
 function startLoop() {
   if(NF_LOOP_PRAZOS)return;
-  let ticks=0;
   NF_LOOP_PRAZOS=setInterval(()=>{
-    if(S){
-      const chamados=new Map(D.ch.map(c=>[String(c.id),c]));
-      document.querySelectorAll('[data-prazo-id]').forEach(node=>{
-        const c=chamados.get(node.dataset.prazoId);if(!c)return;
-        const t=tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
-        node.textContent=t.t;node.className='timer '+t.c;
-      });
-    }
-    if(++ticks%5!==0)return;
-    if (S && S.t === 'adm') { rAt(); rDb(); if(el('v-ml') && !el('v-ml').classList.contains('hidden')) rMl(); }
-    if (S && S.t === 'tec') { rTdb(); rTat(); if(el('t-mt') && !el('t-mt').classList.contains('hidden')) rTmat(); }
+    if(!S||!Array.isArray(D?.ch))return;
+    const chamados=new Map(D.ch.map(c=>[String(c.id),c]));
+    document.querySelectorAll('[data-prazo-id]').forEach(node=>{
+      const c=chamados.get(node.dataset.prazoId);if(!c)return;
+      const t=tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
+      node.textContent=t.t;node.className='timer '+t.c;
+    });
   },1000);
 }
 
@@ -5678,11 +5673,39 @@ function sbAgendarRecarregamentoRealtime(){
   // Um evento em várias tabelas deve gerar uma única carga completa do estado.
   sbProgramarRecarregamento(600);
 }
+function sbPainelVisivel(id){
+  const painel=el(id);
+  return !!painel&&!painel.classList.contains('hidden');
+}
 function sbRenderizarTelas(){
   try{
-    if(S?.t==='adm'){rDb();rAt();rCh();rRl();rTc();rMl();}
-    else if(S?.t==='tec'){rTdb();rTdp();rTat();rTco();rTar();rTmat();nfAbrirChamadoNotificado();}
-    else if(S?.t==='log'){rLog();}
+    if(S?.t==='adm'){
+      if(sbPainelVisivel('v-db'))rDb();
+      else if(sbPainelVisivel('v-at'))rAt();
+      else if(sbPainelVisivel('v-ch'))rCh();
+      else if(sbPainelVisivel('v-rl'))rRl();
+      else if(sbPainelVisivel('v-tc'))rTc();
+      else if(sbPainelVisivel('v-ml'))rMl();
+      else if(sbPainelVisivel('v-ad'))rAd();
+      else if(sbPainelVisivel('v-vi'))renderVistorias();
+      else if(sbPainelVisivel('v-ft'))renderFotosAdmin();
+      else if(sbPainelVisivel('v-aq'))renderArquivoChamados();
+      else if(sbPainelVisivel('v-pn')){
+        if(window.NexoFieldPendencias)window.NexoFieldPendencias.renderAdmin();
+        if(window.NexoFieldReaprazamento)window.NexoFieldReaprazamento.renderAdmin();
+      }else if(sbPainelVisivel('v-lab')&&window.NexoFieldLab)window.NexoFieldLab.render();
+      else if(sbPainelVisivel('v-online'))nfCarregarTecnicosOnline();
+    }else if(S?.t==='tec'){
+      if(sbPainelVisivel('t-db'))rTdb();
+      else if(sbPainelVisivel('t-dp'))rTdp();
+      else if(sbPainelVisivel('t-at'))rTat();
+      else if(sbPainelVisivel('t-co'))rTco();
+      else if(sbPainelVisivel('t-ar'))rTar();
+      else if(sbPainelVisivel('t-mt'))rTmat();
+      else if(sbPainelVisivel('t-lab')&&window.NexoFieldLab)window.NexoFieldLab.render();
+      nfAbrirChamadoNotificado();
+    }else if(S?.t==='log'&&sbPainelVisivel('v-log'))rLog();
+    else if(S?.t==='log')rLog();
   }catch(e){console.error('Erro ao atualizar telas:',e);}
 }
 async function sbRecarregarDados(){
