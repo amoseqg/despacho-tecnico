@@ -460,7 +460,7 @@ function selecionarCircuitoDaDescricao(valor){
   el('c-status').style.color='var(--g)';
 }
 
-function nomeAtividadeOsServico(c){return ({instalacao:'Instalação',alteracao:'Alteração',mudanca_endereco:'Mudança de endereço',vistoria:'Vistoria',retirada:'Retirada'})[c.atividadeServico]||'Serviço';}
+function nomeAtividadeOsServico(c){return ({instalacao:'Instalação',alteracao:'Alteração',mudanca_endereco:'Mudança de endereço',vistoria:'Vistoria',retirada:'Retirada',sob_demanda:'Serviços sob demanda'})[c.atividadeServico]||'Serviço';}
 function identificacaoOs(c){return c?.tipoOs==='servico'?'OS de Serviço • '+(c.pr||'Sem identificador'):(c?.pr||'—');}
 function seloTipoOs(c){return c?.tipoOs==='servico'?'<span class="badge b-andamento">🛠️ OS de Serviços</span>':'';}
 function dadosSite(c) {
@@ -4060,10 +4060,11 @@ async function opEx(id) {
   el('vistoria-mensagem').textContent='';
   el('ex-cobrar-km').checked = anterior.cobrarKm===true;
   el('ex-km').value = anterior.km || ''; el('ex-vkm').value = anterior.vkm || '';
-  el('ex-atv').value = anterior.atv || ''; el('ex-vatv').value = anterior.vatv || '';
+  const atividadeExecucao=anterior.atv||(osServico&&c.atividadeServico==='sob_demanda'?'Serviços sob demanda|0':'');
+  el('ex-atv').value = atividadeExecucao; el('ex-vatv').value = anterior.vatv || '';
   el('ex-avulso').value = anterior.avulso || '';
-  el('ex-avulso-box').classList.toggle('hidden', !(anterior.atv && anterior.atv.endsWith('|0')));
-  el('ex-comprovante-box').classList.toggle('hidden',!String(anterior.atv||'').startsWith('Serviços sob demanda|'));const rotuloAvulso=el('ex-avulso-box')?.querySelector('label');if(rotuloAvulso)rotuloAvulso.textContent=String(anterior.atv||'').startsWith('Serviços sob demanda|')?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';
+  el('ex-avulso-box').classList.toggle('hidden', !(atividadeExecucao && atividadeExecucao.endsWith('|0')));
+  el('ex-comprovante-box').classList.toggle('hidden',!String(atividadeExecucao).startsWith('Serviços sob demanda|'));const rotuloAvulso=el('ex-avulso-box')?.querySelector('label');if(rotuloAvulso)rotuloAvulso.textContent=String(atividadeExecucao).startsWith('Serviços sob demanda|')?'Valor do Serviço sob Demanda (R$)':'Valor do Serviço Maior (R$)';
   ['ex-material-nome','ex-material-unidade','ex-material-qtd','ex-material-valor-unit'].forEach(id=>el(id).value='');EX_MATERIAIS=normalizarMateriaisUtilizados(anterior);renderMateriaisUtilizados();
   el('ex-tmat').value=anterior.tmat||moedaMaterial(EX_MATERIAIS.reduce((s,m)=>s+m.total,0));el('ex-obs').value=anterior.obs||'';
   el('ex-relatorio').value = corrigirIdentificadoresEncerramento(anterior.relatorio || mascaraEncerramento(c),c);
@@ -5889,7 +5890,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.67"></script>
+<script src="/release-info.js?v=2.5.68"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
