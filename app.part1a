@@ -1030,6 +1030,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <p class="info">Consulte o total dos serviços aprovados e o que já está aprovisionado para o próximo período.</p>
         <div id="tp-resumo-aprovados"></div>
         <div id="tp-lista-aprovados" style="margin-top:12px"></div>
+        <div id="tp-lista-proximo-aprovados" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--b)"></div>
       </div>
     </div>
     <div id="t-pp" class="hidden">
@@ -1043,6 +1044,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         </div>
         <div id="tp-resumo-periodo"></div>
         <div id="tp-lista-periodo" style="margin-top:12px"></div>
+        <div id="tp-lista-proximo-periodo" style="margin-top:12px;padding-top:12px;border-top:1px solid var(--b)"></div>
       </div>
     </div>
   </div>

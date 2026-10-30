@@ -2874,6 +2874,29 @@ function rlValorMoeda(valor){
   return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(valor)||0);
 }
 
+function rlAbrirChamadosProximoPeriodo(usuario){
+  const faixa=rlProximoPeriodoUtil(RL_DT2_ATUAL,10);
+  if(!faixa.inicio||!faixa.fim){nfToast('Defina o período aprovado antes de consultar o próximo.','erro');return;}
+  const chamados=servicosPagamentoUnicos(D.ch.filter(c=>{
+    if(c.te!==usuario||c.st!=='concluida')return false;
+    const data=dataBrasilISO(dataEncerramentoChamado(c));
+    return !!data&&data>=faixa.inicio&&data<=faixa.fim;
+  })).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
+  const total=totalAprovadoServicos(chamados);
+  const linhas=chamados.map(c=>{
+    const data=dataEncerramentoChamado(c);
+    return '<tr><td>'+esc(c.pr||'—')+'</td><td>'+esc(c.si||'—')+'</td><td>'+esc(data?formatarDataBrasil(data):'—')+'</td><td>'+esc(c.ex?.atv?.split('|')[0]||c.atividadeServico||'—')+'</td><td style="text-align:right">'+esc(rlValorMoeda(valorAprovadoServico(c)))+'</td></tr>';
+  }).join('');
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(900px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 70px #0005;color:#16324f';
+  dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h3 style="margin:0">Chamados aprovados do próximo período</h3><p style="margin:5px 0 0;color:#526273">'+esc(nt(usuario))+' · '+esc(formatarDataBrasil(faixa.inicio))+' a '+esc(formatarDataBrasil(faixa.fim))+'</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>'+
+    (chamados.length?'<div style="overflow:auto;margin-top:14px"><table class="table"><thead><tr><th>Protocolo</th><th>Site / Cliente</th><th>Data</th><th>Serviço</th><th>Valor</th></tr></thead><tbody>'+linhas+'</tbody><tfoot><tr><th colspan="4" style="text-align:right">Total aprovisionado</th><th style="text-align:right">'+esc(rlValorMoeda(total))+'</th></tr></tfoot></table></div>':'<div class="empty">Nenhum chamado aprovado neste próximo período.</div>');
+  dialog.querySelector('[data-fechar]').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  document.body.append(dialog);
+  dialog.showModal();
+}
+
 function rlPedidoHtml(usuario){
   const perfil=D.tc.find(t=>t.u===usuario),pedidoSalvo=perfil?RL_PEDIDOS_APROVACAO.get(perfil._id):null;
   const pago=perfil&&RL_DT1_ATUAL&&RL_DT2_ATUAL?rlPagamentoDoPeriodo(perfil._id,RL_DT1_ATUAL,RL_DT2_ATUAL):null;
@@ -3207,7 +3230,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
       <td><span style="font-size:12px;font-weight:650">${esc(t.nome)}</span>${historico}</td>
       <td style="white-space:nowrap">${periodoStr}</td>
       <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
-      <td style="white-space:nowrap;font-weight:700">${rlValorMoeda(saldoProximoPeriodo)}</td>
+      <td style="white-space:nowrap;font-weight:700"><button type="button" class="btn-rl-proximo" data-u="${esc(u)}" style="border:0;background:none;color:var(--p);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline" title="Ver apenas os chamados do próximo período">${rlValorMoeda(saldoProximoPeriodo)}</button><small style="display:block;color:#667085">${aprovadosProximoPeriodo.length} chamado(s)</small></td>
       <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
       <td>${validacaoTecnicaHtml}</td><td>${regBadge}</td><td class="rl-pedido-cell" data-u="${esc(u)}">${rlPedidoHtml(u)}</td>
     </tr>`;
@@ -3219,6 +3242,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
+  container.querySelectorAll('.btn-rl-proximo').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();rlAbrirChamadosProximoPeriodo(button.dataset.u);}));
   rlAtualizarCelulasPedido();
   if(carregarPedidos)void rlCarregarPedidosAprovacao();
   container.querySelectorAll('.btn-rl-validacao-nao').forEach(button => {
@@ -3810,11 +3834,13 @@ function rTap(){
   const provisionado=Math.max(0,totalAprovadoServicos(aprovadosProximo)-tpPagamentoDentroDoPeriodo(proximo.inicio,proximo.fim));
   resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">Valor aprovado total</div><div class="v">'+escM(rlValorMoeda(total))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>';
   lista.innerHTML=tpTabelaServicos(aprovados);
+  const listaProximo=el('tp-lista-proximo-aprovados');
+  if(listaProximo)listaProximo.innerHTML='<h4 style="font-size:.8rem;margin:14px 0 6px">Chamados aprovados do próximo período · '+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</h4>'+tpTabelaServicos(aprovadosProximo);
 }
 function rTpp(){
-  const resumo=el('tp-resumo-periodo'),lista=el('tp-lista-periodo');if(!resumo||!lista||!S?.u)return;
+  const resumo=el('tp-resumo-periodo'),lista=el('tp-lista-periodo'),listaProximo=el('tp-lista-proximo-periodo');if(!resumo||!lista||!S?.u)return;
   const inicio=el('tp-dt1')?.value||'',fim=el('tp-dt2')?.value||'';
-  if(!inicio||!fim||fim<inicio){resumo.innerHTML='<div class="empty">Informe uma data inicial e final válidas.</div>';lista.innerHTML='';return;}
+  if(!inicio||!fim||fim<inicio){resumo.innerHTML='<div class="empty">Informe uma data inicial e final válidas.</div>';lista.innerHTML='';if(listaProximo)listaProximo.innerHTML='';return;}
   const aprovados=tpChamadosAprovados(inicio,fim);
   const bruto=totalAprovadoServicos(aprovados);
   const pago=tpPagamentoDentroDoPeriodo(inicio,fim);
@@ -3824,6 +3850,7 @@ function rTpp(){
   const provisionado=Math.max(0,totalAprovadoServicos(aprovadosProximo)-tpPagamentoDentroDoPeriodo(proximo.inicio,proximo.fim));
   resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados neste período</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">A receber neste período</div><div class="v">'+escM(rlValorMoeda(aReceber))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>'+(pago?'<p class="info">Pedidos já enviados neste período: '+escM(rlValorMoeda(pago))+'</p>':'');
   lista.innerHTML=tpTabelaServicos(aprovados);
+  if(listaProximo)listaProximo.innerHTML='<h4 style="font-size:.8rem;margin:14px 0 6px">Chamados aprovados do próximo período · '+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</h4>'+tpTabelaServicos(aprovadosProximo);
 }
 
 function rTar(dt1, dt2) {
@@ -6235,11 +6262,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/entry-cards.js?v=2.6.7"></script>
+<script src="/entry-cards.js?v=2.6.8"></script>
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.7"></script>
+<script src="/release-info.js?v=2.6.8"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
