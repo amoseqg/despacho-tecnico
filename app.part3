@@ -3145,13 +3145,19 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     const naoValidadosTec=ativos.filter(c=>statusValidacaoTecnica(c)==='nao_validado').length;
     const validacaoTecnicaHtml='<div style="line-height:1.8;white-space:nowrap"><div>✅ Validado: '+validadosTec+'</div><div>⏳ Aguardando validação: '+aguardandoTec+'</div>'+(naoValidadosTec?'<button type="button" class="btn btn-rl-validacao-nao" data-u="'+esc(u)+'" style="border:0;background:none;padding:0;color:#b91c1c;font:inherit;cursor:pointer;text-decoration:underline">❌ Não validado: '+naoValidadosTec+'</button>':'<div>❌ Não validado: 0</div>')+'</div>';
     const chamadosAprovados=ativos.filter(c=>c.ap?.status==='aprovado');
-    const totalVal=totalAprovadoServicos(chamadosAprovados);
+    const totalPeriodo=totalAprovadoServicos(chamadosAprovados);
+    const todosChamadosAprovados=servicosPagamentoUnicos(D.ch.filter(c=>c.st==='concluida'))
+      .filter(c=>c.te===u&&!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
+    const totalVal=totalAprovadoServicos(todosChamadosAprovados);
+    const tecnicoId=D.tc.find(x=>x.u===u)?._id;
     const temPeriodo=!!(RL_DT1_ATUAL&&RL_DT2_ATUAL);
-    const valorPago=rlValorPagoDentroDoFiltro(D.tc.find(x=>x.u===u)?._id,RL_DT1_ATUAL,RL_DT2_ATUAL);
-    const saldoAprovado=Math.max(0,totalVal-valorPago);
+    const valorPagoTotal=rlValorPagoDentroDoFiltro(tecnicoId,'','');
+    const saldoAprovado=Math.max(0,totalVal-valorPagoTotal);
+    const valorPagoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,RL_DT1_ATUAL,RL_DT2_ATUAL);
+    const saldoPeriodo=Math.max(0,totalPeriodo-valorPagoPeriodo);
     const totalStr=rlValorMoeda(saldoAprovado);
-    const periodoStr=temPeriodo?rlValorMoeda(totalVal):'—';
-    RL_PERIODOS_VALORES.set(u,{bruto:totalVal,pago:valorPago,saldo:saldoAprovado,periodoInicio:RL_DT1_ATUAL,periodoFim:RL_DT2_ATUAL});
+    const periodoStr=temPeriodo?rlValorMoeda(saldoPeriodo):'—';
+    RL_PERIODOS_VALORES.set(u,{bruto:totalPeriodo,pago:valorPagoPeriodo,saldo:saldoPeriodo,saldoTotal:saldoAprovado,periodoInicio:RL_DT1_ATUAL,periodoFim:RL_DT2_ATUAL});
     RL_PEDIDOS_TOTAL_ATUAL.set(u,saldoAprovado);
     const regBadge = t.regiao === 'capital' ? '<span class="badge b-capital">Capital</span>' : '<span class="badge b-interior">Interior</span>';
     const historico = t.chamados.some(c => c.ex?.pagamentoExcluido)
@@ -6185,11 +6191,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/entry-cards.js?v=2.6.4"></script>
+<script src="/entry-cards.js?v=2.6.5"></script>
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.2"></script>
+<script src="/release-info.js?v=2.6.5"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
