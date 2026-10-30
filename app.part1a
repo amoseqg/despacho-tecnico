@@ -834,7 +834,10 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
           <div class="form-group"><label class="label" for="rl-hist-dt2">Encerrado no portal até</label><input type="date" id="rl-hist-dt2" class="input"></div>
           <div class="form-group"><label class="label" for="rl-hist-busca">Buscar protocolo, SDM, site ou técnico</label><input type="search" id="rl-hist-busca" class="input" placeholder="Digite para localizar"></div>
         </div>
-        <button type="button" class="btn btn-p" id="btn-rl-historico-encerramentos" onclick="rRlHistoricoEncerramentos()">🔍 Consultar histórico</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-p" id="btn-rl-historico-encerramentos" onclick="rRlHistoricoEncerramentos()">🔍 Consultar histórico</button>
+          <button type="button" class="btn btn-r" id="btn-rl-limpar-informacao" onclick="rlLimparInformacaoHistorico()" title="Ocultar do relatório os encerramentos já registrados">🧹 Limpar informação</button>
+        </div>
         <div id="rl-historico-encerramentos" style="margin-top:10px"><div class="empty">Informe os filtros e clique em “Consultar histórico”.</div></div>
       </div>
       <div id="rl-cards"></div>
