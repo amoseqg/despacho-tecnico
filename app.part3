@@ -847,7 +847,12 @@ function admTab(btn, a) {
   }
   if (a === 'ch') rCh();
   if (a === 'at') rAt();
-  if (a === 'rl') rRl();
+  if (a === 'rl') {
+    const inicio=el('rl-dt1'),fim=el('rl-dt2');
+    if(inicio&&!inicio.value)inicio.value='2026-10-15';
+    if(fim&&!fim.value)fim.value='2026-10-28';
+    rRl(inicio?.value||'2026-10-15',fim?.value||'2026-10-28',true);
+  }
   if (a === 'ml') rMl();
   if (a === 'ad') rAd();
   if (a === 'vi') renderVistorias();
@@ -861,7 +866,7 @@ function admTab(btn, a) {
 function tecTab(btn, a) {
   document.querySelectorAll('#nv2 button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','dp','at','co','ar','mt','lab'].forEach(x => {
+  ['db','dp','at','co','ar','pg','pp','mt','lab'].forEach(x => {
     const e = el('t-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -870,6 +875,8 @@ function tecTab(btn, a) {
   if (a === 'at') rTat();
   if (a === 'co') rTco();
   if (a === 'ar') rTar();
+  if (a === 'pg') { rTap(); void tpCarregarPagamentos(); }
+  if (a === 'pp') { rTpp(); void tpCarregarPagamentos(); }
   if (a === 'mt') rTmat();
   if (a === 'lab' && window.NexoFieldLab) window.NexoFieldLab.renderTech();
 }
@@ -2839,13 +2846,39 @@ let RL_DT2_ATUAL = '';
 let RL_CARDS_OCULTOS = localStorage.getItem('nf-rl-cards-ocultos') === '1';
 let RL_PEDIDOS_APROVACAO = new Map();
 let RL_PEDIDOS_TOTAL_ATUAL = new Map();
+let RL_PERIODOS_VALORES = new Map();
+let RL_PAGAMENTOS_PERIODOS = new Map();
+let RL_PEDIDOS_CARREGANDO = false;
+let RL_PEDIDOS_CARREGADOS = false;
+let TPAGAMENTOS = [];
+let TPAG_CARREGANDO = false;
+let TPAG_CARREGADO_EM = 0;
+
+function rlPeriodoKey(tecnicoId,inicio,fim){return String(tecnicoId||'')+'|'+String(inicio||'')+'|'+String(fim||'');}
+function rlValorPagoDentroDoFiltro(tecnicoId,inicio,fim){
+  let total=0;
+  for(const pagamento of RL_PAGAMENTOS_PERIODOS.values()){
+    if(pagamento.tecnico_id!==tecnicoId)continue;
+    if(inicio&&pagamento.periodo_inicio<inicio)continue;
+    if(fim&&pagamento.periodo_fim>fim)continue;
+    total+=Number(pagamento.valor)||0;
+  }
+  return total;
+}
+function rlPagamentoDoPeriodo(tecnicoId,inicio,fim){return RL_PAGAMENTOS_PERIODOS.get(rlPeriodoKey(tecnicoId,inicio,fim))||null;}
+function valorAprovadoServico(chamado){return chamado?.ex?.pagamentoExcluido||chamado?.ap?.status!=='aprovado'?0:(Number(numeroExcel(chamado?.ex?.total))||0);}
+function totalAprovadoServicos(chamados){return chamados.reduce((total,chamado)=>total+valorAprovadoServico(chamado),0);}
+function pagoTecnicoParaData(pagamentos,data){const iso=data?dataBrasilISO(data):'';return !!iso&&(pagamentos||[]).some(p=>p.periodo_inicio<=iso&&p.periodo_fim>=iso);}
 
 function rlValorMoeda(valor){
   return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(valor)||0);
 }
 
 function rlPedidoHtml(usuario){
-  const perfil=D.tc.find(t=>t.u===usuario),pedido=perfil?RL_PEDIDOS_APROVACAO.get(perfil._id):null;
+  const perfil=D.tc.find(t=>t.u===usuario),pedidoSalvo=perfil?RL_PEDIDOS_APROVACAO.get(perfil._id):null;
+  const pago=perfil&&RL_DT1_ATUAL&&RL_DT2_ATUAL?rlPagamentoDoPeriodo(perfil._id,RL_DT1_ATUAL,RL_DT2_ATUAL):null;
+  if(pago)return `<div><span class="badge b-aprovado">✅ Pedido ${esc(pago.numero_pedido)} enviado</span><small style="display:block;margin-top:5px;color:#526273">${esc(rlValorMoeda(pago.valor))} · ${esc(formatarDataBrasil(pago.enviado_em))}</small></div>`;
+  const pedido=pedidoSalvo&&pedidoSalvo.periodo_inicio===RL_DT1_ATUAL&&pedidoSalvo.periodo_fim===RL_DT2_ATUAL?pedidoSalvo:null;
   if(!pedido)return `<button type="button" class="btn btn-rl-pedido" data-u="${esc(usuario)}" style="border:0;border-radius:8px;padding:7px 12px;background:#e8f0ff;color:#174ea6;font-weight:700;cursor:pointer">Pedido</button>`;
   const status=pedido.status==='enviado'
     ? `<small style="display:block;margin-top:5px;color:#137333">✅ Enviado${pedido.email_enviado_em?' em '+esc(formatarDataBrasil(pedido.email_enviado_em)):''}</small>`
@@ -2865,35 +2898,54 @@ function rlAtualizarCelulasPedido(){
   });
 }
 
-async function rlCarregarPedidosAprovacao(){
-  if(S?.t!=='adm'||!SB)return;
+async async function rlCarregarPedidosAprovacao(){
+  if(S?.t!=='adm'||!SB||RL_PEDIDOS_CARREGANDO||RL_PEDIDOS_CARREGADOS)return;
   const ids=D.tc.filter(t=>t._id).map(t=>t._id);
   if(!ids.length)return;
+  RL_PEDIDOS_CARREGANDO=true;
   try{
-    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos')
-      .select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em')
-      .in('tecnico_id',ids));
-    if(error)throw error;
-    RL_PEDIDOS_APROVACAO=new Map((data||[]).map(p=>[p.tecnico_id,p]));
+    const [pedidos,pagamentos]=await Promise.all([
+      sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos')
+        .select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em,periodo_inicio,periodo_fim')
+        .in('tecnico_id',ids)),
+      sbExecutarComSessaoAdmin(()=>SB.from('pagamentos_periodos_tecnicos')
+        .select('id,tecnico_id,periodo_inicio,periodo_fim,numero_pedido,valor,email_destinatario,enviado_em')
+        .in('tecnico_id',ids))
+    ]);
+    if(pedidos.error)throw pedidos.error;
+    if(pagamentos.error)throw pagamentos.error;
+    RL_PEDIDOS_APROVACAO=new Map((pedidos.data||[]).map(p=>[p.tecnico_id,p]));
+    RL_PAGAMENTOS_PERIODOS=new Map((pagamentos.data||[]).map(p=>[rlPeriodoKey(p.tecnico_id,p.periodo_inicio,p.periodo_fim),p]));
+    RL_PEDIDOS_CARREGADOS=true;
     rlAtualizarCelulasPedido();
-  }catch(error){sbShowError('Não foi possível carregar os pedidos de aprovação',error);}
+    if(!el('v-rl')?.classList.contains('hidden'))rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
+  }catch(error){sbShowError('Não foi possível carregar os pedidos e pagamentos por período',error);}
+  finally{RL_PEDIDOS_CARREGANDO=false;}
 }
 
 async function rlAbrirPedido(usuario){
   if(S?.t!=='adm')return;
   const perfil=D.tc.find(t=>t.u===usuario);
   if(!perfil?._id){nfToast('Não foi possível localizar o cadastro deste técnico.','erro');return;}
-  const pedidoAtual=RL_PEDIDOS_APROVACAO.get(perfil._id)||null;
+  const periodoInicio=RL_DT1_ATUAL,periodoFim=RL_DT2_ATUAL;
+  if(!periodoInicio||!periodoFim||periodoFim<periodoInicio){nfToast('Selecione as datas do período aprovado antes de gerar o pedido.','erro');return;}
+  if(!RL_PEDIDOS_CARREGADOS){nfToast('Aguarde o carregamento dos valores de pagamento e tente novamente.','');return;}
+  const pagamentoExistente=rlPagamentoDoPeriodo(perfil._id,periodoInicio,periodoFim);
+  if(pagamentoExistente){nfToast('Este período já foi enviado para pagamento.','');return;}
+  const pedidoSalvo=RL_PEDIDOS_APROVACAO.get(perfil._id)||null;
+  const pedidoAtual=pedidoSalvo?.periodo_inicio===periodoInicio&&pedidoSalvo?.periodo_fim===periodoFim?pedidoSalvo:null;
+  const resumo=RL_PERIODOS_VALORES.get(usuario)||{bruto:0,pago:0,saldo:0};
   const email=String(perfil.e||'').trim();
-  const valorAtual=pedidoAtual?Number(pedidoAtual.valor)||0:Number(RL_PEDIDOS_TOTAL_ATUAL.get(usuario)||0);
+  const valorAtual=pedidoAtual?Number(pedidoAtual.valor)||0:Number(resumo.saldo)||0;
+  const valorBruto=Number(resumo.bruto)||0;
   const dialog=document.createElement('dialog');
   dialog.style.cssText='width:min(620px,calc(100% - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:22px;box-shadow:0 24px 70px #0005;color:#16324f;font-family:system-ui';
   dialog.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0">Pedido para emissão de nota fiscal</h3><p style="margin:5px 0 0;color:#526273">${esc(perfil.n)}</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>
-    <div style="margin:16px 0;padding:12px;border-radius:10px;background:#f3f6fb"><div><b>Valor dos serviços:</b> ${esc(rlValorMoeda(valorAtual))}</div><div style="margin-top:5px"><b>E-mail do técnico:</b> ${esc(email||'Não cadastrado')}</div></div>
+    <div style="margin:16px 0;padding:12px;border-radius:10px;background:#f3f6fb"><div><b>Período aprovado:</b> ${esc(formatarDataBrasil(periodoInicio))} a ${esc(formatarDataBrasil(periodoFim))}</div><div style="margin-top:5px"><b>Serviços aprovados no período:</b> ${esc(rlValorMoeda(valorBruto))}</div><div style="margin-top:5px"><b>Valor deste pedido:</b> ${esc(rlValorMoeda(valorAtual))}</div><div style="margin-top:5px"><b>E-mail do técnico:</b> ${esc(email||'Não cadastrado')}</div></div>
     <label style="display:block;font-weight:650">Número do pedido<input id="rl-numero-pedido" class="input" maxlength="100" autocomplete="off" placeholder="Digite o número do pedido" value="${esc(pedidoAtual?.numero_pedido||'')}" style="display:block;width:100%;margin-top:6px"></label>
-    <div id="rl-pedido-status" role="status" aria-live="polite" style="min-height:24px;margin-top:10px;color:${pedidoAtual?.status==='enviado'?'#137333':'#9a6700'}">${pedidoAtual?pedidoAtual.status==='enviado'?'✅ Pedido marcado como enviado.':'⏳ Pedido salvo; falta confirmar o envio pelo e-mail.':'Informe o número do pedido para continuar.'}</div>
-    <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn btn-p" data-preparar>${pedidoAtual?'Salvar e abrir e-mail':'Salvar pedido e abrir e-mail'}</button><button type="button" class="btn btn-g" data-enviado ${!pedidoAtual||pedidoAtual.status==='enviado'?'disabled':''}>Confirmar que enviei</button></div>
-    <p style="margin:10px 0 0;color:#667085;font-size:12px">O e-mail será aberto no programa configurado. Depois de enviar a mensagem, clique em “Confirmar que enviei” para registrar o status no portal.</p>`;
+    <div id="rl-pedido-status" role="status" aria-live="polite" style="min-height:24px;margin-top:10px;color:${pedidoAtual?.status==='enviado'?'#137333':'#9a6700'}">${valorAtual<=0?'Não há saldo aprovado disponível neste período.':pedidoAtual?pedidoAtual.status==='enviado'?'✅ Pedido marcado como enviado.':'⏳ Pedido salvo; falta confirmar o envio pelo e-mail.':'Informe o número do pedido para continuar.'}</div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn btn-p" data-preparar ${valorAtual<=0?'disabled':''}>${pedidoAtual?'Salvar e abrir e-mail':'Salvar pedido e abrir e-mail'}</button><button type="button" class="btn btn-g" data-enviado ${!pedidoAtual||pedidoAtual.status==='enviado'||valorAtual<=0?'disabled':''}>Confirmar que enviei</button></div>
+    <p style="margin:10px 0 0;color:#667085;font-size:12px">O valor do pedido corresponde ao saldo dos serviços aprovados neste período. O saldo será descontado depois que o envio for confirmado.</p>`;
   document.body.append(dialog);
   const status=dialog.querySelector('#rl-pedido-status');
   const campoNumero=dialog.querySelector('#rl-numero-pedido');
@@ -2907,19 +2959,20 @@ async function rlAbrirPedido(usuario){
     event.preventDefault();
     const numero=campoNumero.value.trim();
     if(!numero){mostrarStatus('Informe o número do pedido.','#b42318');campoNumero.focus();return;}
+    if(valorAtual<=0){mostrarStatus('Não há saldo aprovado disponível neste período.','#b42318');return;}
     if(!emailValido(email)){mostrarStatus('O cadastro do técnico não possui um e-mail válido. Corrija o e-mail do perfil antes de salvar.','#b42318');return;}
     botaoSalvar.disabled=true;
     mostrarStatus('Salvando pedido...');
     try{
       const admin=await sbExigirSessaoAdmin();
       const mesmoPedidoEnviado=pedidoAtual?.numero_pedido===numero&&pedidoAtual?.status==='enviado';
-      const registro={tecnico_id:perfil._id,numero_pedido:numero,valor:valorAtual,status:mesmoPedidoEnviado?'enviado':'aguardando_envio',email_destinatario:email,email_enviado_em:mesmoPedidoEnviado?pedidoAtual.email_enviado_em:null,atualizado_em:new Date().toISOString(),criado_por:admin.id};
-      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos').upsert(registro,{onConflict:'tecnico_id'}).select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em').single());
+      const registro={tecnico_id:perfil._id,numero_pedido:numero,valor:valorAtual,status:mesmoPedidoEnviado?'enviado':'aguardando_envio',email_destinatario:email,email_enviado_em:mesmoPedidoEnviado?pedidoAtual.email_enviado_em:null,periodo_inicio:periodoInicio,periodo_fim:periodoFim,atualizado_em:new Date().toISOString(),criado_por:admin.id};
+      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos').upsert(registro,{onConflict:'tecnico_id'}).select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em,periodo_inicio,periodo_fim').single());
       if(error)throw error;
       RL_PEDIDOS_APROVACAO.set(perfil._id,data);
       rlAtualizarCelulasPedido();
       const assunto=encodeURIComponent(`Pedido ${numero} — emissão de nota fiscal`);
-      const corpo=encodeURIComponent(`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`);
+      const corpo=encodeURIComponent(`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nPeríodo aprovado: ${formatarDataBrasil(periodoInicio)} a ${formatarDataBrasil(periodoFim)}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`);
       if(data.status==='enviado'){
         mostrarStatus('✅ Este pedido já está registrado como enviado.','#137333');
         botaoConfirmar.disabled=true;
@@ -2939,23 +2992,9 @@ async function rlAbrirPedido(usuario){
     event.preventDefault();
     const numeroDigitado=campoNumero.value.trim();
     let registro=RL_PEDIDOS_APROVACAO.get(perfil._id)||null;
-    if(!registro){
-      mostrarStatus('Localizando o pedido salvo...');
-      try{
-        const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos')
-          .select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em')
-          .eq('tecnico_id',perfil._id).maybeSingle());
-        if(error)throw error;
-        if(data){registro=data;RL_PEDIDOS_APROVACAO.set(perfil._id,data);}
-      }catch(error){
-        sbShowError('Não foi possível localizar o pedido salvo',error);
-        mostrarStatus('Não foi possível localizar o pedido. Tente novamente.','#b42318');
-        return;
-      }
-    }
-    if(!registro){
-      mostrarStatus('Nenhum pedido foi salvo ainda. Informe o número e clique em “Salvar pedido e abrir e-mail”.','#b42318');
-      campoNumero.focus();
+    if(!registro||registro.periodo_inicio!==periodoInicio||registro.periodo_fim!==periodoFim){
+      mostrarStatus('Salve o pedido deste período antes de confirmar o envio.','#b42318');
+      botaoSalvar.focus();
       return;
     }
     if(numeroDigitado!==String(registro.numero_pedido||'')){
@@ -2972,18 +3011,19 @@ async function rlAbrirPedido(usuario){
     mostrarStatus('Registrando a confirmação de envio...');
     try{
       await sbExigirSessaoAdmin();
-      const enviadoEm=new Date().toISOString();
-      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos')
-        .update({status:'enviado',email_enviado_em:enviadoEm,atualizado_em:enviadoEm})
-        .eq('tecnico_id',perfil._id)
-        .eq('numero_pedido',registro.numero_pedido)
-        .select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em')
-        .maybeSingle());
+      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.rpc('confirmar_pagamento_periodo_tecnico',{
+        p_tecnico_id:perfil._id,p_periodo_inicio:periodoInicio,p_periodo_fim:periodoFim,
+        p_numero_pedido:registro.numero_pedido,p_valor:Number(registro.valor),p_email_destinatario:registro.email_destinatario
+      }));
       if(error)throw error;
-      if(!data)throw new Error('O banco não confirmou a atualização. Recarregue a lista de pedidos e tente novamente.');
-      RL_PEDIDOS_APROVACAO.set(perfil._id,data);
-      rlAtualizarCelulasPedido();
-      mostrarStatus('✅ Envio confirmado e registrado.','#137333');
+      const pagamento=Array.isArray(data)?data[0]:data;
+      if(!pagamento?.id)throw new Error('O banco não confirmou o pagamento deste período.');
+      RL_PAGAMENTOS_PERIODOS.set(rlPeriodoKey(perfil._id,periodoInicio,periodoFim),pagamento);
+      registro={...registro,status:'enviado',email_enviado_em:pagamento.enviado_em||new Date().toISOString()};
+      RL_PEDIDOS_APROVACAO.set(perfil._id,registro);
+      RL_PEDIDOS_CARREGADOS=true;
+      mostrarStatus('✅ Envio confirmado; o valor foi descontado do saldo aprovado.','#137333');
+      rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
     }catch(error){
       sbShowError('Não foi possível registrar o envio',error);
       mostrarStatus('Não foi possível registrar o envio. Veja a mensagem exibida e tente novamente.','#b42318');
@@ -3055,7 +3095,7 @@ function abrirDetalheRelatorioServicos(usuario,tipo){
  dialog.querySelector('.fechar-rel-servicos').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
 }
 
-function rRl(dt1, dt2, forcarExibicao) {
+function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   const container = el('rl-cards');
   if(!container) return;
   renderRelatoriosQualidade();
@@ -3104,16 +3144,15 @@ function rRl(dt1, dt2, forcarExibicao) {
     const aguardandoTec=ativos.filter(c=>statusValidacaoTecnica(c)==='aguardando_validacao').length;
     const naoValidadosTec=ativos.filter(c=>statusValidacaoTecnica(c)==='nao_validado').length;
     const validacaoTecnicaHtml='<div style="line-height:1.8;white-space:nowrap"><div>✅ Validado: '+validadosTec+'</div><div>⏳ Aguardando validação: '+aguardandoTec+'</div>'+(naoValidadosTec?'<button type="button" class="btn btn-rl-validacao-nao" data-u="'+esc(u)+'" style="border:0;background:none;padding:0;color:#b91c1c;font:inherit;cursor:pointer;text-decoration:underline">❌ Não validado: '+naoValidadosTec+'</button>':'<div>❌ Não validado: 0</div>')+'</div>';
-    let totalVal = 0;
-    ativos.forEach(c => {
-      if (c.ex?.total) {
-        const v = numeroExcel(c.ex.total);
-        if (!isNaN(v)) totalVal += v;
-      }
-    });
-
-    const totalStr = 'R$ ' + totalVal.toFixed(2).replace('.', ',');
-    RL_PEDIDOS_TOTAL_ATUAL.set(u,totalVal);
+    const chamadosAprovados=ativos.filter(c=>c.ap?.status==='aprovado');
+    const totalVal=totalAprovadoServicos(chamadosAprovados);
+    const temPeriodo=!!(RL_DT1_ATUAL&&RL_DT2_ATUAL);
+    const valorPago=rlValorPagoDentroDoFiltro(D.tc.find(x=>x.u===u)?._id,RL_DT1_ATUAL,RL_DT2_ATUAL);
+    const saldoAprovado=Math.max(0,totalVal-valorPago);
+    const totalStr=rlValorMoeda(saldoAprovado);
+    const periodoStr=temPeriodo?rlValorMoeda(totalVal):'—';
+    RL_PERIODOS_VALORES.set(u,{bruto:totalVal,pago:valorPago,saldo:saldoAprovado,periodoInicio:RL_DT1_ATUAL,periodoFim:RL_DT2_ATUAL});
+    RL_PEDIDOS_TOTAL_ATUAL.set(u,saldoAprovado);
     const regBadge = t.regiao === 'capital' ? '<span class="badge b-capital">Capital</span>' : '<span class="badge b-interior">Interior</span>';
     const historico = t.chamados.some(c => c.ex?.pagamentoExcluido)
       ? '<small style="display:block;margin-top:2px;color:#708096;font-size:10px">Há valores excluídos no histórico</small>'
@@ -3121,21 +3160,22 @@ function rRl(dt1, dt2, forcarExibicao) {
 
     return `<tr class="btn-ver-pl" data-u="${esc(u)}" title="Clique para ver os serviços deste técnico" style="cursor:pointer">
       <td><span style="font-size:12px;font-weight:650">${esc(t.nome)}</span>${historico}</td>
-      <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
+      <td style="white-space:nowrap">${periodoStr}</td>
       <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
+      <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
       <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
       <td>${validacaoTecnicaHtml}</td><td>${regBadge}</td><td class="rl-pedido-cell" data-u="${esc(u)}">${rlPedidoHtml(u)}</td>
     </tr>`;
   }).join('');
 
   container.innerHTML = `<div style="overflow-x:auto">
-    <table class="table" style="width:100%;min-width:1040px;font-size:12px">
-      <thead><tr><th>Técnico</th><th>Valor</th><th>Serviços aprovados</th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
+    <table class="table" style="width:100%;min-width:1250px;font-size:12px">
+      <thead><tr><th>Técnico</th><th>Período aprovado (10 dias úteis)</th><th>Serviços aprovados</th><th>Saldo serviços aprovados</th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
   rlAtualizarCelulasPedido();
-  void rlCarregarPedidosAprovacao();
+  if(carregarPedidos)void rlCarregarPedidosAprovacao();
   container.querySelectorAll('.btn-rl-validacao-nao').forEach(button => {
     button.addEventListener('click', event => {
       event.preventDefault();
@@ -3686,6 +3726,56 @@ function abrirMotivosValidacaoTecnica(usuario){
   dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><h3 style="margin:0">Não validados — '+esc(tec?.n||nt(usuario))+'</h3><button type="button" class="btn btn-s fechar">Fechar</button></div>'+(itens||'<p class="empty">Nenhum serviço não validado neste período.</p>');
   dialog.querySelector('.fechar').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
 }
+function tpPagamentoDentroDoPeriodo(inicio,fim){
+  return TPAGAMENTOS.filter(p=>(!inicio||p.periodo_inicio>=inicio)&&(!fim||p.periodo_fim<=fim)).reduce((s,p)=>s+(Number(p.valor)||0),0);
+}
+function tpChamadosAprovados(inicio,fim){
+  let lista=D.ch.filter(c=>c.te===S?.u&&c.st==='concluida');
+  if(inicio)lista=lista.filter(c=>!!dataEncerramentoChamado(c)&&dataBrasilISO(dataEncerramentoChamado(c))>=inicio);
+  if(fim)lista=lista.filter(c=>!!dataEncerramentoChamado(c)&&dataBrasilISO(dataEncerramentoChamado(c))<=fim);
+  return servicosPagamentoUnicos(lista).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
+}
+function tpTabelaServicos(lista){
+  if(!lista.length)return '<div class="empty">Nenhum serviço aprovado neste intervalo.</div>';
+  const rows=lista.map(c=>{
+    const data=dataEncerramentoChamado(c),iso=data?dataBrasilISO(data):'';
+    const pago=pagoTecnicoParaData(TPAGAMENTOS,data);
+    return '<tr><td>'+escM(c.pr||'—')+'</td><td>'+escM(c.si||'—')+'</td><td>'+(data?escM(formatarDataBrasil(data)):'—')+'</td><td>'+escM(rlValorMoeda(valorAprovadoServico(c)))+'</td><td><span class="badge '+(pago?'b-aprovado':'b-pag-pendente')+'">'+(pago?'Enviado para pagamento':'Saldo aprovado')+'</span></td></tr>';
+  }).join('');
+  return '<div style="overflow-x:auto"><table class="table"><thead><tr><th>Protocolo</th><th>Site / Cliente</th><th>Data</th><th>Valor</th><th>Pagamento</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+async function tpCarregarPagamentos(forcar=false){
+  if(S?.t!=='tec'||!SB||!SB_PROFILE?.id||TPAG_CARREGANDO)return;
+  if(!forcar&&TPAG_CARREGADO_EM&&Date.now()-TPAG_CARREGADO_EM<30000)return;
+  TPAG_CARREGANDO=true;
+  try{
+    const {data,error}=await SB.from('pagamentos_periodos_tecnicos').select('id,tecnico_id,periodo_inicio,periodo_fim,numero_pedido,valor,email_destinatario,enviado_em').eq('tecnico_id',SB_PROFILE.id).order('periodo_inicio',{ascending:false});
+    if(error)throw error;
+    TPAGAMENTOS=data||[];TPAG_CARREGADO_EM=Date.now();
+  }catch(error){sbShowError('Não foi possível carregar seus pagamentos aprovados',error);}
+  finally{TPAG_CARREGANDO=false;if(sbPainelVisivel('t-pg'))rTap();if(sbPainelVisivel('t-pp'))rTpp();}
+}
+function rTap(){
+  const resumo=el('tp-resumo-aprovados'),lista=el('tp-lista-aprovados');if(!resumo||!lista||!S?.u)return;
+  const aprovados=tpChamadosAprovados('','');
+  const total=totalAprovadoServicos(aprovados);
+  const pago=TPAGAMENTOS.reduce((s,p)=>s+(Number(p.valor)||0),0);
+  const saldo=Math.max(0,total-pago);
+  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">Valor aprovado</div><div class="v">'+escM(rlValorMoeda(total))+'</div></div><div class="card stat g"><div class="l">Saldo disponível</div><div class="v">'+escM(rlValorMoeda(saldo))+'</div></div></div>';
+  lista.innerHTML=tpTabelaServicos(aprovados);
+}
+function rTpp(){
+  const resumo=el('tp-resumo-periodo'),lista=el('tp-lista-periodo');if(!resumo||!lista||!S?.u)return;
+  const inicio=el('tp-dt1')?.value||'',fim=el('tp-dt2')?.value||'';
+  if(!inicio||!fim||fim<inicio){resumo.innerHTML='<div class="empty">Informe uma data inicial e final válidas.</div>';lista.innerHTML='';return;}
+  const aprovados=tpChamadosAprovados(inicio,fim);
+  const bruto=totalAprovadoServicos(aprovados);
+  const pago=tpPagamentoDentroDoPeriodo(inicio,fim);
+  const saldo=Math.max(0,bruto-pago);
+  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados no período</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">Aprovado no período</div><div class="v">'+escM(rlValorMoeda(bruto))+'</div></div><div class="card stat g"><div class="l">Saldo após pedidos enviados</div><div class="v">'+escM(rlValorMoeda(saldo))+'</div></div></div>'+(pago?'<p class="info">Pedidos já enviados neste período: '+escM(rlValorMoeda(pago))+'</p>':'');
+  lista.innerHTML=tpTabelaServicos(aprovados);
+}
+
 function rTar(dt1, dt2) {
   const tb = el('tb-ar-body');
   if(!tb) return;
@@ -4475,20 +4565,31 @@ function gerarConsolidadoPagamentos() {
   const usadas = new Set(['TOTAL','LPU']);
   const abas = Object.keys(grupos).map(u => ({u, nome:nt(u) || u || 'Técnico', aba:nomeAbaExcel(nt(u) || u || 'Técnico', usadas), chamados:grupos[u]}));
   const periodo = (dt1 && dt2) ? new Date(dt1+'T00:00:00').toLocaleDateString('pt-BR') + ' A ' + new Date(dt2+'T00:00:00').toLocaleDateString('pt-BR') : 'BASE COMPLETA';
-  const totalDados = [['TOTAL - PERÍODO ' + periodo],[],['PARCEIRO','VALOR TOTAL','QTDE OS','APROVADAS','PENDENTES','REJEITADAS']];
-  abas.forEach(a => totalDados.push([
-    a.nome,
-    a.chamados.reduce((s,c)=>s+numeroExcel(c.ex && c.ex.total),0),
-    a.chamados.length,
-    a.chamados.filter(c=>c.ap&&c.ap.status==='aprovado').length,
-    a.chamados.filter(c=>!c.ap||c.ap.status==='pendente').length,
-    a.chamados.filter(c=>c.ap&&c.ap.status==='rejeitado').length
-  ]));
-  totalDados.push([],['VALOR TOTAL',list.reduce((s,c)=>s+numeroExcel(c.ex&&c.ex.total),0),list.length]);
+  const totalDados = [['TOTAL - PERÍODO ' + periodo],[],['PARCEIRO','APROVADO NO PERÍODO','SERVIÇOS APROVADOS','SALDO APROVADO','QTDE OS','PENDENTES','REJEITADAS']];
+  abas.forEach(a => {
+    const aprovados=a.chamados.filter(c=>c.ap?.status==='aprovado'&&!c.ex?.pagamentoExcluido);
+    const bruto=totalAprovadoServicos(aprovados);
+    const tecnicoId=D.tc.find(t=>t.u===a.u)?._id;
+    const pago=rlValorPagoDentroDoFiltro(tecnicoId,dt1,dt2);
+    totalDados.push([
+      a.nome,
+      dt1&&dt2?bruto:'—',
+      aprovados.length,
+      Math.max(0,bruto-pago),
+      a.chamados.length,
+      a.chamados.filter(c=>!c.ap||c.ap.status==='pendente').length,
+      a.chamados.filter(c=>c.ap&&c.ap.status==='rejeitado').length
+    ]);
+  });
+  const aprovadoPeriodo=dt1&&dt2?totalAprovadoServicos(list.filter(c=>c.ap?.status==='aprovado')):'—';
+  const saldoTotal=Math.max(0,totalAprovadoServicos(list.filter(c=>c.ap?.status==='aprovado'))-abas.reduce((s,a)=>s+rlValorPagoDentroDoFiltro(D.tc.find(t=>t.u===a.u)?._id,dt1,dt2),0));
+  totalDados.push([],['TOTAL',aprovadoPeriodo,list.filter(c=>c.ap?.status==='aprovado').length,saldoTotal,list.length]);
   const wsTotal = XLSX.utils.aoa_to_sheet(totalDados);
-  wsTotal['!merges']=[{s:{r:0,c:0},e:{r:0,c:5}}];
-  wsTotal['!cols']=[{wch:38},{wch:18},{wch:12},{wch:12},{wch:12},{wch:12}];
-  for(let r=4;r<=abas.length+3;r++)if(wsTotal['B'+r])wsTotal['B'+r].z='R$ #,##0.00';
+  wsTotal['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
+  wsTotal['!cols']=[{wch:38},{wch:20},{wch:20},{wch:20},{wch:12},{wch:12},{wch:12}];
+  for(let r=4;r<=abas.length+3;r++){if(wsTotal['B'+r]&&typeof wsTotal['B'+r].v==='number')wsTotal['B'+r].z='R$ #,##0.00';if(wsTotal['D'+r])wsTotal['D'+r].z='R$ #,##0.00';}
+  if(wsTotal['B'+(abas.length+5)]&&typeof wsTotal['B'+(abas.length+5)].v==='number')wsTotal['B'+(abas.length+5)].z='R$ #,##0.00';
+  if(wsTotal['D'+(abas.length+5)])wsTotal['D'+(abas.length+5)].z='R$ #,##0.00';
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,wsTotal,'TOTAL');
   abas.forEach(a=>XLSX.utils.book_append_sheet(wb,criarAbaPagamento(a.nome,a.chamados),a.aba));
@@ -5947,6 +6048,8 @@ function sbRenderizarTelas(){
       else if(sbPainelVisivel('t-at'))rTat();
       else if(sbPainelVisivel('t-co'))rTco();
       else if(sbPainelVisivel('t-ar'))rTar();
+      else if(sbPainelVisivel('t-pg')){rTap();void tpCarregarPagamentos();}
+      else if(sbPainelVisivel('t-pp')){rTpp();void tpCarregarPagamentos();}
       else if(sbPainelVisivel('t-mt'))rTmat();
       else if(sbPainelVisivel('t-lab')&&window.NexoFieldLab)window.NexoFieldLab.render();
       nfAbrirChamadoNotificado();
