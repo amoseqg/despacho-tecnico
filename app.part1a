@@ -830,12 +830,11 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <h3 style="font-size:.85rem;color:var(--p)">🕒 Histórico de encerramento dos protocolos</h3>
         <p class="info">Compare a data de conclusão informada pelo técnico com a data e hora do encerramento no portal.</p>
         <div class="grid-3" style="gap:8px;align-items:end">
-          <div class="form-group"><label class="label" for="rl-hist-dt1">Encerrado no portal a partir de</label><input type="date" id="rl-hist-dt1" class="input"></div>
-          <div class="form-group"><label class="label" for="rl-hist-dt2">Encerrado no portal até</label><input type="date" id="rl-hist-dt2" class="input"></div>
+          <div class="form-group"><label class="label" for="rl-hist-dt1">Encerrado no portal a partir de</label><input type="date" id="rl-hist-dt1" class="input" onchange="rRlHistoricoEncerramentos()"></div>
+          <div class="form-group"><label class="label" for="rl-hist-dt2">Encerrado no portal até</label><input type="date" id="rl-hist-dt2" class="input" onchange="rRlHistoricoEncerramentos()"></div>
           <div class="form-group"><label class="label" for="rl-hist-busca">Buscar protocolo, SDM, site ou técnico</label><input type="search" id="rl-hist-busca" class="input" placeholder="Digite protocolo, SDM, site ou técnico" oninput="rRlHistoricoEncerramentos(true)"></div>
         </div>
-        <button type="button" class="btn btn-p" id="btn-rl-historico-encerramentos" onclick="rRlHistoricoEncerramentos()">🔍 Consultar histórico</button>
-        <div id="rl-historico-encerramentos" style="margin-top:10px"><div class="empty">Digite um protocolo, SDM, site ou técnico. Ao apagar o texto, a listagem será limpa.</div></div>
+        <div id="rl-historico-encerramentos" style="margin-top:10px"><div class="empty">Digite protocolo, SDM, site ou técnico no campo de busca. Os resultados aparecem automaticamente; ao apagar o texto, a lista filtrada é limpa.</div></div>
       </div>
       <div id="rl-cards"></div>
     </div>
