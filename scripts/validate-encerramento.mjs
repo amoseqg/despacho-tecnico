@@ -1,11 +1,12 @@
 import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
-const src=fs.readFileSync('app.part3','utf8');const ctx={S:{n:'Técnico teste'}};
+const src=fs.readFileSync('app.part3','utf8');const ctx={S:{n:'Técnico teste'},el:()=>({value:''})};
+vm.createContext(ctx);
 assert.ok(!src.includes("if(!SB_PROFILE||SB_PROFILE.tipo!=='admin'){alert('Somente administradores podem encerrar chamados.');return;}"),'O encerramento não pode depender apenas do perfil local antes de revalidar a sessão.');
 assert.ok(src.indexOf('const admin=await sbExigirSessaoAdmin();')<src.indexOf('const encerramento=await nfSolicitarEncerramento(c);'),'A sessão administrativa deve ser revalidada antes de solicitar o encerramento.');
 assert.ok(!src.includes('const encerramento=prompt('),'O encerramento administrativo não pode usar prompt bloqueante.');
 assert.match(src,/SB_PROFILE=\{\.\.\.\(SB_PROFILE\|\|\{\}\),\.\.\.perfil\};/,'A validação deve recuperar o perfil administrativo local usando o perfil confirmado pelo servidor.');
-for(const name of ['mascaraEncerramento','corrigirIdentificadoresEncerramento']){
- const fn=src.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))?.[0];assert.ok(fn);vm.runInNewContext(fn,ctx);
+for(const name of ['atividadeSobDemanda','mascaraEncerramento','corrigirIdentificadoresEncerramento']){
+ const fn=src.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))?.[0];assert.ok(fn);vm.runInContext(fn,ctx);
 }
 const c={pr:'3666009',sdm:'SDM-9988',si:'Site',en:'Endereço'};
 const novo=ctx.mascaraEncerramento(c);assert.match(novo,/NUMERO SDM : SDM-9988\nNUMERO MÉTODO: 3666009\n/);
@@ -22,7 +23,7 @@ const inputs={};
 for(const id of ['ex-causa','ex-solucao','ex-validacao','ex-senha','ex-usuario-validacao','ex-relatorio'])inputs[id]={value:'',setCustomValidity(v){this.error=v},reportValidity(){},focus(){}};
 inputs['ex-causa'].options=['','Infracliente','Elétrica cliente','Elétrica concessionária','Mau uso','Vistoria'].map(value=>({value}));
 ctx.el=id=>inputs[id];
-for(const name of ['camposObrigatoriosEncerramento','camposTecnicosEncerramento','trechoCampoEncerramento','preencherCamposEncerramento','sincronizarCamposEncerramento','validarCamposEncerramento'])vm.runInNewContext(src.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))[0],ctx);
+for(const name of ['camposObrigatoriosEncerramento','camposTecnicosEncerramento','trechoCampoEncerramento','preencherCamposEncerramento','sincronizarCamposEncerramento','validarCamposEncerramento'])vm.runInContext(src.match(new RegExp('function '+name+'\\([^]*?\\n\\}'))[0],ctx);
 inputs['ex-relatorio'].value=novo;
 assert.equal(ctx.validarCamposEncerramento(),false);
 const valores=['Infracliente','Troca do cabo\nTeste realizado','Operador confirmou','1234'];

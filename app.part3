@@ -3141,10 +3141,42 @@ function removerBlocosDuplicados(texto){
 let APT = null;
 
 let APSERVICO = null;
-function opApv(tipo,id) {
+async function sbAtualizarAprovacaoChamado(c){
+  if(!c||!sbUUID(c.id))throw new Error('Não foi possível identificar este serviço no servidor.');
+  const {data,error}=await SB.from('aprovacoes')
+    .select('status,observacao,atualizado_em,administrador_id,reenviado')
+    .eq('chamado_id',c.id)
+    .maybeSingle();
+  if(error)throw error;
+  c.ap=data?{status:data.status,obs:data.observacao||'',data:data.atualizado_em,admin:sbNameById(data.administrador_id),reenviado:!!data.reenviado}:null;
+  lsSet('dd',D);
+  return c.ap;
+}
+
+function atualizarTelaAprovacaoServico(c){
+  lsSet('dd',D);
+  rRl(RL_DT1_ATUAL,RL_DT2_ATUAL);
+  rDb();
+  if(PLU)opPl(PLU);
+}
+
+async function opApv(tipo,id) {
   if (!PLU || S?.t!=='adm' || !['aprovado','rejeitado'].includes(tipo)) return;
   const c=D.ch.find(c=>c.id===id && c.te===PLU && c.st==='concluida' && !c.ex?.pagamentoExcluido);
   if(!c)return;
+  if(el('m-ap').classList.contains('a'))return;
+  try{
+    const aprovacao=await sbAtualizarAprovacaoChamado(c);
+    if(aprovacao?.status===tipo){
+      atualizarTelaAprovacaoServico(c);
+      nfToast(tipo==='aprovado'?'Este serviço já está aprovado. A lista foi atualizada.':'Este serviço já está rejeitado. A lista foi atualizada.','info');
+      return;
+    }
+  }catch(err){
+    sbShowError('Não foi possível consultar a situação atual do serviço',err);
+    await sbRecarregarDados();
+    return;
+  }
   APT = tipo; APSERVICO=id;
   el('ap-tit').textContent = tipo === 'aprovado' ? '✅ Aprovar serviço' : '❌ Rejeitar serviço';
   el('ap-in').innerHTML = '<b>OS '+esc(c.pr)+'</b> — '+esc(c.si)+'<br>A decisão será aplicada somente a este serviço.';
@@ -3157,26 +3189,36 @@ async function cfAp() {
   if(S?.t!=='adm' || !APSERVICO || !['aprovado','rejeitado'].includes(APT))return;
   const obs = el('ap-obs').value.trim();
   if (APT === 'rejeitado' && !obs) { alert('Informe o motivo da rejeição'); return; }
-  // A tela oferece "Aprovar" também quando há itens rejeitados e "Rejeitar"
-  // quando há itens aprovados. A confirmação deve seguir a mesma regra visual,
-  // permitindo corrigir a decisão anterior sem deixar o modal travado.
-  const alvos=D.ch.filter(c=>{
-    if(c.id!==APSERVICO || c.te!==PLU || c.st!=='concluida' || c.ex?.pagamentoExcluido) return false;
-    const status=c.ap?.status||'pendente';
-    return APT==='aprovado' ? status!=='aprovado' : status!=='rejeitado';
-  });
-  if(!alvos.length){alert(APT==='aprovado'?'Todos os serviços já estão aprovados.':'Todos os serviços já estão rejeitados.');return;}
+  const servicoId=APSERVICO,acao=APT,tecnico=PLU;
+  const servico=D.ch.find(c=>c.id===servicoId&&c.te===tecnico&&c.st==='concluida'&&!c.ex?.pagamentoExcluido);
+  if(!servico){el('m-ap').classList.remove('a');nfToast('Este serviço não está mais disponível para aprovação. A lista foi atualizada.','info');await sbRecarregarDados();return;}
   const btn=el('btn-cf-ap'),textoBtn=btn?.textContent;
   try{
-    if(btn){btn.disabled=true;btn.textContent='Salvando no Supabase...';}
-    const confirmadoEm=await sbPersistirAprovacoes(alvos,APT,APT==='rejeitado'?obs:'');
+    if(btn){btn.disabled=true;btn.textContent='Verificando situação...';}
+    const aprovacaoAtual=await sbAtualizarAprovacaoChamado(servico);
+    // A decisão pode ter sido salva por outro administrador enquanto o modal
+    // estava aberto. Feche o modal e informe o estado deste único serviço.
+    if(aprovacaoAtual?.status===acao){
+      el('m-ap').classList.remove('a');
+      atualizarTelaAprovacaoServico(servico);
+      nfToast(acao==='aprovado'?'Este serviço já está aprovado. A lista foi atualizada.':'Este serviço já está rejeitado. A lista foi atualizada.','info');
+      return;
+    }
+    const alvos=D.ch.filter(c=>{
+      if(c.id!==servicoId || c.te!==tecnico || c.st!=='concluida' || c.ex?.pagamentoExcluido) return false;
+      const status=c.ap?.status||'pendente';
+      return acao==='aprovado' ? status!=='aprovado' : status!=='rejeitado';
+    });
+    if(!alvos.length){el('m-ap').classList.remove('a');atualizarTelaAprovacaoServico(servico);nfToast('A situação deste serviço mudou. A lista foi atualizada; confira o status antes de tentar novamente.','info');return;}
+    if(btn){btn.textContent='Salvando no Supabase...';}
+    const confirmadoEm=await sbPersistirAprovacoes(alvos,acao,acao==='rejeitado'?obs:'');
     alvos.forEach(c=>{
-      c.ap={status:APT,obs:APT==='rejeitado'?obs:'',data:confirmadoEm,admin:S.n};
+      c.ap={status:acao,obs:acao==='rejeitado'?obs:'',data:confirmadoEm,admin:S.n};
     });
     lsSet('dd',D);
     el('m-ap').classList.remove('a');
     rRl(RL_DT1_ATUAL,RL_DT2_ATUAL);rDb();opPl(PLU);
-    alert(APT==='aprovado'?'Serviço aprovado e confirmado no servidor!':'Serviço rejeitado e confirmado no servidor.');
+    alert(acao==='aprovado'?'Serviço aprovado e confirmado no servidor!':'Serviço rejeitado e confirmado no servidor.');
   }catch(err){
     sbShowError('Não foi possível salvar a aprovação',err);
     await sbRecarregarDados();
