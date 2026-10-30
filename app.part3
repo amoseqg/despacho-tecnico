@@ -4725,19 +4725,12 @@ function startLoop() {
 
 // ========== EVENT LISTENERS ==========
 document.addEventListener('DOMContentLoaded', function() {
-  // Importa os 126 materiais da planilha MATERIAL LOGISTICO.xlsx
-  // sem apagar materiais já cadastrados manualmente.
-  inicializarMateriaisPlanilha();
-
-  // Tela inicial
-  const cardTec = el('card-tec');
-  const cardAdm = el('card-adm');
-  const cardLog = el('card-log');
-  // Os cards já possuem acionamento direto no HTML. Estes listeners são apenas
-  // uma proteção para versões antigas do arquivo que ainda não tenham onclick.
-  if(cardTec && !cardTec.onclick) cardTec.addEventListener('click', function() { showLogin('tec'); });
-  if(cardAdm && !cardAdm.onclick) cardAdm.addEventListener('click', function() { showLogin('adm'); });
-  if(cardLog && !cardLog.onclick) cardLog.addEventListener('click', function() { showLogin('log'); });
+  // Importa materiais sem deixar que uma falha na base bloqueie os acessos às áreas.
+  try {
+    inicializarMateriaisPlanilha();
+  } catch (error) {
+    console.error('Não foi possível importar a planilha de materiais:', error);
+  }
 
   // Login
   const btnLogin = el('btn-login');
@@ -6192,10 +6185,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
+<script src="/entry-cards.js?v=2.6.2"></script>
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.0"></script>
+<script src="/release-info.js?v=2.6.2"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
