@@ -1,10 +1,15 @@
 import fs from 'node:fs';import vm from 'node:vm';import assert from 'node:assert/strict';
-const src=fs.readFileSync('app.part3','utf8');const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',classList:{toggle(){},add(){},remove(){}},disabled:false});return nodes.get(id);};
-const chamados=[{id:'a',te:'tec',pr:'1',si:'Site A',st:'concluida'},{id:'b',te:'tec',pr:'2',si:'Site B',st:'concluida'},{id:'c',te:'tec',st:'concluida',ex:{pagamentoExcluido:true}}];const writes=[];
-const ctx={S:{t:'adm',n:'Admin'},D:{ch:chamados},el,esc:String,lsSet(){},rRl(){},rDb(){},opPl(){},alert(){},sbShowError(){assert.fail('Erro inesperado')},sbRecarregarDados:async()=>{},sbPersistirAprovacoes:async(items,status)=>{writes.push({ids:items.map(c=>c.id),status});return '2026-10-09T13:00:00Z';}};
+const src=fs.readFileSync('app.part3','utf8');const nodes=new Map();const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'Confirmar',disabled:false,classList:{opened:false,toggle(){},add(){this.opened=true;},remove(){this.opened=false;},contains(){return this.opened;}}});return nodes.get(id);};
+const chamados=[{id:'a',te:'tec',pr:'1',si:'Site A',st:'concluida'},{id:'b',te:'tec',pr:'2',si:'Site B',st:'concluida'},{id:'c',te:'tec',st:'concluida',ex:{pagamentoExcluido:true}}];const writes=[],server=new Map(),toasts=[];
+const ctx={S:{t:'adm',n:'Admin'},D:{ch:chamados},el,esc:String,lsSet(){},rRl(){},rDb(){},opPl(){},alert(){},nfToast:(message,type)=>toasts.push({message,type}),sbUUID:()=>true,sbNameById:()=>'',SB:{from:()=>({id:null,select(){return this;},eq(_column,id){this.id=id;return this;},maybeSingle:async function(){return {data:server.has(this.id)?{status:server.get(this.id),observacao:'',atualizado_em:'2026-10-09T13:00:00Z',administrador_id:null,reenviado:false}:null,error:null};}})},sbShowError(_title,error){throw error},sbRecarregarDados:async()=>{},sbPersistirAprovacoes:async(items,status)=>{writes.push({ids:items.map(c=>c.id),status});items.forEach(c=>server.set(c.id,status));return '2026-10-09T13:00:00Z';}};
 vm.createContext(ctx);vm.runInContext("let PLU='tec',APT=null,APSERVICO=null,RL_DT1_ATUAL='',RL_DT2_ATUAL='';",ctx);
-for(const name of ['opApv','cfAp'])vm.runInContext(src.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\}`))[0],ctx);
-ctx.opApv('aprovado','a');await ctx.cfAp();assert.deepEqual(Array.from(writes[0].ids),['a']);assert.equal(chamados[1].ap,undefined);
-ctx.opApv('rejeitado','b');await ctx.cfAp();assert.equal(writes.length,1);el('ap-obs').value='Valor incorreto';await ctx.cfAp();assert.deepEqual(Array.from(writes[1].ids),['b']);assert.equal(chamados[0].ap.status,'aprovado');assert.equal(chamados[1].ap.obs,'Valor incorreto');
-ctx.S.t='tec';ctx.opApv('aprovado','b');await ctx.cfAp();assert.equal(writes.length,2);
-console.log('PASS: aprovação individual preserva os demais serviços; rejeição exige motivo; técnico não altera pagamentos.');
+for(const name of ['sbAtualizarAprovacaoChamado','atualizarTelaAprovacaoServico','opApv','cfAp'])vm.runInContext(src.match(new RegExp(`(?:async )?function ${name}\\([^]*?\\n\\}`))[0],ctx);
+await ctx.opApv('aprovado','a');assert.equal(el('m-ap').classList.opened,true);await ctx.cfAp();assert.deepEqual(Array.from(writes[0].ids),['a']);assert.equal(chamados[1].ap,undefined);
+await ctx.opApv('rejeitado','b');assert.equal(el('m-ap').classList.opened,true);await ctx.cfAp();assert.equal(writes.length,1);el('ap-obs').value='Valor incorreto';await ctx.cfAp();assert.deepEqual(Array.from(writes[1].ids),['b']);assert.equal(chamados[0].ap.status,'aprovado');assert.equal(chamados[1].ap.obs,'Valor incorreto');
+// Detecta aprovação feita por outro administrador antes de abrir o diálogo.
+chamados.push({id:'d',te:'tec',pr:'4',si:'Site D',st:'concluida'});server.set('d','aprovado');
+await ctx.opApv('aprovado','d');assert.equal(el('m-ap').classList.opened,false);assert.equal(writes.length,2);assert.match(toasts.at(-1).message,/já está aprovado/);
+// A decisão pode mudar entre a abertura e a confirmação do modal.
+server.delete('a');await ctx.opApv('aprovado','a');assert.equal(el('m-ap').classList.opened,true);server.set('a','aprovado');await ctx.cfAp();assert.equal(writes.length,2);assert.equal(el('m-ap').classList.opened,false);
+ctx.S.t='tecnico';await ctx.opApv('aprovado','b');await ctx.cfAp();assert.equal(writes.length,2);
+console.log('PASS: aprovação individual, rejeição com motivo e atualização concorrente consultam o servidor e não regravam decisão existente.');
