@@ -2837,6 +2837,117 @@ function abrirAprovacaoAtendimento(usuario) {
 let RL_DT1_ATUAL = '';
 let RL_DT2_ATUAL = '';
 let RL_CARDS_OCULTOS = localStorage.getItem('nf-rl-cards-ocultos') === '1';
+let RL_PEDIDOS_APROVACAO = new Map();
+let RL_PEDIDOS_TOTAL_ATUAL = new Map();
+
+function rlValorMoeda(valor){
+  return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(valor)||0);
+}
+
+function rlPedidoHtml(usuario){
+  const perfil=D.tc.find(t=>t.u===usuario),pedido=perfil?RL_PEDIDOS_APROVACAO.get(perfil._id):null;
+  if(!pedido)return `<button type="button" class="btn btn-rl-pedido" data-u="${esc(usuario)}" style="border:0;border-radius:8px;padding:7px 12px;background:#e8f0ff;color:#174ea6;font-weight:700;cursor:pointer">Pedido</button>`;
+  const status=pedido.status==='enviado'
+    ? `<small style="display:block;margin-top:5px;color:#137333">✅ Enviado${pedido.email_enviado_em?' em '+esc(formatarDataBrasil(pedido.email_enviado_em)):''}</small>`
+    : '<small style="display:block;margin-top:5px;color:#9a6700">⏳ Aguardando confirmação de envio</small>';
+  return `<div><button type="button" class="btn btn-rl-pedido" data-u="${esc(usuario)}" style="border:0;background:none;padding:0;color:var(--p);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline">Pedido ${esc(pedido.numero_pedido)}</button>${status}<small style="display:block;color:#526273">${esc(rlValorMoeda(pedido.valor))}</small><button type="button" class="btn btn-rl-pedido-limpar" data-u="${esc(usuario)}" style="margin-top:5px;border:0;background:none;padding:0;color:#b42318;font:inherit;font-size:11px;cursor:pointer;text-decoration:underline">Limpar pedido atual</button></div>`;
+}
+
+function rlAtualizarCelulasPedido(){
+  document.querySelectorAll('#rl-cards .rl-pedido-cell').forEach(celula=>{
+    celula.innerHTML=rlPedidoHtml(celula.dataset.u);
+    celula.querySelector('.btn-rl-pedido')?.addEventListener('click',event=>{
+      event.preventDefault();event.stopPropagation();void rlAbrirPedido(celula.dataset.u);
+    });
+    celula.querySelector('.btn-rl-pedido-limpar')?.addEventListener('click',event=>{
+      event.preventDefault();event.stopPropagation();void rlLimparPedido(celula.dataset.u);
+    });
+  });
+}
+
+async function rlCarregarPedidosAprovacao(){
+  if(S?.t!=='adm'||!SB)return;
+  const ids=D.tc.filter(t=>t._id).map(t=>t._id);
+  if(!ids.length)return;
+  try{
+    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos')
+      .select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em')
+      .in('tecnico_id',ids));
+    if(error)throw error;
+    RL_PEDIDOS_APROVACAO=new Map((data||[]).map(p=>[p.tecnico_id,p]));
+    rlAtualizarCelulasPedido();
+  }catch(error){sbShowError('Não foi possível carregar os pedidos de aprovação',error);}
+}
+
+async function rlAbrirPedido(usuario){
+  if(S?.t!=='adm')return;
+  const perfil=D.tc.find(t=>t.u===usuario);
+  if(!perfil?._id){nfToast('Não foi possível localizar o cadastro deste técnico.','erro');return;}
+  const pedidoAtual=RL_PEDIDOS_APROVACAO.get(perfil._id)||null;
+  const email=String(perfil.e||'').trim();
+  const valorAtual=pedidoAtual?Number(pedidoAtual.valor)||0:Number(RL_PEDIDOS_TOTAL_ATUAL.get(usuario)||0);
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(620px,calc(100% - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:22px;box-shadow:0 24px 70px #0005;color:#16324f;font-family:system-ui';
+  dialog.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0">Pedido para emissão de nota fiscal</h3><p style="margin:5px 0 0;color:#526273">${esc(perfil.n)}</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>
+    <div style="margin:16px 0;padding:12px;border-radius:10px;background:#f3f6fb"><div><b>Valor dos serviços:</b> ${esc(rlValorMoeda(valorAtual))}</div><div style="margin-top:5px"><b>E-mail do técnico:</b> ${esc(email||'Não cadastrado')}</div></div>
+    <label style="display:block;font-weight:650">Número do pedido<input id="rl-numero-pedido" class="input" maxlength="100" autocomplete="off" placeholder="Digite o número do pedido" value="${esc(pedidoAtual?.numero_pedido||'')}" style="display:block;width:100%;margin-top:6px"></label>
+    <div id="rl-pedido-status" role="status" style="min-height:24px;margin-top:10px;color:${pedidoAtual?.status==='enviado'?'#137333':'#9a6700'}">${pedidoAtual?pedidoAtual.status==='enviado'?'✅ Pedido marcado como enviado.':'⏳ Pedido salvo; falta confirmar o envio pelo e-mail.':'Informe o número do pedido para continuar.'}</div>
+    <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn btn-p" data-preparar>${pedidoAtual?'Salvar e abrir e-mail':'Salvar pedido e abrir e-mail'}</button><button type="button" class="btn btn-g" data-enviado ${!pedidoAtual||pedidoAtual.status==='enviado'?'disabled':''}>Confirmar que enviei</button></div>
+    <p style="margin:10px 0 0;color:#667085;font-size:12px">O e-mail será aberto no programa configurado. Depois de enviar a mensagem, clique em “Confirmar que enviei” para registrar o status no portal.</p>`;
+  document.body.append(dialog);
+  const status=dialog.querySelector('#rl-pedido-status');
+  const fechar=()=>dialog.close();
+  dialog.querySelector('[data-fechar]').addEventListener('click',fechar);
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  dialog.querySelector('[data-preparar]').addEventListener('click',async event=>{
+    event.preventDefault();
+    const botao=event.currentTarget,numero=dialog.querySelector('#rl-numero-pedido').value.trim();
+    if(!numero){status.textContent='Informe o número do pedido.';dialog.querySelector('#rl-numero-pedido').focus();return;}
+    if(!emailValido(email)){status.textContent='O cadastro do técnico não possui um e-mail válido. Corrija o e-mail do perfil antes de enviar.';return;}
+    botao.disabled=true;
+    try{
+      const admin=await sbExigirSessaoAdmin();
+      const registro={tecnico_id:perfil._id,numero_pedido:numero,valor:valorAtual,status:'aguardando_envio',email_destinatario:email,email_enviado_em:null,atualizado_em:new Date().toISOString(),criado_por:admin.id};
+      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos').upsert(registro,{onConflict:'tecnico_id'}).select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em').single());
+      if(error)throw error;
+      RL_PEDIDOS_APROVACAO.set(perfil._id,data);rlAtualizarCelulasPedido();
+      const assunto=encodeURIComponent(`Pedido ${numero} — emissão de nota fiscal`);
+      const corpo=encodeURIComponent(`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`);
+      status.textContent='Pedido salvo. O e-mail foi aberto para envio; confirme abaixo depois de enviar.';status.style.color='#9a6700';
+      dialog.querySelector('[data-enviado]').disabled=false;
+      window.location.href=`mailto:${encodeURIComponent(email)}?subject=${assunto}&body=${corpo}`;
+    }catch(error){sbShowError('Não foi possível salvar o pedido',error);status.textContent='Não foi possível salvar o pedido. Verifique a mensagem e tente novamente.';}
+    finally{if(botao.isConnected)botao.disabled=false;}
+  });
+  dialog.querySelector('[data-enviado]').addEventListener('click',async event=>{
+    const botao=event.currentTarget,registro=RL_PEDIDOS_APROVACAO.get(perfil._id);
+    if(!registro||registro.status==='enviado')return;
+    botao.disabled=true;
+    try{
+      await sbExigirSessaoAdmin();
+      const enviadoEm=new Date().toISOString();
+      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos').update({status:'enviado',email_enviado_em:enviadoEm,atualizado_em:enviadoEm}).eq('tecnico_id',perfil._id).select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em').single());
+      if(error)throw error;
+      RL_PEDIDOS_APROVACAO.set(perfil._id,data);rlAtualizarCelulasPedido();status.textContent='✅ Envio confirmado e registrado.';status.style.color='#137333';
+    }catch(error){sbShowError('Não foi possível registrar o envio',error);status.textContent='Não foi possível registrar o envio. Tente novamente.';botao.disabled=false;}
+  });
+  dialog.showModal();
+}
+
+async function rlLimparPedido(usuario){
+  if(S?.t!=='adm')return;
+  const perfil=D.tc.find(t=>t.u===usuario);
+  if(!perfil?._id||!RL_PEDIDOS_APROVACAO.has(perfil._id))return;
+  const atual=RL_PEDIDOS_APROVACAO.get(perfil._id);
+  if(!confirm(`Limpar o pedido ${atual.numero_pedido} de ${perfil.n}?`))return;
+  try{
+    await sbExigirSessaoAdmin();
+    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos').delete().eq('tecnico_id',perfil._id).select('tecnico_id'));
+    if(error)throw error;
+    if(!data?.length)throw new Error('O banco não confirmou a exclusão do pedido atual.');
+    RL_PEDIDOS_APROVACAO.delete(perfil._id);rlAtualizarCelulasPedido();nfToast('Pedido atual limpo.','sucesso');
+  }catch(error){sbShowError('Não foi possível limpar o pedido atual',error);}
+}
 
 function limparCardsRelatorio() {
   RL_CARDS_OCULTOS = true;
@@ -2943,6 +3054,7 @@ function rRl(dt1, dt2, forcarExibicao) {
     });
 
     const totalStr = 'R$ ' + totalVal.toFixed(2).replace('.', ',');
+    RL_PEDIDOS_TOTAL_ATUAL.set(u,totalVal);
     const regBadge = t.regiao === 'capital' ? '<span class="badge b-capital">Capital</span>' : '<span class="badge b-interior">Interior</span>';
     const historico = t.chamados.some(c => c.ex?.pagamentoExcluido)
       ? '<small style="display:block;margin-top:2px;color:#708096;font-size:10px">Há valores excluídos no histórico</small>'
@@ -2953,16 +3065,18 @@ function rRl(dt1, dt2, forcarExibicao) {
       <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
       <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
       <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
-      <td>${validacaoTecnicaHtml}</td> <td>${regBadge}</td>
+      <td>${validacaoTecnicaHtml}</td><td>${regBadge}</td><td class="rl-pedido-cell" data-u="${esc(u)}">${rlPedidoHtml(u)}</td>
     </tr>`;
   }).join('');
 
   container.innerHTML = `<div style="overflow-x:auto">
-    <table class="table" style="width:100%;min-width:900px;font-size:12px">
-      <thead><tr><th>Técnico</th><th>Valor</th><th>Serviços aprovados</th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th></tr></thead>
+    <table class="table" style="width:100%;min-width:1040px;font-size:12px">
+      <thead><tr><th>Técnico</th><th>Valor</th><th>Serviços aprovados</th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
+  rlAtualizarCelulasPedido();
+  void rlCarregarPedidosAprovacao();
   container.querySelectorAll('.btn-rl-validacao-nao').forEach(button => {
     button.addEventListener('click', event => {
       event.preventDefault();
@@ -5919,7 +6033,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.5.68"></script>
+<script src="/release-info.js?v=2.6.0"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
