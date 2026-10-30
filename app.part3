@@ -1986,7 +1986,7 @@ async function rTc() {
     const [{data,error},{data:enderecos,error:enderecosError}]=await Promise.all([SB.from('perfis').select('*').eq('ativo',true).or('tipo.eq.tecnico,tambem_tecnico.eq.true').order('nome'),SB.from('tecnico_enderecos_logistica').select('*')]);
     if(error)throw error;if(enderecosError)throw enderecosError;
     const endMap=new Map((enderecos||[]).map(x=>[String(x.tecnico_id),{cep:x.cep||'',endereco:x.endereco||'',numero:x.numero||'',bairro:x.bairro||'',complemento:x.complemento||'',cidade:[x.cidade,x.uf].filter(Boolean).join(' - '),contato:x.contato||''}]));
-    D.tc=(data||[]).map(p=>({_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],entrega:endMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,tecnicoAtivo:p.tipo==='tecnico'||p.tambem_tecnico===true,c:p.criado_em}));
+    D.tc=(data||[]).map(p=>({_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],liberarTravaPeriodo:p.liberar_trava_periodo===true,entrega:endMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,tecnicoAtivo:p.tipo==='tecnico'||p.tambem_tecnico===true,c:p.criado_em}));
     lsSet('dd',D);
     renderTc();
     if(!D.tc.length)tb.innerHTML='<tr><td colspan="9" class="empty">Nenhum técnico ativo foi retornado pelo Supabase.</td></tr>';
@@ -2946,6 +2946,27 @@ async function rlCarregarPedidosAprovacao(){
   finally{RL_PEDIDOS_CARREGANDO=false;}
 }
 
+async function rlAlternarTravaPeriodo(usuario){
+  if(S?.t!=='adm')return;
+  const perfil=D.tc.find(t=>t.u===usuario);
+  if(!perfil?._id){nfToast('Não foi possível localizar o cadastro deste técnico.','erro');return;}
+  const novoEstado=perfil.liberarTravaPeriodo!==true;
+  const botao=document.querySelector('#rl-cards .btn-rl-periodo-toggle[data-u="'+CSS.escape(String(usuario))+'"]');
+  if(botao)botao.disabled=true;
+  try{
+    await sbExigirSessaoAdmin();
+    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('perfis').update({liberar_trava_periodo:novoEstado}).eq('id',perfil._id).select('id,liberar_trava_periodo').single());
+    if(error)throw error;
+    perfil.liberarTravaPeriodo=data?.liberar_trava_periodo===true;
+    lsSet('dd',D);
+    nfToast(perfil.liberarTravaPeriodo?'Trava do período liberada. O técnico receberá o saldo integral aprovado ainda não pago.':'Trava do período ativada novamente.','sucesso');
+    rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
+  }catch(error){
+    sbShowError('Não foi possível alterar a liberação da trava de período',error);
+    if(botao)botao.disabled=false;
+  }
+}
+
 async function rlAbrirPedido(usuario){
   if(S?.t!=='adm')return;
   const perfil=D.tc.find(t=>t.u===usuario);
@@ -2959,16 +2980,17 @@ async function rlAbrirPedido(usuario){
   const pedidoAtual=pedidoSalvo?.periodo_inicio===periodoInicio&&pedidoSalvo?.periodo_fim===periodoFim?pedidoSalvo:null;
   const resumo=RL_PERIODOS_VALORES.get(usuario)||{bruto:0,pago:0,saldo:0};
   const email=String(perfil.e||'').trim();
-  const valorAtual=pedidoAtual?Number(pedidoAtual.valor)||0:Number(resumo.saldo)||0;
+  const liberarTravaPeriodo=resumo.liberarTrava===true;
+  const valorAtual=Number(resumo.saldo)||0;
   const valorBruto=Number(resumo.bruto)||0;
   const dialog=document.createElement('dialog');
   dialog.style.cssText='width:min(620px,calc(100% - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:22px;box-shadow:0 24px 70px #0005;color:#16324f;font-family:system-ui';
   dialog.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0">Pedido para emissão de nota fiscal</h3><p style="margin:5px 0 0;color:#526273">${esc(perfil.n)}</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>
-    <div style="margin:16px 0;padding:12px;border-radius:10px;background:#f3f6fb"><div><b>Período aprovado:</b> ${esc(formatarDataBrasil(periodoInicio))} a ${esc(formatarDataBrasil(periodoFim))}</div><div style="margin-top:5px"><b>Serviços aprovados no período:</b> ${esc(rlValorMoeda(valorBruto))}</div><div style="margin-top:5px"><b>Valor deste pedido:</b> ${esc(rlValorMoeda(valorAtual))}</div><div style="margin-top:5px"><b>E-mail do técnico:</b> ${esc(email||'Não cadastrado')}</div></div>
+    <div style="margin:16px 0;padding:12px;border-radius:10px;background:#f3f6fb"><div><b>${liberarTravaPeriodo?"Período do pedido:":"Período aprovado:"}</b> ${esc(formatarDataBrasil(periodoInicio))} a ${esc(formatarDataBrasil(periodoFim))}</div><div style="margin-top:5px"><b>${liberarTravaPeriodo?"Saldo aprovado total ainda não pago:":"Serviços aprovados no período:"}</b> ${esc(rlValorMoeda(valorBruto))}</div>${liberarTravaPeriodo?'<div style="margin-top:5px;color:#15803d"><b>Liberação integral ativa:</b> trava de 10 dias úteis ignorada para este técnico.</div>':''}<div style="margin-top:5px"><b>Valor deste pedido:</b> ${esc(rlValorMoeda(valorAtual))}</div><div style="margin-top:5px"><b>E-mail do técnico:</b> ${esc(email||'Não cadastrado')}</div></div>
     <label style="display:block;font-weight:650">Número do pedido<input id="rl-numero-pedido" class="input" maxlength="100" autocomplete="off" placeholder="Digite o número do pedido" value="${esc(pedidoAtual?.numero_pedido||'')}" style="display:block;width:100%;margin-top:6px"></label>
     <div id="rl-pedido-status" role="status" aria-live="polite" style="min-height:24px;margin-top:10px;color:${pedidoAtual?.status==='enviado'?'#137333':'#9a6700'}">${valorAtual<=0?'Não há saldo aprovado disponível neste período.':pedidoAtual?pedidoAtual.status==='enviado'?'✅ Pedido marcado como enviado.':'⏳ Pedido salvo; falta confirmar o envio pelo e-mail.':'Informe o número do pedido para continuar.'}</div>
     <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn btn-p" data-preparar ${valorAtual<=0?'disabled':''}>${pedidoAtual?'Salvar e abrir e-mail':'Salvar pedido e abrir e-mail'}</button><button type="button" class="btn btn-g" data-enviado ${!pedidoAtual||pedidoAtual.status==='enviado'||valorAtual<=0?'disabled':''}>Confirmar que enviei</button></div>
-    <p style="margin:10px 0 0;color:#667085;font-size:12px">O valor do pedido corresponde ao saldo dos serviços aprovados neste período. O saldo será descontado depois que o envio for confirmado.</p>`;
+    <p style="margin:10px 0 0;color:#667085;font-size:12px">O valor do pedido corresponde ao saldo aprovado disponível${liberarTravaPeriodo?" sem a trava de 10 dias úteis":""}. O saldo será descontado depois que o envio for confirmado.</p>`;
   document.body.append(dialog);
   const status=dialog.querySelector('#rl-pedido-status');
   const campoNumero=dialog.querySelector('#rl-numero-pedido');
@@ -3228,6 +3250,45 @@ function rlAtualizarBarraRolagemInferior(){
   }
 }
 
+function rlFormatarDataHoraHistorico(valor){
+  if(!valor)return 'Não registrado';
+  const data=new Date(valor);if(Number.isNaN(data.getTime()))return 'Não registrado';
+  return new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short',timeZone:'America/Sao_Paulo'}).format(data);
+}
+function rlDiasConclusaoAteEncerramento(chamado){
+  const execucao=dataBrasilISO(chamado?.dtexec),encerramento=dataBrasilISO(chamado?.cc);
+  if(!execucao||!encerramento)return null;
+  return Math.round((Date.parse(encerramento+'T00:00:00Z')-Date.parse(execucao+'T00:00:00Z'))/86400000);
+}
+function rlAbrirDetalheHistoricoEncerramento(id){
+  const c=D.ch.find(x=>String(x.id)===String(id));if(!c)return;
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(640px,calc(100% - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:22px;box-shadow:0 24px 70px #0005;color:#16324f;font-family:system-ui';
+  const diferenca=rlDiasConclusaoAteEncerramento(c);
+  const intervalo=diferenca===null?'Não foi possível comparar as datas':diferenca===0?'Encerrado no mesmo dia da conclusão informada':diferenca>0?'Encerrado '+diferenca+' dia(s) após a conclusão informada':'Encerrado '+Math.abs(diferenca)+' dia(s) antes da data informada';
+  const marcos=[['Chamado criado',c.cr],['Técnico aceitou',c.ae],['Atendimento iniciado',c.am],['Conclusão informada pelo técnico',c.dtexec],['Encerrado no portal',c.cc]];
+  dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0">Histórico do protocolo '+esc(c.pr||'—')+'</h3><p style="margin:5px 0 0;color:#526273">'+esc(c.si||'Site não informado')+'</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div><div style="margin:14px 0;padding:10px;border-radius:9px;background:#f0fdf4;color:#166534">'+esc(intervalo)+'</div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Etapa</th><th>Data e hora registrada</th></tr></thead><tbody>'+marcos.map(([nome,data])=>'<tr><td>'+esc(nome)+'</td><td>'+esc(nome==='Conclusão informada pelo técnico'?formatarDataBrasil(data):rlFormatarDataHoraHistorico(data))+'</td></tr>').join('')+'</tbody></table></div><p><b>Técnico:</b> '+esc(nt(c.te)||'Não informado')+'<br><b>SDM:</b> '+esc(c.sdm||'—')+'<br><b>Circuito:</b> '+esc(c.ci||'—')+'</p>';
+  document.body.append(dialog);dialog.querySelector('[data-fechar]').addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
+}
+function rRlHistoricoEncerramentos(){
+  const area=el('rl-historico-encerramentos');if(!area)return;
+  const inicio=el('rl-hist-dt1')?.value||'',fim=el('rl-hist-dt2')?.value||'',busca=(el('rl-hist-busca')?.value||'').trim().toLocaleLowerCase('pt-BR');
+  if(inicio&&fim&&fim<inicio){area.innerHTML='<div class="empty">A data final precisa ser igual ou posterior à data inicial.</div>';return;}
+  const lista=D.ch.filter(c=>{
+    if(c.st!=='concluida'||!c.cc)return false;
+    const fechamento=dataBrasilISO(c.cc);if(!fechamento||(inicio&&fechamento<inicio)||(fim&&fechamento>fim))return false;
+    const perfil=D.tc.find(t=>t.u===c.te);
+    const texto=[c.pr,c.sdm,c.si,c.ci,perfil?.n||nt(c.te)].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
+    return !busca||texto.includes(busca);
+  }).sort((a,b)=>new Date(b.cc).getTime()-new Date(a.cc).getTime());
+  if(!lista.length){area.innerHTML='<div class="empty">Nenhum protocolo encerrado foi encontrado com esses filtros.</div>';return;}
+  area.innerHTML='<div style="overflow-x:auto"><table class="table"><thead><tr><th>Protocolo</th><th>Site / cliente</th><th>Técnico</th><th>Conclusão informada</th><th>Encerrado no portal</th><th>Intervalo</th></tr></thead><tbody>'+lista.map(c=>{
+    const dias=rlDiasConclusaoAteEncerramento(c),intervalo=dias===null?'—':dias===0?'Mesmo dia':dias+' dia(s)';
+    return '<tr><td><button type="button" class="btn btn-rl-hist-detalhe" data-id="'+esc(c.id)+'" style="border:0;background:none;padding:0;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">'+esc(c.pr||'—')+'</button></td><td>'+esc(c.si||'—')+'</td><td>'+esc(nt(c.te)||'Não informado')+'</td><td>'+esc(formatarDataBrasil(c.dtexec))+'</td><td>'+esc(rlFormatarDataHoraHistorico(c.cc))+'</td><td>'+esc(intervalo)+'</td></tr>';
+  }).join('')+'</tbody></table></div><p class="info">Protocolos encontrados: '+lista.length+'. Clique no número para consultar as etapas e os horários registrados.</p>';
+  area.querySelectorAll('.btn-rl-hist-detalhe').forEach(b=>b.addEventListener('click',()=>rlAbrirDetalheHistoricoEncerramento(b.dataset.id)));
+}
+
 function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   const container = el('rl-cards');
   if(!container) return;
@@ -3271,7 +3332,11 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     else { porTec[c.te] = { nome: nt(c.te), regiao: c.re, chamados: [c] }; }
   });
 
-  const tecnicos = Array.from(new Set([...Object.keys(porTec).filter(u => porTec[u].chamados.length > 0),...chamadosProximoPeriodo.map(c=>c.te).filter(Boolean)]));
+  const tecnicosComSaldoAprovado=D.tc.filter(t=>{
+    const aprovados=servicosPagamentoUnicos(D.ch.filter(c=>c.te===t.u&&c.st==='concluida')).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
+    return totalAprovadoServicos(aprovados)-rlValorPagoDentroDoFiltro(t._id,'','')>0;
+  }).map(t=>t.u);
+  const tecnicos = Array.from(new Set([...Object.keys(porTec).filter(u => porTec[u].chamados.length > 0),...chamadosProximoPeriodo.map(c=>c.te).filter(Boolean),...tecnicosComSaldoAprovado]));
 
   if (tecnicos.length === 0) {
     container.innerHTML = '<div class="empty"><h3>Nenhum chamado concluído no período</h3><p>Ajuste as datas ou aguarde serviços finalizados.</p></div>';
@@ -3290,9 +3355,10 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     const validacaoTecnicaHtml='<div style="line-height:1.8;white-space:nowrap"><div>✅ Validado: '+validadosTec+'</div><div>⏳ Aguardando validação: '+aguardandoTec+'</div>'+(naoValidadosTec?'<button type="button" class="btn btn-rl-validacao-nao" data-u="'+esc(u)+'" style="border:0;background:none;padding:0;color:#b91c1c;font:inherit;cursor:pointer;text-decoration:underline">❌ Não validado: '+naoValidadosTec+'</button>':'<div>❌ Não validado: 0</div>')+'</div>';
     const chamadosAprovados=ativos.filter(c=>c.ap?.status==='aprovado');
     const totalPeriodo=totalAprovadoServicos(chamadosAprovados);
-    const tecnicoId=D.tc.find(x=>x.u===u)?._id;
+    const perfilTecnico=D.tc.find(x=>x.u===u);
+    const tecnicoId=perfilTecnico?._id;
+    const liberarTravaPeriodo=perfilTecnico?.liberarTravaPeriodo===true;
     const valorPagoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,periodoInicio,periodoFim);
-    const saldoPeriodo=Math.max(0,totalPeriodo-valorPagoPeriodo);
     const aprovadosProximoPeriodo=chamadosProximoPeriodo.filter(c=>c.te===u&&!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
     const totalProximoPeriodo=totalAprovadoServicos(aprovadosProximoPeriodo);
     const valorPagoProximoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,proximoPeriodo.inicio,proximoPeriodo.fim);
@@ -3301,8 +3367,11 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     const totalVal=totalAprovadoServicos(todosChamadosAprovados);
     const valorPagoTotal=rlValorPagoDentroDoFiltro(tecnicoId,'','');
     const saldoAprovado=Math.max(0,totalVal-valorPagoTotal);
+    const saldoPeriodo=liberarTravaPeriodo?saldoAprovado:Math.max(0,totalPeriodo-valorPagoPeriodo);
     const periodoStr=rlValorMoeda(saldoPeriodo);
-    RL_PERIODOS_VALORES.set(u,{bruto:totalPeriodo,pago:valorPagoPeriodo,saldo:saldoPeriodo,saldoTotal:saldoAprovado,proximo:saldoProximoPeriodo,periodoInicio,periodoFim});
+    const travaHtml='<button type="button" class="btn btn-rl-periodo-toggle" data-u="'+esc(u)+'" aria-pressed="'+(liberarTravaPeriodo?'true':'false')+'" aria-label="'+(liberarTravaPeriodo?'Desativar liberação integral para ':'Liberar pagamento integral para ')+esc(t.nome)+'" title="'+(liberarTravaPeriodo?'Clique para voltar à trava de 10 dias úteis':'Clique para liberar o saldo aprovado integral')+'" style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;border:1px solid '+(liberarTravaPeriodo?'#86efac':'#cbd5e1')+';background:'+(liberarTravaPeriodo?'#f0fdf4':'#fff')+';border-radius:9px;padding:5px 8px;cursor:pointer;color:#16324f"><span aria-hidden="true" style="font-size:18px">'+(liberarTravaPeriodo?'🔓':'🔒')+'</span><small>'+(liberarTravaPeriodo?'Liberado':'Bloqueado')+'</small></button>';
+    const periodoHtml='<span style="white-space:nowrap">'+periodoStr+'</span>'+(liberarTravaPeriodo?'<small style="display:block;margin-top:3px;color:#15803d">Saldo total liberado</small>':'');
+    RL_PERIODOS_VALORES.set(u,{bruto:liberarTravaPeriodo?totalVal:totalPeriodo,pago:liberarTravaPeriodo?valorPagoTotal:valorPagoPeriodo,saldo:saldoPeriodo,saldoTotal:saldoAprovado,proximo:saldoProximoPeriodo,periodoInicio,periodoFim,liberarTrava:liberarTravaPeriodo});
     RL_PEDIDOS_TOTAL_ATUAL.set(u,saldoAprovado);
     const regBadge = t.regiao === 'capital' ? '<span class="badge b-capital">Capital</span>' : '<span class="badge b-interior">Interior</span>';
     const historico = t.chamados.some(c => c.ex?.pagamentoExcluido)
@@ -3311,7 +3380,8 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
 
     return `<tr class="btn-ver-pl" data-u="${esc(u)}" title="Clique para ver os serviços deste técnico" style="cursor:pointer">
       <td><span style="font-size:12px;font-weight:650">${esc(t.nome)}</span>${historico}</td>
-      <td style="white-space:nowrap">${periodoStr}</td>
+      <td style="text-align:center">${travaHtml}</td>
+      <td style="white-space:nowrap">${periodoHtml}</td>
       <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
       <td style="white-space:nowrap;font-weight:700"><button type="button" class="btn-rl-proximo" data-u="${esc(u)}" style="border:0;background:none;color:var(--p);font:inherit;font-weight:700;cursor:pointer;text-decoration:underline" title="Ver apenas os chamados do próximo período">${rlValorMoeda(saldoProximoPeriodo)}</button><small style="display:block;color:#667085">${aprovadosProximoPeriodo.length} chamado(s)</small></td>
       <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
@@ -3320,12 +3390,13 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   }).join('');
 
   container.innerHTML = `<div id="rl-table-scroll" style="overflow-x:auto">
-    <table class="table" style="width:100%;min-width:1250px;font-size:12px">
-      <thead><tr><th>Técnico</th><th>Período aprovado (10 dias úteis)</th><th>Serviços aprovados</th><th>Saldo aprovisionado para o próximo período<br><small>${esc(formatarDataBrasil(proximoPeriodo.inicio))} a ${esc(formatarDataBrasil(proximoPeriodo.fim))}</small></th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
+    <table class="table" style="width:100%;min-width:1380px;font-size:12px">
+      <thead><tr><th>Técnico</th><th>Liberar trava do período</th><th>Período aprovado (10 dias úteis)</th><th>Serviços aprovados</th><th>Saldo aprovisionado para o próximo período<br><small>${esc(formatarDataBrasil(proximoPeriodo.inicio))} a ${esc(formatarDataBrasil(proximoPeriodo.fim))}</small></th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
   rlAtualizarBarraRolagemInferior();
+  container.querySelectorAll('.btn-rl-periodo-toggle').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();void rlAlternarTravaPeriodo(button.dataset.u);}));
   container.querySelectorAll('.btn-rl-proximo').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();rlAbrirChamadosProximoPeriodo(button.dataset.u);}));
   rlAtualizarCelulasPedido();
   if(carregarPedidos)void rlCarregarPedidosAprovacao();
@@ -3902,9 +3973,15 @@ async function tpCarregarPagamentos(forcar=false){
   if(!forcar&&TPAG_CARREGADO_EM&&Date.now()-TPAG_CARREGADO_EM<30000)return;
   TPAG_CARREGANDO=true;
   try{
-    const {data,error}=await SB.from('pagamentos_periodos_tecnicos').select('id,tecnico_id,periodo_inicio,periodo_fim,numero_pedido,valor,email_destinatario,enviado_em').eq('tecnico_id',SB_PROFILE.id).order('periodo_inicio',{ascending:false});
-    if(error)throw error;
-    TPAGAMENTOS=data||[];TPAG_CARREGADO_EM=Date.now();
+    const [pagamentos,perfil]=await Promise.all([
+      SB.from('pagamentos_periodos_tecnicos').select('id,tecnico_id,periodo_inicio,periodo_fim,numero_pedido,valor,email_destinatario,enviado_em').eq('tecnico_id',SB_PROFILE.id).order('periodo_inicio',{ascending:false}),
+      SB.from('perfis').select('liberar_trava_periodo').eq('id',SB_PROFILE.id).single()
+    ]);
+    if(pagamentos.error)throw pagamentos.error;
+    if(perfil.error)throw perfil.error;
+    TPAGAMENTOS=pagamentos.data||[];
+    SB_PROFILE={...SB_PROFILE,liberar_trava_periodo:perfil.data?.liberar_trava_periodo===true};
+    TPAG_CARREGADO_EM=Date.now();
   }catch(error){sbShowError('Não foi possível carregar seus pagamentos aprovados',error);}
   finally{TPAG_CARREGANDO=false;if(sbPainelVisivel('t-pg'))rTap();if(sbPainelVisivel('t-pp'))rTpp();}
 }
@@ -3924,15 +4001,18 @@ function rTap(){
 function rTpp(){
   const resumo=el('tp-resumo-periodo'),lista=el('tp-lista-periodo'),listaProximo=el('tp-lista-proximo-periodo');if(!resumo||!lista||!S?.u)return;
   const inicio=el('tp-dt1')?.value||'',fim=el('tp-dt2')?.value||'';
-  if(!inicio||!fim||fim<inicio){resumo.innerHTML='<div class="empty">Informe uma data inicial e final válidas.</div>';lista.innerHTML='';if(listaProximo)listaProximo.innerHTML='';return;}
-  const aprovados=tpChamadosAprovados(inicio,fim);
+  const liberarTravaPeriodo=SB_PROFILE?.liberar_trava_periodo===true;
+  const periodoValido=!!inicio&&!!fim&&fim>=inicio;
+  if(!periodoValido&&!liberarTravaPeriodo){resumo.innerHTML='<div class="empty">Informe uma data inicial e final válidas.</div>';lista.innerHTML='';if(listaProximo)listaProximo.innerHTML='';return;}
+  const referenciaFim=periodoValido?fim:dataBrasilISO(new Date());
+  const aprovados=liberarTravaPeriodo?tpChamadosAprovados('',''):tpChamadosAprovados(inicio,fim);
   const bruto=totalAprovadoServicos(aprovados);
-  const pago=tpPagamentoDentroDoPeriodo(inicio,fim);
+  const pago=liberarTravaPeriodo?tpPagamentoDentroDoPeriodo('',''):tpPagamentoDentroDoPeriodo(inicio,fim);
   const aReceber=Math.max(0,bruto-pago);
-  const proximo=rlProximoPeriodoUtil(fim,10);
+  const proximo=rlProximoPeriodoUtil(referenciaFim,10);
   const aprovadosProximo=tpChamadosAprovados(proximo.inicio,proximo.fim);
   const provisionado=Math.max(0,totalAprovadoServicos(aprovadosProximo)-tpPagamentoDentroDoPeriodo(proximo.inicio,proximo.fim));
-  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados neste período</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">A receber neste período</div><div class="v">'+escM(rlValorMoeda(aReceber))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>'+(pago?'<p class="info">Pedidos já enviados neste período: '+escM(rlValorMoeda(pago))+'</p>':'');
+  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">'+(liberarTravaPeriodo?'Serviços aprovados liberados':'Serviços aprovados neste período')+'</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">'+(liberarTravaPeriodo?'A receber sem trava do período':'A receber neste período')+'</div><div class="v">'+escM(rlValorMoeda(aReceber))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>'+(liberarTravaPeriodo?'<p class="info">O administrador liberou o saldo integral aprovado ainda não pago, sem aplicar a janela de 10 dias úteis.</p>':'')+(pago?'<p class="info">Pedidos já enviados'+(liberarTravaPeriodo?' no total':' neste período')+': '+escM(rlValorMoeda(pago))+'</p>':'');
   lista.innerHTML=tpTabelaServicos(aprovados);
   if(listaProximo)listaProximo.innerHTML='<h4 style="font-size:.8rem;margin:14px 0 6px">Chamados aprovados do próximo período · '+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</h4>'+tpTabelaServicos(aprovadosProximo);
 }
@@ -5605,7 +5685,7 @@ async function sbLoadAll(){
   D.tc=[]; D.ad=[];
   const enderecosTecMap=new Map((endR.data||[]).map(x=>[String(x.tecnico_id),{cep:x.cep||'',endereco:x.endereco||'',numero:x.numero||'',bairro:x.bairro||'',complemento:x.complemento||'',cidade:[x.cidade,x.uf].filter(Boolean).join(' - '),contato:x.contato||''}]));
   (pR.data||[]).forEach(p=>{
-    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],entrega:enderecosTecMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,tecnicoAtivo:p.tipo==='tecnico'||p.tambem_tecnico===true,c:p.criado_em};
+    const x={_id:p.id,n:p.nome,u:p.usuario,e:p.email||'',r:p.regiao||'',sk:p.skills||[],ar:p.areas||[],liberarTravaPeriodo:p.liberar_trava_periodo===true,entrega:enderecosTecMap.get(String(p.id))||null,p:!!p.admin_geral,tipo:p.tipo,tecnicoAtivo:p.tipo==='tecnico'||p.tambem_tecnico===true,c:p.criado_em};
     if(p.tipo==='admin'||p.tipo==='logistica') D.ad.push(x); if(p.tipo==='tecnico'||p.tambem_tecnico===true) D.tc.push(x);
   });
 
