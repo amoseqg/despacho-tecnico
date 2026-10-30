@@ -220,6 +220,11 @@ body{font-family:system-ui,-apple-system,sans-serif;background:#f1f5f9;min-heigh
 .table{width:100%;border-collapse:collapse;font-size:.75rem}
 .table th{text-align:left;padding:8px;color:var(--gr);font-weight:600;border-bottom:2px solid var(--b);white-space:nowrap}
 .table td{padding:8px;border-bottom:1px solid var(--b);vertical-align:middle}
+.rl-fixed-scrollbar{position:fixed;left:0;right:0;bottom:0;height:24px;padding:4px 10px;background:rgba(255,255,255,.98);border-top:1px solid #cbd5e1;box-shadow:0 -3px 12px rgba(15,23,42,.12);z-index:1000;display:none;touch-action:none;user-select:none}
+.rl-fixed-scroll-track{position:relative;width:100%;height:14px;border-radius:999px;background:#d6dce5;cursor:pointer}
+.rl-fixed-scroll-thumb{position:absolute;left:0;top:2px;height:10px;min-width:54px;border-radius:999px;background:#64748b;cursor:grab;touch-action:none}
+.rl-fixed-scroll-thumb:hover,.rl-fixed-scroll-thumb:active{background:#334155}
+.rl-fixed-scroll-thumb:active{cursor:grabbing}
 .empty{text-align:center;padding:30px 16px;color:var(--gr);font-size:.8rem}
 .empty h3{color:var(--p);margin-bottom:4px;font-size:1rem}
 .login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0f172a,#1e293b);padding:12px}
