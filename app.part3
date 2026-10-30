@@ -3095,6 +3095,21 @@ function abrirDetalheRelatorioServicos(usuario,tipo){
  dialog.querySelector('.fechar-rel-servicos').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
 }
 
+function rlDataPascoa(ano){
+  const a=ano%19,b=Math.floor(ano/100),c=ano%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451);
+  const mes=Math.floor((h+l-7*m+114)/31),dia=((h+l-7*m+114)%31)+1;
+  return new Date(Date.UTC(ano,mes-1,dia));
+}
+function rlFeriadosRecife(ano){
+  const fixos=['01-01','03-06','04-21','05-01','06-24','07-16','09-07','10-12','11-02','11-15','11-20','12-08','12-25'];
+  const datas=new Set(fixos.map(d=>ano+'-'+d));
+  const pascoa=rlDataPascoa(ano),isoData=data=>data.toISOString().slice(0,10);
+  const sextaSanta=new Date(pascoa);sextaSanta.setUTCDate(sextaSanta.getUTCDate()-2);
+  const carnaval=new Date(pascoa);carnaval.setUTCDate(carnaval.getUTCDate()-47);
+  datas.add(isoData(sextaSanta));datas.add(isoData(carnaval));
+  return datas;
+}
 function rlProximoPeriodoUtil(dataFinal,diasUteis=10){
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dataFinal||'')))return{inicio:'',fim:''};
   const total=Math.max(1,Number(diasUteis)||10);
@@ -3103,7 +3118,7 @@ function rlProximoPeriodoUtil(dataFinal,diasUteis=10){
   let inicio='',fim='',contagem=0;
   while(contagem<total){
     const dia=data.getUTCDay(),iso=data.toISOString().slice(0,10);
-    if(dia!==0&&dia!==6){if(!inicio)inicio=iso;fim=iso;contagem++;}
+    if(dia!==0&&dia!==6&&!rlFeriadosRecife(data.getUTCFullYear()).has(iso)){if(!inicio)inicio=iso;fim=iso;contagem++;}
     data.setUTCDate(data.getUTCDate()+1);
   }
   return{inicio,fim};
