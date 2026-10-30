@@ -2891,45 +2891,104 @@ async function rlAbrirPedido(usuario){
   dialog.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0">Pedido para emissão de nota fiscal</h3><p style="margin:5px 0 0;color:#526273">${esc(perfil.n)}</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>
     <div style="margin:16px 0;padding:12px;border-radius:10px;background:#f3f6fb"><div><b>Valor dos serviços:</b> ${esc(rlValorMoeda(valorAtual))}</div><div style="margin-top:5px"><b>E-mail do técnico:</b> ${esc(email||'Não cadastrado')}</div></div>
     <label style="display:block;font-weight:650">Número do pedido<input id="rl-numero-pedido" class="input" maxlength="100" autocomplete="off" placeholder="Digite o número do pedido" value="${esc(pedidoAtual?.numero_pedido||'')}" style="display:block;width:100%;margin-top:6px"></label>
-    <div id="rl-pedido-status" role="status" style="min-height:24px;margin-top:10px;color:${pedidoAtual?.status==='enviado'?'#137333':'#9a6700'}">${pedidoAtual?pedidoAtual.status==='enviado'?'✅ Pedido marcado como enviado.':'⏳ Pedido salvo; falta confirmar o envio pelo e-mail.':'Informe o número do pedido para continuar.'}</div>
+    <div id="rl-pedido-status" role="status" aria-live="polite" style="min-height:24px;margin-top:10px;color:${pedidoAtual?.status==='enviado'?'#137333':'#9a6700'}">${pedidoAtual?pedidoAtual.status==='enviado'?'✅ Pedido marcado como enviado.':'⏳ Pedido salvo; falta confirmar o envio pelo e-mail.':'Informe o número do pedido para continuar.'}</div>
     <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:14px"><button type="button" class="btn btn-p" data-preparar>${pedidoAtual?'Salvar e abrir e-mail':'Salvar pedido e abrir e-mail'}</button><button type="button" class="btn btn-g" data-enviado ${!pedidoAtual||pedidoAtual.status==='enviado'?'disabled':''}>Confirmar que enviei</button></div>
     <p style="margin:10px 0 0;color:#667085;font-size:12px">O e-mail será aberto no programa configurado. Depois de enviar a mensagem, clique em “Confirmar que enviei” para registrar o status no portal.</p>`;
   document.body.append(dialog);
   const status=dialog.querySelector('#rl-pedido-status');
+  const campoNumero=dialog.querySelector('#rl-numero-pedido');
+  const botaoSalvar=dialog.querySelector('[data-preparar]');
+  const botaoConfirmar=dialog.querySelector('[data-enviado]');
+  const mostrarStatus=(mensagem,cor='#9a6700')=>{status.textContent=mensagem;status.style.color=cor;};
   const fechar=()=>dialog.close();
   dialog.querySelector('[data-fechar]').addEventListener('click',fechar);
   dialog.addEventListener('close',()=>dialog.remove(),{once:true});
-  dialog.querySelector('[data-preparar]').addEventListener('click',async event=>{
+  botaoSalvar.addEventListener('click',async event=>{
     event.preventDefault();
-    const botao=event.currentTarget,numero=dialog.querySelector('#rl-numero-pedido').value.trim();
-    if(!numero){status.textContent='Informe o número do pedido.';dialog.querySelector('#rl-numero-pedido').focus();return;}
-    if(!emailValido(email)){status.textContent='O cadastro do técnico não possui um e-mail válido. Corrija o e-mail do perfil antes de enviar.';return;}
-    botao.disabled=true;
+    const numero=campoNumero.value.trim();
+    if(!numero){mostrarStatus('Informe o número do pedido.','#b42318');campoNumero.focus();return;}
+    if(!emailValido(email)){mostrarStatus('O cadastro do técnico não possui um e-mail válido. Corrija o e-mail do perfil antes de salvar.','#b42318');return;}
+    botaoSalvar.disabled=true;
+    mostrarStatus('Salvando pedido...');
     try{
       const admin=await sbExigirSessaoAdmin();
-      const registro={tecnico_id:perfil._id,numero_pedido:numero,valor:valorAtual,status:'aguardando_envio',email_destinatario:email,email_enviado_em:null,atualizado_em:new Date().toISOString(),criado_por:admin.id};
+      const mesmoPedidoEnviado=pedidoAtual?.numero_pedido===numero&&pedidoAtual?.status==='enviado';
+      const registro={tecnico_id:perfil._id,numero_pedido:numero,valor:valorAtual,status:mesmoPedidoEnviado?'enviado':'aguardando_envio',email_destinatario:email,email_enviado_em:mesmoPedidoEnviado?pedidoAtual.email_enviado_em:null,atualizado_em:new Date().toISOString(),criado_por:admin.id};
       const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos').upsert(registro,{onConflict:'tecnico_id'}).select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em').single());
       if(error)throw error;
-      RL_PEDIDOS_APROVACAO.set(perfil._id,data);rlAtualizarCelulasPedido();
+      RL_PEDIDOS_APROVACAO.set(perfil._id,data);
+      rlAtualizarCelulasPedido();
       const assunto=encodeURIComponent(`Pedido ${numero} — emissão de nota fiscal`);
       const corpo=encodeURIComponent(`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`);
-      status.textContent='Pedido salvo. O e-mail foi aberto para envio; confirme abaixo depois de enviar.';status.style.color='#9a6700';
-      dialog.querySelector('[data-enviado]').disabled=false;
-      window.location.href=`mailto:${encodeURIComponent(email)}?subject=${assunto}&body=${corpo}`;
-    }catch(error){sbShowError('Não foi possível salvar o pedido',error);status.textContent='Não foi possível salvar o pedido. Verifique a mensagem e tente novamente.';}
-    finally{if(botao.isConnected)botao.disabled=false;}
+      if(data.status==='enviado'){
+        mostrarStatus('✅ Este pedido já está registrado como enviado.','#137333');
+        botaoConfirmar.disabled=true;
+      }else{
+        mostrarStatus('✅ Pedido salvo. O e-mail foi aberto para envio; confirme abaixo depois de enviar.','#9a6700');
+        botaoConfirmar.disabled=false;
+        window.location.href=`mailto:${encodeURIComponent(email)}?subject=${assunto}&body=${corpo}`;
+      }
+    }catch(error){
+      sbShowError('Não foi possível salvar o pedido',error);
+      mostrarStatus('Não foi possível salvar o pedido. Veja a mensagem exibida e tente novamente.','#b42318');
+    }finally{
+      if(botaoSalvar.isConnected)botaoSalvar.disabled=false;
+    }
   });
-  dialog.querySelector('[data-enviado]').addEventListener('click',async event=>{
-    const botao=event.currentTarget,registro=RL_PEDIDOS_APROVACAO.get(perfil._id);
-    if(!registro||registro.status==='enviado')return;
-    botao.disabled=true;
+  botaoConfirmar.addEventListener('click',async event=>{
+    event.preventDefault();
+    const numeroDigitado=campoNumero.value.trim();
+    let registro=RL_PEDIDOS_APROVACAO.get(perfil._id)||null;
+    if(!registro){
+      mostrarStatus('Localizando o pedido salvo...');
+      try{
+        const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos')
+          .select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em')
+          .eq('tecnico_id',perfil._id).maybeSingle());
+        if(error)throw error;
+        if(data){registro=data;RL_PEDIDOS_APROVACAO.set(perfil._id,data);}
+      }catch(error){
+        sbShowError('Não foi possível localizar o pedido salvo',error);
+        mostrarStatus('Não foi possível localizar o pedido. Tente novamente.','#b42318');
+        return;
+      }
+    }
+    if(!registro){
+      mostrarStatus('Nenhum pedido foi salvo ainda. Informe o número e clique em “Salvar pedido e abrir e-mail”.','#b42318');
+      campoNumero.focus();
+      return;
+    }
+    if(numeroDigitado!==String(registro.numero_pedido||'')){
+      mostrarStatus('O número foi alterado. Clique em “Salvar e abrir e-mail” antes de confirmar o envio.','#b42318');
+      botaoSalvar.focus();
+      return;
+    }
+    if(registro.status==='enviado'){
+      mostrarStatus('✅ Este pedido já está registrado como enviado.','#137333');
+      botaoConfirmar.disabled=true;
+      return;
+    }
+    botaoConfirmar.disabled=true;
+    mostrarStatus('Registrando a confirmação de envio...');
     try{
       await sbExigirSessaoAdmin();
       const enviadoEm=new Date().toISOString();
-      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos').update({status:'enviado',email_enviado_em:enviadoEm,atualizado_em:enviadoEm}).eq('tecnico_id',perfil._id).select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em').single());
+      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('pedidos_aprovacao_tecnicos')
+        .update({status:'enviado',email_enviado_em:enviadoEm,atualizado_em:enviadoEm})
+        .eq('tecnico_id',perfil._id)
+        .eq('numero_pedido',registro.numero_pedido)
+        .select('tecnico_id,numero_pedido,valor,status,email_destinatario,email_enviado_em,atualizado_em')
+        .maybeSingle());
       if(error)throw error;
-      RL_PEDIDOS_APROVACAO.set(perfil._id,data);rlAtualizarCelulasPedido();status.textContent='✅ Envio confirmado e registrado.';status.style.color='#137333';
-    }catch(error){sbShowError('Não foi possível registrar o envio',error);status.textContent='Não foi possível registrar o envio. Tente novamente.';botao.disabled=false;}
+      if(!data)throw new Error('O banco não confirmou a atualização. Recarregue a lista de pedidos e tente novamente.');
+      RL_PEDIDOS_APROVACAO.set(perfil._id,data);
+      rlAtualizarCelulasPedido();
+      mostrarStatus('✅ Envio confirmado e registrado.','#137333');
+    }catch(error){
+      sbShowError('Não foi possível registrar o envio',error);
+      mostrarStatus('Não foi possível registrar o envio. Veja a mensagem exibida e tente novamente.','#b42318');
+      botaoConfirmar.disabled=false;
+    }
   });
   dialog.showModal();
 }
