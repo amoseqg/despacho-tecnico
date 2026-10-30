@@ -4001,13 +4001,15 @@ function rTap(){
 function rTpp(){
   const resumo=el('tp-resumo-periodo'),lista=el('tp-lista-periodo'),listaProximo=el('tp-lista-proximo-periodo');if(!resumo||!lista||!S?.u)return;
   const inicio=el('tp-dt1')?.value||'',fim=el('tp-dt2')?.value||'';
-  if(!inicio||!fim||fim<inicio){resumo.innerHTML='<div class="empty">Informe uma data inicial e final válidas.</div>';lista.innerHTML='';if(listaProximo)listaProximo.innerHTML='';return;}
   const liberarTravaPeriodo=SB_PROFILE?.liberar_trava_periodo===true;
+  const periodoValido=!!inicio&&!!fim&&fim>=inicio;
+  if(!periodoValido&&!liberarTravaPeriodo){resumo.innerHTML='<div class="empty">Informe uma data inicial e final válidas.</div>';lista.innerHTML='';if(listaProximo)listaProximo.innerHTML='';return;}
+  const referenciaFim=periodoValido?fim:dataBrasilISO(new Date());
   const aprovados=liberarTravaPeriodo?tpChamadosAprovados('',''):tpChamadosAprovados(inicio,fim);
   const bruto=totalAprovadoServicos(aprovados);
   const pago=liberarTravaPeriodo?tpPagamentoDentroDoPeriodo('',''):tpPagamentoDentroDoPeriodo(inicio,fim);
   const aReceber=Math.max(0,bruto-pago);
-  const proximo=rlProximoPeriodoUtil(fim,10);
+  const proximo=rlProximoPeriodoUtil(referenciaFim,10);
   const aprovadosProximo=tpChamadosAprovados(proximo.inicio,proximo.fim);
   const provisionado=Math.max(0,totalAprovadoServicos(aprovadosProximo)-tpPagamentoDentroDoPeriodo(proximo.inicio,proximo.fim));
   resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">'+(liberarTravaPeriodo?'Serviços aprovados liberados':'Serviços aprovados neste período')+'</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">'+(liberarTravaPeriodo?'A receber sem trava do período':'A receber neste período')+'</div><div class="v">'+escM(rlValorMoeda(aReceber))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>'+(liberarTravaPeriodo?'<p class="info">O administrador liberou o saldo integral aprovado ainda não pago, sem aplicar a janela de 10 dias úteis.</p>':'')+(pago?'<p class="info">Pedidos já enviados'+(liberarTravaPeriodo?' no total':' neste período')+': '+escM(rlValorMoeda(pago))+'</p>':'');
