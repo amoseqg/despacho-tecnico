@@ -2338,6 +2338,7 @@ function rDb() {
 }
 
 function dataEncerramentoChamado(c){return c.cc||c.dtexec||'';}
+function dataPeriodoPagamentoChamado(c){return c?.dataPeriodoPagamento||dataEncerramentoChamado(c)||'';}
 function chamadosTop5DoTecnico(tipo,tecnicoId){
  if(!['prazo','reincidencia'].includes(tipo))return [];
  const dados=dadosIndicadoresTecnicos(),todos=tipo==='prazo'?dados.perdas:dados.reincidencias;
@@ -2874,23 +2875,58 @@ function rlValorMoeda(valor){
   return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(valor)||0);
 }
 
+function rlPodeEditarDataPeriodoPagamento(){return S?.t==='adm'&&SB_PROFILE?.tipo==='admin'&&String(SB_PROFILE?.email||'').trim().toLowerCase()==='amos.gomes@metodotelecom.com.br';}
+async function rlSalvarDataPeriodoPagamento(input,usuario,dialog){
+  if(!rlPodeEditarDataPeriodoPagamento()){nfToast('Somente o perfil amos.gomes@metodotelecom.com.br pode alterar a data de contabilização.','erro');return;}
+  const chamadoId=String(input?.dataset?.id||''),chamado=D.ch.find(c=>String(c.id)===chamadoId);
+  if(!chamado){nfToast('Não foi possível localizar o chamado para ajustar a data.','erro');return;}
+  const dataOriginal=dataBrasilISO(dataEncerramentoChamado(chamado)),novaData=String(input.value||'');
+  if(novaData&&!/^\d{4}-\d{2}-\d{2}$/.test(novaData)){nfToast('Informe uma data válida.','erro');return;}
+  const dataAnterior=String(chamado.dataPeriodoPagamento||'');
+  if(novaData===dataAnterior||(!novaData&&!dataAnterior))return;
+  input.disabled=true;
+  try{
+    await sbExigirSessaoAdmin();
+    const voltarDataOriginal=!novaData||novaData===dataOriginal;
+    if(voltarDataOriginal){
+      const {error}=await sbExecutarComSessaoAdmin(()=>SB.from('ajustes_periodo_pagamento').delete().eq('chamado_id',chamadoId));
+      if(error)throw error;
+      chamado.dataPeriodoPagamento='';
+    }else{
+      const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('ajustes_periodo_pagamento').upsert({chamado_id:chamadoId,data_contabilizacao:novaData,alterado_por:SB_PROFILE.id,alterado_em:new Date().toISOString()},{onConflict:'chamado_id'}).select('chamado_id,data_contabilizacao').single());
+      if(error)throw error;
+      chamado.dataPeriodoPagamento=data?.data_contabilizacao||novaData;
+    }
+    nfToast(voltarDataOriginal?'Data original restaurada; o chamado voltou ao período correspondente.':'Data alterada; o valor será contabilizado no período da nova data.','sucesso');
+    rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
+    dialog.close();
+  }catch(error){
+    sbShowError('Não foi possível alterar a data de contabilização do chamado',error);
+    input.value=dataAnterior||dataOriginal||'';
+    input.disabled=false;
+  }
+}
 function rlAbrirChamadosProximoPeriodo(usuario){
   const faixa=rlProximoPeriodoUtil(RL_DT2_ATUAL,10);
   if(!faixa.inicio||!faixa.fim){nfToast('Defina o período aprovado antes de consultar o próximo.','erro');return;}
   const chamados=servicosPagamentoUnicos(D.ch.filter(c=>{
     if(c.te!==usuario||c.st!=='concluida')return false;
-    const data=dataBrasilISO(dataEncerramentoChamado(c));
+    const data=dataBrasilISO(dataPeriodoPagamentoChamado(c));
     return !!data&&data>=faixa.inicio&&data<=faixa.fim;
   })).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
   const total=totalAprovadoServicos(chamados);
+  const podeAjustarData=rlPodeEditarDataPeriodoPagamento();
+  const ajudaData=podeAjustarData?'<p class="info" style="margin-top:10px">Altere a data para mover este serviço ao período anterior ou posterior correspondente. A alteração só está habilitada para amos.gomes@metodotelecom.com.br. Para desfazer, selecione a data original.</p>':'';
   const linhas=chamados.map(c=>{
-    const data=dataEncerramentoChamado(c);
-    return '<tr><td>'+esc(c.pr||'—')+'</td><td>'+esc(c.si||'—')+'</td><td>'+esc(data?formatarDataBrasil(data):'—')+'</td><td>'+esc(c.ex?.atv?.split('|')[0]||c.atividadeServico||'—')+'</td><td style="text-align:right">'+esc(rlValorMoeda(valorAprovadoServico(c)))+'</td></tr>';
+    const data=dataPeriodoPagamentoChamado(c),dataISO=dataBrasilISO(data),dataOriginal=dataBrasilISO(dataEncerramentoChamado(c));
+    const controleData=podeAjustarData?'<input type="date" class="input rl-ajuste-data-periodo" data-id="'+esc(c.id)+'" value="'+esc(dataISO)+'" aria-label="Alterar data de contabilização do protocolo '+esc(c.pr||'')+'" title="A data escolhida define o período que receberá este valor" style="min-width:145px;padding:5px">':esc(data?formatarDataBrasil(data):'—');
+    return '<tr><td>'+esc(c.pr||'—')+'</td><td>'+esc(c.si||'—')+'</td><td>'+controleData+'</td><td>'+esc(c.ex?.atv?.split('|')[0]||c.atividadeServico||'—')+'</td><td style="text-align:right">'+esc(rlValorMoeda(valorAprovadoServico(c)))+'</td></tr>';
   }).join('');
-  const dialog=document.createElement('dialog');
+    const dialog=document.createElement('dialog');
   dialog.style.cssText='width:min(900px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 70px #0005;color:#16324f';
-  dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h3 style="margin:0">Chamados aprovados do próximo período</h3><p style="margin:5px 0 0;color:#526273">'+esc(nt(usuario))+' · '+esc(formatarDataBrasil(faixa.inicio))+' a '+esc(formatarDataBrasil(faixa.fim))+'</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>'+
-    (chamados.length?'<div style="overflow:auto;margin-top:14px"><table class="table"><thead><tr><th>Protocolo</th><th>Site / Cliente</th><th>Data</th><th>Serviço</th><th>Valor</th></tr></thead><tbody>'+linhas+'</tbody><tfoot><tr><th colspan="4" style="text-align:right">Total aprovisionado</th><th style="text-align:right">'+esc(rlValorMoeda(total))+'</th></tr></tfoot></table></div>':'<div class="empty">Nenhum chamado aprovado neste próximo período.</div>');
+  dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h3 style="margin:0">Chamados aprovados do próximo período</h3><p style="margin:5px 0 0;color:#526273">'+esc(nt(usuario))+' · '+esc(formatarDataBrasil(faixa.inicio))+' a '+esc(formatarDataBrasil(faixa.fim))+'</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>'+ajudaData+
+    (chamados.length?'<div style="overflow:auto;margin-top:14px"><table class="table"><thead><tr><th>Protocolo</th><th>Site / Cliente</th><th>'+(podeAjustarData?'Data para contabilização':'Data')+'</th><th>Serviço</th><th>Valor</th></tr></thead><tbody>'+linhas+'</tbody><tfoot><tr><th colspan="4" style="text-align:right">Total aprovisionado</th><th style="text-align:right">'+esc(rlValorMoeda(total))+'</th></tr></tfoot></table></div>':'<div class="empty">Nenhum chamado aprovado neste próximo período.</div>');
+  dialog.querySelectorAll('.rl-ajuste-data-periodo').forEach(input=>input.addEventListener('change',()=>void rlSalvarDataPeriodoPagamento(input,usuario,dialog)));
   dialog.querySelector('[data-fechar]').addEventListener('click',()=>dialog.close());
   dialog.addEventListener('close',()=>dialog.remove(),{once:true});
   document.body.append(dialog);
@@ -3315,14 +3351,14 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
 
   let chamados = D.ch.filter(c => c.st === 'concluida');
   chamados = chamados.filter(c => {
-    const data=dataBrasilISO(dataEncerramentoChamado(c));
+    const data=dataBrasilISO(dataPeriodoPagamentoChamado(c));
     return !!data&&data>=periodoInicio&&data<=periodoFim;
   });
 
   chamados = servicosPagamentoUnicos(chamados);
   const chamadosProximoPeriodo=servicosPagamentoUnicos(D.ch.filter(c=>{
     if(c.st!=='concluida')return false;
-    const data=dataBrasilISO(dataEncerramentoChamado(c));
+    const data=dataBrasilISO(dataPeriodoPagamentoChamado(c));
     return !!data&&data>=proximoPeriodo.inicio&&data<=proximoPeriodo.fim;
   }));
   const porTec = {};
@@ -3956,14 +3992,14 @@ function tpPagamentoDentroDoPeriodo(inicio,fim){
 }
 function tpChamadosAprovados(inicio,fim){
   let lista=D.ch.filter(c=>c.te===S?.u&&c.st==='concluida');
-  if(inicio)lista=lista.filter(c=>!!dataEncerramentoChamado(c)&&dataBrasilISO(dataEncerramentoChamado(c))>=inicio);
-  if(fim)lista=lista.filter(c=>!!dataEncerramentoChamado(c)&&dataBrasilISO(dataEncerramentoChamado(c))<=fim);
+  if(inicio)lista=lista.filter(c=>!!dataPeriodoPagamentoChamado(c)&&dataBrasilISO(dataPeriodoPagamentoChamado(c))>=inicio);
+  if(fim)lista=lista.filter(c=>!!dataPeriodoPagamentoChamado(c)&&dataBrasilISO(dataPeriodoPagamentoChamado(c))<=fim);
   return servicosPagamentoUnicos(lista).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
 }
 function tpTabelaServicos(lista){
   if(!lista.length)return '<div class="empty">Nenhum serviço aprovado neste intervalo.</div>';
   const rows=lista.map(c=>{
-    const data=dataEncerramentoChamado(c),iso=data?dataBrasilISO(data):'';
+    const data=dataPeriodoPagamentoChamado(c),iso=data?dataBrasilISO(data):'';
     const pago=pagoTecnicoParaData(TPAGAMENTOS,data);
     return '<tr><td>'+escM(c.pr||'—')+'</td><td>'+escM(c.si||'—')+'</td><td>'+(data?escM(formatarDataBrasil(data)):'—')+'</td><td>'+escM(rlValorMoeda(valorAprovadoServico(c)))+'</td><td><span class="badge '+(pago?'b-aprovado':'b-pag-pendente')+'">'+(pago?'Enviado para pagamento':'Saldo aprovado')+'</span></td></tr>';
   }).join('');
@@ -5661,7 +5697,7 @@ async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
   await carregarConfigPainel();
-  const [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR,ajustesPeriodoR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     sbTabelaCompleta('chamados','id'),
     sbTabelaCompleta('execucoes','chamado_id'),
@@ -5676,9 +5712,10 @@ async function sbLoadAll(){
     SB.from('exclusoes_chamados_portal').select('*'),
     SB.from('materiais_retirados').select('*').order('retirado_em',{ascending:false}),
     SB.from('movimentacoes_estoque').select('*').order('criado_em',{ascending:false}).limit(60),
-    SB.from('tecnico_enderecos_logistica').select('*')
+    SB.from('tecnico_enderecos_logistica').select('*'),
+    SB.from('ajustes_periodo_pagamento').select('chamado_id,data_contabilizacao')
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR,ajustesPeriodoR]) if(r.error) throw r.error;
   SB_ESCOLAS=escR.data||[];
   SB_FOTOS_MAP=new Map();
   (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
@@ -5694,13 +5731,14 @@ async function sbLoadAll(){
   const validacaoMap=new Map((vR.data||[]).map(x=>[x.chamado_id,x]));
   const exclusaoPortalMap=new Map((xR.data||[]).map(x=>[x.chamado_id,x]));
   const apMap=new Map((aR.data||[]).map(x=>[x.chamado_id,x]));
+  const ajustesPeriodoMap=new Map((ajustesPeriodoR.data||[]).map(x=>[String(x.chamado_id),x.data_contabilizacao]));
   const trMap=new Map();
   (tR.data||[]).forEach(x=>{ if(!trMap.has(x.chamado_id)) trMap.set(x.chamado_id,[]); trMap.get(x.chamado_id).push(x); });
   D.ch=(cR.data||[]).map(c=>{
     const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
       id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'', atualizadoEm:c.atualizado_em||'',
-      re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'',
+      re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'', dataPeriodoPagamento:ajustesPeriodoMap.get(String(c.id))||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
       solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', operadora:c.operadora||'', vencimento:c.vencimento_em||'',pendenciaAtiva:!!c.pendencia_ativa,pendenciaDesde:c.pendencia_desde||'',prazoPausadoSegundos:Number(c.prazo_pausado_segundos||0),
