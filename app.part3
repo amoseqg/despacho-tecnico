@@ -3270,32 +3270,14 @@ function rlAbrirDetalheHistoricoEncerramento(id){
   dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h3 style="margin:0">Histórico do protocolo '+esc(c.pr||'—')+'</h3><p style="margin:5px 0 0;color:#526273">'+esc(c.si||'Site não informado')+'</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div><div style="margin:14px 0;padding:10px;border-radius:9px;background:#f0fdf4;color:#166534">'+esc(intervalo)+'</div><div style="overflow-x:auto"><table class="table"><thead><tr><th>Etapa</th><th>Data e hora registrada</th></tr></thead><tbody>'+marcos.map(([nome,data])=>'<tr><td>'+esc(nome)+'</td><td>'+esc(nome==='Conclusão informada pelo técnico'?formatarDataBrasil(data):rlFormatarDataHoraHistorico(data))+'</td></tr>').join('')+'</tbody></table></div><p><b>Técnico:</b> '+esc(nt(c.te)||'Não informado')+'<br><b>SDM:</b> '+esc(c.sdm||'—')+'<br><b>Circuito:</b> '+esc(c.ci||'—')+'</p>';
   document.body.append(dialog);dialog.querySelector('[data-fechar]').addEventListener('click',()=>dialog.close());dialog.addEventListener('close',()=>dialog.remove(),{once:true});dialog.showModal();
 }
-async function rlLimparInformacaoHistorico(){
-  if(S?.t!=='adm'||!SB_PROFILE?.id)return;
-  if(!window.confirm('Limpar a informação do histórico deste perfil administrativo? Os chamados continuarão preservados no portal; novos encerramentos continuarão aparecendo.'))return;
-  const botao=el('btn-rl-limpar-informacao');if(botao)botao.disabled=true;
-  try{
-    await sbExigirSessaoAdmin();
-    const limite=new Date().toISOString();
-    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('perfis').update({historico_encerramentos_limpo_em:limite}).eq('id',SB_PROFILE.id).select('id,historico_encerramentos_limpo_em').single());
-    if(error)throw error;
-    SB_PROFILE={...SB_PROFILE,historico_encerramentos_limpo_em:data?.historico_encerramentos_limpo_em||limite};
-    const area=el('rl-historico-encerramentos');if(area)area.innerHTML='<div class="empty">Informações anteriores foram limpas desta listagem. Consulte novamente para ver novos encerramentos.</div>';
-    nfToast('Informação do histórico limpa. Os chamados permanecem preservados.','sucesso');
-  }catch(error){
-    sbShowError('Não foi possível limpar a informação do histórico',error);
-    if(botao)botao.disabled=false;
-  }
-}
-function rRlHistoricoEncerramentos(){
+function rRlHistoricoEncerramentos(limparAoApagar=false){
   const area=el('rl-historico-encerramentos');if(!area)return;
   const inicio=el('rl-hist-dt1')?.value||'',fim=el('rl-hist-dt2')?.value||'',busca=(el('rl-hist-busca')?.value||'').trim().toLocaleLowerCase('pt-BR');
-  const limiteLimpeza=Date.parse(SB_PROFILE?.historico_encerramentos_limpo_em||'')||0;
   if(inicio&&fim&&fim<inicio){area.innerHTML='<div class="empty">A data final precisa ser igual ou posterior à data inicial.</div>';return;}
+  if(limparAoApagar&&!busca){area.innerHTML='<div class="empty">Digite um protocolo, SDM, site ou técnico para consultar o histórico.</div>';return;}
   const lista=D.ch.filter(c=>{
     if(c.st!=='concluida'||!c.cc)return false;
     const fechamento=dataBrasilISO(c.cc);if(!fechamento||(inicio&&fechamento<inicio)||(fim&&fechamento>fim))return false;
-    if(limiteLimpeza&&new Date(c.cc).getTime()<=limiteLimpeza)return false;
     const perfil=D.tc.find(t=>t.u===c.te);
     const texto=[c.pr,c.sdm,c.si,c.ci,perfil?.n||nt(c.te)].filter(Boolean).join(' ').toLocaleLowerCase('pt-BR');
     return !busca||texto.includes(busca);
