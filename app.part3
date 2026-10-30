@@ -2898,7 +2898,7 @@ function rlAtualizarCelulasPedido(){
   });
 }
 
-async async function rlCarregarPedidosAprovacao(){
+async function rlCarregarPedidosAprovacao(){
   if(S?.t!=='adm'||!SB||RL_PEDIDOS_CARREGANDO||RL_PEDIDOS_CARREGADOS)return;
   const ids=D.tc.filter(t=>t._id).map(t=>t._id);
   if(!ids.length)return;
@@ -6185,7 +6185,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/entry-cards.js?v=2.6.3"></script>
+<script src="/entry-cards.js?v=2.6.4"></script>
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
