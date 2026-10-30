@@ -2984,8 +2984,13 @@ async function rlAbrirPedido(usuario){
     if(!numero){mostrarStatus('Informe o número do pedido.','#b42318');campoNumero.focus();return;}
     if(valorAtual<=0){mostrarStatus('Não há saldo aprovado disponível neste período.','#b42318');return;}
     if(!emailValido(email)){mostrarStatus('O cadastro do técnico não possui um e-mail válido. Corrija o e-mail do perfil antes de salvar.','#b42318');return;}
+    const assunto=encodeURIComponent(`Pedido ${numero} — emissão de nota fiscal`);
+    const corpo=encodeURIComponent(`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nPeríodo aprovado: ${formatarDataBrasil(periodoInicio)} a ${formatarDataBrasil(periodoFim)}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`);
+    const mailtoUrl=`mailto:${encodeURIComponent(email)}?subject=${assunto}&body=${corpo}`;
+    let janelaEmail=null;
+    try{janelaEmail=window.open('about:blank','_blank');}catch(_){}
     botaoSalvar.disabled=true;
-    mostrarStatus('Salvando pedido...');
+    mostrarStatus('Salvando pedido e preparando o e-mail...');
     try{
       const admin=await sbExigirSessaoAdmin();
       const mesmoPedidoEnviado=pedidoAtual?.numero_pedido===numero&&pedidoAtual?.status==='enviado';
@@ -2994,17 +2999,22 @@ async function rlAbrirPedido(usuario){
       if(error)throw error;
       RL_PEDIDOS_APROVACAO.set(perfil._id,data);
       rlAtualizarCelulasPedido();
-      const assunto=encodeURIComponent(`Pedido ${numero} — emissão de nota fiscal`);
-      const corpo=encodeURIComponent(`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nPeríodo aprovado: ${formatarDataBrasil(periodoInicio)} a ${formatarDataBrasil(periodoFim)}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`);
       if(data.status==='enviado'){
+        if(janelaEmail&&!janelaEmail.closed)janelaEmail.close();
         mostrarStatus('✅ Este pedido já está registrado como enviado.','#137333');
         botaoConfirmar.disabled=true;
       }else{
-        mostrarStatus('✅ Pedido salvo. O e-mail foi aberto para envio; confirme abaixo depois de enviar.','#9a6700');
         botaoConfirmar.disabled=false;
-        window.location.href=`mailto:${encodeURIComponent(email)}?subject=${assunto}&body=${corpo}`;
+        if(janelaEmail&&!janelaEmail.closed){
+          janelaEmail.location.href=mailtoUrl;
+          mostrarStatus('✅ Pedido salvo. O e-mail foi aberto para envio; confirme abaixo depois de enviar.','#9a6700');
+        }else{
+          status.innerHTML='✅ Pedido salvo. A abertura automática foi bloqueada pelo navegador. <a href="'+esc(mailtoUrl)+'" target="_blank" rel="noopener">Clique aqui para abrir o e-mail</a> e confirme abaixo depois de enviar.';
+          status.style.color='#9a6700';
+        }
       }
     }catch(error){
+      if(janelaEmail&&!janelaEmail.closed)janelaEmail.close();
       sbShowError('Não foi possível salvar o pedido',error);
       mostrarStatus('Não foi possível salvar o pedido. Veja a mensagem exibida e tente novamente.','#b42318');
     }finally{
@@ -6262,11 +6272,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/entry-cards.js?v=2.6.8"></script>
+<script src="/entry-cards.js?v=2.6.9"></script>
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.8"></script>
+<script src="/release-info.js?v=2.6.9"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
