@@ -2881,7 +2881,7 @@ async function rlSalvarDataPeriodoPagamento(input,usuario,dialog){
   const chamadoId=String(input?.dataset?.id||''),chamado=D.ch.find(c=>String(c.id)===chamadoId);
   if(!chamado){nfToast('Não foi possível localizar o chamado para ajustar a data.','erro');return;}
   const dataOriginal=dataBrasilISO(dataEncerramentoChamado(chamado)),novaData=String(input.value||'');
-  if(novaData&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(novaData)){nfToast('Informe uma data válida.','erro');return;}
+  if(novaData&&!/^\d{4}-\d{2}-\d{2}$/.test(novaData)){nfToast('Informe uma data válida.','erro');return;}
   const dataAnterior=String(chamado.dataPeriodoPagamento||'');
   if(novaData===dataAnterior||(!novaData&&!dataAnterior))return;
   input.disabled=true;
@@ -2924,7 +2924,7 @@ function rlAbrirChamadosProximoPeriodo(usuario){
   }).join('');
     const dialog=document.createElement('dialog');
   dialog.style.cssText='width:min(900px,calc(100vw - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:20px;box-shadow:0 24px 70px #0005;color:#16324f';
-  dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h3 style="margin:0">Chamados aprovados do próximo período</h3><p style="margin:5px 0 0;color:#526273">'+esc(nt(usuario))+' · '+esc(formatarDataBrasil(faixa.inicio))+' a '+esc(formatarDataBrasil(faixa.fim))+'</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>'+
+  dialog.innerHTML='<div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><h3 style="margin:0">Chamados aprovados do próximo período</h3><p style="margin:5px 0 0;color:#526273">'+esc(nt(usuario))+' · '+esc(formatarDataBrasil(faixa.inicio))+' a '+esc(formatarDataBrasil(faixa.fim))+'</p></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div>'+ajudaData+
     (chamados.length?'<div style="overflow:auto;margin-top:14px"><table class="table"><thead><tr><th>Protocolo</th><th>Site / Cliente</th><th>'+(podeAjustarData?'Data para contabilização':'Data')+'</th><th>Serviço</th><th>Valor</th></tr></thead><tbody>'+linhas+'</tbody><tfoot><tr><th colspan="4" style="text-align:right">Total aprovisionado</th><th style="text-align:right">'+esc(rlValorMoeda(total))+'</th></tr></tfoot></table></div>':'<div class="empty">Nenhum chamado aprovado neste próximo período.</div>');
   dialog.querySelectorAll('.rl-ajuste-data-periodo').forEach(input=>input.addEventListener('change',()=>void rlSalvarDataPeriodoPagamento(input,usuario,dialog)));
   dialog.querySelector('[data-fechar]').addEventListener('click',()=>dialog.close());
