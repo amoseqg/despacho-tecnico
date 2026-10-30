@@ -3095,13 +3095,33 @@ function abrirDetalheRelatorioServicos(usuario,tipo){
  dialog.querySelector('.fechar-rel-servicos').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove(),{once:true});document.body.append(dialog);dialog.showModal();
 }
 
+function rlProximoPeriodoUtil(dataFinal,diasUteis=10){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(dataFinal||'')))return{inicio:'',fim:''};
+  const total=Math.max(1,Number(diasUteis)||10);
+  const data=new Date(dataFinal+'T00:00:00Z');
+  data.setUTCDate(data.getUTCDate()+1);
+  let inicio='',fim='',contagem=0;
+  while(contagem<total){
+    const dia=data.getUTCDay(),iso=data.toISOString().slice(0,10);
+    if(dia!==0&&dia!==6){if(!inicio)inicio=iso;fim=iso;contagem++;}
+    data.setUTCDate(data.getUTCDate()+1);
+  }
+  return{inicio,fim};
+}
+
 function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   const container = el('rl-cards');
   if(!container) return;
   renderRelatoriosQualidade();
 
-  RL_DT1_ATUAL = dt1 || '';
-  RL_DT2_ATUAL = dt2 || '';
+  const campoInicio=el('rl-dt1'),campoFim=el('rl-dt2');
+  const periodoInicio=dt1||campoInicio?.value||'2026-10-15';
+  const periodoFim=dt2||campoFim?.value||'2026-10-28';
+  if(campoInicio)campoInicio.value=periodoInicio;
+  if(campoFim)campoFim.value=periodoFim;
+  RL_DT1_ATUAL=periodoInicio;
+  RL_DT2_ATUAL=periodoFim;
+  const proximoPeriodo=rlProximoPeriodoUtil(periodoFim,10);
   if (forcarExibicao) {
     RL_CARDS_OCULTOS = false;
     localStorage.removeItem('nf-rl-cards-ocultos');
@@ -3112,14 +3132,17 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   }
 
   let chamados = D.ch.filter(c => c.st === 'concluida');
-  if (dt1) {
-    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= dt1 && !!dataEncerramentoChamado(c));
-  }
-  if (dt2) {
-    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c));
-  }
+  chamados = chamados.filter(c => {
+    const data=dataBrasilISO(dataEncerramentoChamado(c));
+    return !!data&&data>=periodoInicio&&data<=periodoFim;
+  });
 
   chamados = servicosPagamentoUnicos(chamados);
+  const chamadosProximoPeriodo=servicosPagamentoUnicos(D.ch.filter(c=>{
+    if(c.st!=='concluida')return false;
+    const data=dataBrasilISO(dataEncerramentoChamado(c));
+    return !!data&&data>=proximoPeriodo.inicio&&data<=proximoPeriodo.fim;
+  }));
   const porTec = {};
   D.tc.forEach(t => { porTec[t.u] = { nome: t.n, regiao: t.r, chamados: [] }; });
 
@@ -3128,7 +3151,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     else { porTec[c.te] = { nome: nt(c.te), regiao: c.re, chamados: [c] }; }
   });
 
-  const tecnicos = Object.keys(porTec).filter(u => porTec[u].chamados.length > 0);
+  const tecnicos = Array.from(new Set([...Object.keys(porTec).filter(u => porTec[u].chamados.length > 0),...chamadosProximoPeriodo.map(c=>c.te).filter(Boolean)]));
 
   if (tecnicos.length === 0) {
     container.innerHTML = '<div class="empty"><h3>Nenhum chamado concluído no período</h3><p>Ajuste as datas ou aguarde serviços finalizados.</p></div>';
@@ -3136,7 +3159,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   }
 
   const linhas = tecnicos.map(u => {
-    const t = porTec[u];
+    const t = porTec[u]||{nome:D.tc.find(x=>x.u===u)?.n||nt(u),regiao:D.tc.find(x=>x.u===u)?.r||'interior',chamados:[]};
     const ativos = t.chamados.filter(c => !c.ex?.pagamentoExcluido);
     const aprovados = ativos.filter(c => c.ap?.status === 'aprovado').length;
     const naoAprovados = ativos.length - aprovados;
@@ -3146,18 +3169,19 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     const validacaoTecnicaHtml='<div style="line-height:1.8;white-space:nowrap"><div>✅ Validado: '+validadosTec+'</div><div>⏳ Aguardando validação: '+aguardandoTec+'</div>'+(naoValidadosTec?'<button type="button" class="btn btn-rl-validacao-nao" data-u="'+esc(u)+'" style="border:0;background:none;padding:0;color:#b91c1c;font:inherit;cursor:pointer;text-decoration:underline">❌ Não validado: '+naoValidadosTec+'</button>':'<div>❌ Não validado: 0</div>')+'</div>';
     const chamadosAprovados=ativos.filter(c=>c.ap?.status==='aprovado');
     const totalPeriodo=totalAprovadoServicos(chamadosAprovados);
-    const todosChamadosAprovados=servicosPagamentoUnicos(D.ch.filter(c=>c.st==='concluida'))
-      .filter(c=>c.te===u&&!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
-    const totalVal=totalAprovadoServicos(todosChamadosAprovados);
     const tecnicoId=D.tc.find(x=>x.u===u)?._id;
-    const temPeriodo=!!(RL_DT1_ATUAL&&RL_DT2_ATUAL);
+    const valorPagoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,periodoInicio,periodoFim);
+    const saldoPeriodo=Math.max(0,totalPeriodo-valorPagoPeriodo);
+    const aprovadosProximoPeriodo=chamadosProximoPeriodo.filter(c=>c.te===u&&!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
+    const totalProximoPeriodo=totalAprovadoServicos(aprovadosProximoPeriodo);
+    const valorPagoProximoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,proximoPeriodo.inicio,proximoPeriodo.fim);
+    const saldoProximoPeriodo=Math.max(0,totalProximoPeriodo-valorPagoProximoPeriodo);
+    const todosChamadosAprovados=servicosPagamentoUnicos(D.ch.filter(c=>c.st==='concluida')).filter(c=>c.te===u&&!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
+    const totalVal=totalAprovadoServicos(todosChamadosAprovados);
     const valorPagoTotal=rlValorPagoDentroDoFiltro(tecnicoId,'','');
     const saldoAprovado=Math.max(0,totalVal-valorPagoTotal);
-    const valorPagoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,RL_DT1_ATUAL,RL_DT2_ATUAL);
-    const saldoPeriodo=Math.max(0,totalPeriodo-valorPagoPeriodo);
-    const totalStr=rlValorMoeda(saldoAprovado);
-    const periodoStr=temPeriodo?rlValorMoeda(saldoPeriodo):'—';
-    RL_PERIODOS_VALORES.set(u,{bruto:totalPeriodo,pago:valorPagoPeriodo,saldo:saldoPeriodo,saldoTotal:saldoAprovado,periodoInicio:RL_DT1_ATUAL,periodoFim:RL_DT2_ATUAL});
+    const periodoStr=rlValorMoeda(saldoPeriodo);
+    RL_PERIODOS_VALORES.set(u,{bruto:totalPeriodo,pago:valorPagoPeriodo,saldo:saldoPeriodo,saldoTotal:saldoAprovado,proximo:saldoProximoPeriodo,periodoInicio,periodoFim});
     RL_PEDIDOS_TOTAL_ATUAL.set(u,saldoAprovado);
     const regBadge = t.regiao === 'capital' ? '<span class="badge b-capital">Capital</span>' : '<span class="badge b-interior">Interior</span>';
     const historico = t.chamados.some(c => c.ex?.pagamentoExcluido)
@@ -3168,7 +3192,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
       <td><span style="font-size:12px;font-weight:650">${esc(t.nome)}</span>${historico}</td>
       <td style="white-space:nowrap">${periodoStr}</td>
       <td><button type="button" class="btn btn-rl-aprovados" data-u="${esc(u)}" aria-label="Ver ${aprovados} serviços aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${aprovados}</button></td>
-      <td style="white-space:nowrap;font-weight:700">${totalStr}</td>
+      <td style="white-space:nowrap;font-weight:700">${rlValorMoeda(saldoProximoPeriodo)}</td>
       <td><button type="button" class="btn btn-rl-nao-aprovados" data-u="${esc(u)}" aria-label="Ver ${naoAprovados} serviços não aprovados de ${esc(t.nome)}" style="border:0;background:none;color:var(--p);font:inherit;cursor:pointer;text-decoration:underline">${naoAprovados}</button></td>
       <td>${validacaoTecnicaHtml}</td><td>${regBadge}</td><td class="rl-pedido-cell" data-u="${esc(u)}">${rlPedidoHtml(u)}</td>
     </tr>`;
@@ -3176,7 +3200,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
 
   container.innerHTML = `<div style="overflow-x:auto">
     <table class="table" style="width:100%;min-width:1250px;font-size:12px">
-      <thead><tr><th>Técnico</th><th>Período aprovado (10 dias úteis)</th><th>Serviços aprovados</th><th>Saldo serviços aprovados</th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
+      <thead><tr><th>Técnico</th><th>Período aprovado (10 dias úteis)</th><th>Serviços aprovados</th><th>Saldo aprovisionado para o próximo período<br><small>${esc(formatarDataBrasil(proximoPeriodo.inicio))} a ${esc(formatarDataBrasil(proximoPeriodo.fim))}</small></th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
@@ -3765,9 +3789,11 @@ function rTap(){
   const resumo=el('tp-resumo-aprovados'),lista=el('tp-lista-aprovados');if(!resumo||!lista||!S?.u)return;
   const aprovados=tpChamadosAprovados('','');
   const total=totalAprovadoServicos(aprovados);
-  const pago=TPAGAMENTOS.reduce((s,p)=>s+(Number(p.valor)||0),0);
-  const saldo=Math.max(0,total-pago);
-  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">Valor aprovado</div><div class="v">'+escM(rlValorMoeda(total))+'</div></div><div class="card stat g"><div class="l">Saldo disponível</div><div class="v">'+escM(rlValorMoeda(saldo))+'</div></div></div>';
+  const fim=el('tp-dt2')?.value||'2026-10-28';
+  const proximo=rlProximoPeriodoUtil(fim,10);
+  const aprovadosProximo=tpChamadosAprovados(proximo.inicio,proximo.fim);
+  const provisionado=Math.max(0,totalAprovadoServicos(aprovadosProximo)-tpPagamentoDentroDoPeriodo(proximo.inicio,proximo.fim));
+  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">Valor aprovado total</div><div class="v">'+escM(rlValorMoeda(total))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>';
   lista.innerHTML=tpTabelaServicos(aprovados);
 }
 function rTpp(){
@@ -3777,8 +3803,11 @@ function rTpp(){
   const aprovados=tpChamadosAprovados(inicio,fim);
   const bruto=totalAprovadoServicos(aprovados);
   const pago=tpPagamentoDentroDoPeriodo(inicio,fim);
-  const saldo=Math.max(0,bruto-pago);
-  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados no período</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">Aprovado no período</div><div class="v">'+escM(rlValorMoeda(bruto))+'</div></div><div class="card stat g"><div class="l">Saldo após pedidos enviados</div><div class="v">'+escM(rlValorMoeda(saldo))+'</div></div></div>'+(pago?'<p class="info">Pedidos já enviados neste período: '+escM(rlValorMoeda(pago))+'</p>':'');
+  const aReceber=Math.max(0,bruto-pago);
+  const proximo=rlProximoPeriodoUtil(fim,10);
+  const aprovadosProximo=tpChamadosAprovados(proximo.inicio,proximo.fim);
+  const provisionado=Math.max(0,totalAprovadoServicos(aprovadosProximo)-tpPagamentoDentroDoPeriodo(proximo.inicio,proximo.fim));
+  resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados neste período</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">A receber neste período</div><div class="v">'+escM(rlValorMoeda(aReceber))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>'+(pago?'<p class="info">Pedidos já enviados neste período: '+escM(rlValorMoeda(pago))+'</p>':'');
   lista.innerHTML=tpTabelaServicos(aprovados);
 }
 
@@ -6191,11 +6220,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/entry-cards.js?v=2.6.5"></script>
+<script src="/entry-cards.js?v=2.6.6"></script>
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.5"></script>
+<script src="/release-info.js?v=2.6.6"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
