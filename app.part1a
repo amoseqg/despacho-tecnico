@@ -509,17 +509,17 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
         <p style="color:#94a3b8;font-size:.75rem">Gestão Inteligente de Operações de Campo</p>
       </div>
       <div class="grid-3">
-        <div class="area-card" id="card-tec" role="button" tabindex="0" onclick="showLogin('tec')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showLogin('tec')}">
+        <div class="area-card" id="card-tec" role="button" tabindex="0" >
           <div class="role-photo role-photo-tec" role="img" aria-label="Técnico de campo com equipamentos de rede"></div>
           <h3>Área do Técnico</h3>
           <p>Acesse seus chamados e execute serviços</p>
         </div>
-        <div class="area-card" id="card-adm" role="button" tabindex="0" onclick="showLogin('adm')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showLogin('adm')}">
+        <div class="area-card" id="card-adm" role="button" tabindex="0" >
           <div class="role-photo role-photo-adm" role="img" aria-label="Administradora em central de operações"></div>
           <h3>Área Administrador</h3>
           <p>Painel de gestão, despacho e relatórios</p>
         </div>
-        <div class="area-card" id="card-log" role="button" tabindex="0" onclick="showLogin('log')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showLogin('log')}">
+        <div class="area-card" id="card-log" role="button" tabindex="0" >
           <div class="role-photo role-photo-log" role="img" aria-label="Profissional de logística em armazém"></div>
           <h3>Área Logística</h3>
           <p>Separação, rastreamento e entrega de materiais</p>
