@@ -3157,6 +3157,77 @@ function rlProximoPeriodoUtil(dataFinal,diasUteis=10){
   return{inicio,fim};
 }
 
+function rlAtualizarBarraRolagemInferior(){
+  let barra=el('rl-fixed-scrollbar');
+  if(!barra){
+    barra=document.createElement('div');
+    barra.id='rl-fixed-scrollbar';
+    barra.className='rl-fixed-scrollbar';
+    barra.setAttribute('role','scrollbar');
+    barra.setAttribute('aria-orientation','horizontal');
+    barra.setAttribute('aria-label','Rolagem horizontal da tabela de pagamentos');
+    barra.setAttribute('tabindex','0');
+    barra.innerHTML='<div class="rl-fixed-scroll-track"><div class="rl-fixed-scroll-thumb"></div></div>';
+    document.body.append(barra);
+  }
+  const area=el('rl-table-scroll'),track=barra.querySelector('.rl-fixed-scroll-track'),thumb=barra.querySelector('.rl-fixed-scroll-thumb');
+  if(!area||area.scrollWidth<=area.clientWidth+1||el('v-rl')?.classList.contains('hidden')){
+    barra.style.display='none';
+    return;
+  }
+  barra.style.display='block';
+  if(barra._area!==area){
+    if(barra._area&&barra._onAreaScroll)barra._area.removeEventListener('scroll',barra._onAreaScroll);
+    barra._area=area;
+    barra._onAreaScroll=()=>rlAtualizarBarraRolagemInferior();
+    area.addEventListener('scroll',barra._onAreaScroll,{passive:true});
+  }
+  const larguraTrilho=track.clientWidth;
+  const larguraPolegar=Math.max(54,larguraTrilho*area.clientWidth/area.scrollWidth);
+  const maxTrilho=Math.max(0,larguraTrilho-larguraPolegar);
+  const maxRolagem=Math.max(1,area.scrollWidth-area.clientWidth);
+  thumb.style.width=Math.min(larguraTrilho,larguraPolegar)+'px';
+  thumb.style.transform='translateX('+Math.round(maxTrilho*area.scrollLeft/maxRolagem)+'px)';
+  barra.setAttribute('aria-valuemin','0');
+  barra.setAttribute('aria-valuemax',String(Math.round(maxRolagem)));
+  barra.setAttribute('aria-valuenow',String(Math.round(area.scrollLeft)));
+  if(!barra._eventosInstalados){
+    let arrasto=null;
+    barra.addEventListener('pointerdown',event=>{
+      const atual=barra._area;
+      if(!atual)return;
+      const ret=track.getBoundingClientRect(),largura=Math.max(54,ret.width*atual.clientWidth/atual.scrollWidth);
+      const maxTrilho=Math.max(1,ret.width-largura),maxRolagem=Math.max(0,atual.scrollWidth-atual.clientWidth);
+      if(event.target===thumb){
+        arrasto={x:event.clientX,scroll:atual.scrollLeft,maxTrilho,maxRolagem};
+        barra.setPointerCapture(event.pointerId);
+      }else{
+        const pos=Math.max(0,Math.min(maxTrilho,event.clientX-ret.left-largura/2));
+        atual.scrollLeft=pos/maxTrilho*maxRolagem;
+      }
+      event.preventDefault();
+    });
+    barra.addEventListener('pointermove',event=>{
+      if(!arrasto||!barra._area)return;
+      const dx=event.clientX-arrasto.x;
+      barra._area.scrollLeft=Math.max(0,Math.min(arrasto.maxRolagem,arrasto.scroll+dx/arrasto.maxTrilho*arrasto.maxRolagem));
+    });
+    const terminar=()=>{arrasto=null;};
+    barra.addEventListener('pointerup',terminar);
+    barra.addEventListener('pointercancel',terminar);
+    barra.addEventListener('keydown',event=>{
+      const atual=barra._area;if(!atual)return;
+      if(event.key==='ArrowLeft'||event.key==='ArrowRight'){atual.scrollBy({left:(event.key==='ArrowRight'?1:-1)*Math.max(80,atual.clientWidth*.12)});event.preventDefault();}
+      else if(event.key==='Home'){atual.scrollLeft=0;event.preventDefault();}
+      else if(event.key==='End'){atual.scrollLeft=atual.scrollWidth;event.preventDefault();}
+    });
+    window.addEventListener('resize',()=>rlAtualizarBarraRolagemInferior(),{passive:true});
+    const painel=el('v-rl');
+    if(painel)new MutationObserver(()=>rlAtualizarBarraRolagemInferior()).observe(painel,{attributes:true,attributeFilter:['class']});
+    barra._eventosInstalados=true;
+  }
+}
+
 function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   const container = el('rl-cards');
   if(!container) return;
@@ -3176,6 +3247,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   }
   if (RL_CARDS_OCULTOS) {
     container.innerHTML = '<div class="empty"><h3>Cards limpos da tela</h3><p>A base histórica permanece salva e disponível para filtros e relatórios. Clique em “Filtrar Período” para exibir os cards novamente.</p></div>';
+    rlAtualizarBarraRolagemInferior();
     return;
   }
 
@@ -3203,6 +3275,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
 
   if (tecnicos.length === 0) {
     container.innerHTML = '<div class="empty"><h3>Nenhum chamado concluído no período</h3><p>Ajuste as datas ou aguarde serviços finalizados.</p></div>';
+    rlAtualizarBarraRolagemInferior();
     return;
   }
 
@@ -3246,12 +3319,13 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     </tr>`;
   }).join('');
 
-  container.innerHTML = `<div style="overflow-x:auto">
+  container.innerHTML = `<div id="rl-table-scroll" style="overflow-x:auto">
     <table class="table" style="width:100%;min-width:1250px;font-size:12px">
       <thead><tr><th>Técnico</th><th>Período aprovado (10 dias úteis)</th><th>Serviços aprovados</th><th>Saldo aprovisionado para o próximo período<br><small>${esc(formatarDataBrasil(proximoPeriodo.inicio))} a ${esc(formatarDataBrasil(proximoPeriodo.fim))}</small></th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
+  rlAtualizarBarraRolagemInferior();
   container.querySelectorAll('.btn-rl-proximo').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();rlAbrirChamadosProximoPeriodo(button.dataset.u);}));
   rlAtualizarCelulasPedido();
   if(carregarPedidos)void rlCarregarPedidosAprovacao();
@@ -6272,11 +6346,11 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.addEventListener('DOMContentLoaded',()=>{if(q('lab-iniciar'))q('lab-iniciar').onclick=start;});
 })();
 </script>
-<script src="/entry-cards.js?v=2.6.9"></script>
+<script src="/entry-cards.js?v=2.6.10"></script>
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.9"></script>
+<script src="/release-info.js?v=2.6.10"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
