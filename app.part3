@@ -2872,6 +2872,23 @@ function rlValorPagoDentroDoFiltro(tecnicoId,inicio,fim){
 function rlPagamentoDoPeriodo(tecnicoId,inicio,fim){return RL_PAGAMENTOS_PERIODOS.get(rlPeriodoKey(tecnicoId,inicio,fim))||null;}
 function valorAprovadoServico(chamado){return chamado?.ex?.pagamentoExcluido||chamado?.ap?.status!=='aprovado'?0:(Number(numeroExcel(chamado?.ex?.total))||0);}
 function totalAprovadoServicos(chamados){return chamados.reduce((total,chamado)=>total+valorAprovadoServico(chamado),0);}
+function rlChamadosConcluidosPeriodo(inicio,fim){
+  return servicosPagamentoUnicos(D.ch.filter(c=>{
+    if(c.st!=='concluida')return false;
+    const data=dataBrasilISO(dataPeriodoPagamentoChamado(c));
+    return !!data&&(!inicio||data>=inicio)&&(!fim||data<=fim);
+  }));
+}
+function rlResumoFinanceiroTecnico(usuario,inicio,fim,chamadosPeriodo){
+  const perfil=D.tc.find(t=>t.u===usuario),tecnicoId=perfil?._id;
+  const doPeriodo=(chamadosPeriodo||rlChamadosConcluidosPeriodo(inicio,fim)).filter(c=>c.te===usuario&&!c.ex?.pagamentoExcluido);
+  const totalPeriodo=totalAprovadoServicos(doPeriodo.filter(c=>c.ap?.status==='aprovado'));
+  const pagoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,inicio,fim);
+  const historico=servicosPagamentoUnicos(D.ch.filter(c=>c.te===usuario&&c.st==='concluida')).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
+  const totalHistorico=totalAprovadoServicos(historico),pagoHistorico=rlValorPagoDentroDoFiltro(tecnicoId,'','');
+  const saldoHistorico=Math.max(0,totalHistorico-pagoHistorico),liberarTrava=perfil?.liberarTravaPeriodo===true;
+  return {totalPeriodo,pagoPeriodo,totalHistorico,pagoHistorico,saldoHistorico,liberarTrava,bruto:liberarTrava?totalHistorico:totalPeriodo,pago:liberarTrava?pagoHistorico:pagoPeriodo,saldo:liberarTrava?saldoHistorico:Math.max(0,totalPeriodo-pagoPeriodo)};
+}
 function pagoTecnicoParaData(pagamentos,data){const iso=data?dataBrasilISO(data):'';return !!iso&&(pagamentos||[]).some(p=>p.periodo_inicio<=iso&&p.periodo_fim>=iso);}
 
 function rlValorMoeda(valor){
@@ -3352,18 +3369,8 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     return;
   }
 
-  let chamados = D.ch.filter(c => c.st === 'concluida');
-  chamados = chamados.filter(c => {
-    const data=dataBrasilISO(dataPeriodoPagamentoChamado(c));
-    return !!data&&data>=periodoInicio&&data<=periodoFim;
-  });
-
-  chamados = servicosPagamentoUnicos(chamados);
-  const chamadosProximoPeriodo=servicosPagamentoUnicos(D.ch.filter(c=>{
-    if(c.st!=='concluida')return false;
-    const data=dataBrasilISO(dataPeriodoPagamentoChamado(c));
-    return !!data&&data>=proximoPeriodo.inicio&&data<=proximoPeriodo.fim;
-  }));
+  const chamados=rlChamadosConcluidosPeriodo(periodoInicio,periodoFim);
+  const chamadosProximoPeriodo=rlChamadosConcluidosPeriodo(proximoPeriodo.inicio,proximoPeriodo.fim);
   const porTec = {};
   D.tc.forEach(t => { porTec[t.u] = { nome: t.n, regiao: t.r, chamados: [] }; });
 
@@ -3373,8 +3380,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   });
 
   const tecnicosComSaldoAprovado=D.tc.filter(t=>{
-    const aprovados=servicosPagamentoUnicos(D.ch.filter(c=>c.te===t.u&&c.st==='concluida')).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
-    return totalAprovadoServicos(aprovados)-rlValorPagoDentroDoFiltro(t._id,'','')>0;
+    return rlResumoFinanceiroTecnico(t.u,periodoInicio,periodoFim,chamados).saldoHistorico>0;
   }).map(t=>t.u);
   const tecnicos = Array.from(new Set([...Object.keys(porTec).filter(u => porTec[u].chamados.length > 0),...chamadosProximoPeriodo.map(c=>c.te).filter(Boolean),...tecnicosComSaldoAprovado]));
 
@@ -3393,21 +3399,20 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     const aguardandoTec=ativos.filter(c=>statusValidacaoTecnica(c)==='aguardando_validacao').length;
     const naoValidadosTec=ativos.filter(c=>statusValidacaoTecnica(c)==='nao_validado').length;
     const validacaoTecnicaHtml='<div style="line-height:1.8;white-space:nowrap"><div>✅ Validado: '+validadosTec+'</div><div>⏳ Aguardando validação: '+aguardandoTec+'</div>'+(naoValidadosTec?'<button type="button" class="btn btn-rl-validacao-nao" data-u="'+esc(u)+'" style="border:0;background:none;padding:0;color:#b91c1c;font:inherit;cursor:pointer;text-decoration:underline">❌ Não validado: '+naoValidadosTec+'</button>':'<div>❌ Não validado: 0</div>')+'</div>';
-    const chamadosAprovados=ativos.filter(c=>c.ap?.status==='aprovado');
-    const totalPeriodo=totalAprovadoServicos(chamadosAprovados);
     const perfilTecnico=D.tc.find(x=>x.u===u);
     const tecnicoId=perfilTecnico?._id;
-    const liberarTravaPeriodo=perfilTecnico?.liberarTravaPeriodo===true;
-    const valorPagoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,periodoInicio,periodoFim);
+    const financeiro=rlResumoFinanceiroTecnico(u,periodoInicio,periodoFim,chamados);
+    const liberarTravaPeriodo=financeiro.liberarTrava;
     const aprovadosProximoPeriodo=chamadosProximoPeriodo.filter(c=>c.te===u&&!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
     const totalProximoPeriodo=totalAprovadoServicos(aprovadosProximoPeriodo);
     const valorPagoProximoPeriodo=rlValorPagoDentroDoFiltro(tecnicoId,proximoPeriodo.inicio,proximoPeriodo.fim);
     const saldoProximoPeriodo=Math.max(0,totalProximoPeriodo-valorPagoProximoPeriodo);
-    const todosChamadosAprovados=servicosPagamentoUnicos(D.ch.filter(c=>c.st==='concluida')).filter(c=>c.te===u&&!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
-    const totalVal=totalAprovadoServicos(todosChamadosAprovados);
-    const valorPagoTotal=rlValorPagoDentroDoFiltro(tecnicoId,'','');
-    const saldoAprovado=Math.max(0,totalVal-valorPagoTotal);
-    const saldoPeriodo=liberarTravaPeriodo?saldoAprovado:Math.max(0,totalPeriodo-valorPagoPeriodo);
+    const totalPeriodo=financeiro.totalPeriodo;
+    const valorPagoPeriodo=financeiro.pagoPeriodo;
+    const totalVal=financeiro.totalHistorico;
+    const valorPagoTotal=financeiro.pagoHistorico;
+    const saldoAprovado=financeiro.saldoHistorico;
+    const saldoPeriodo=financeiro.saldo;
     const periodoStr=rlValorMoeda(saldoPeriodo);
     const travaHtml='<button type="button" class="btn btn-rl-periodo-toggle" data-u="'+esc(u)+'" aria-pressed="'+(liberarTravaPeriodo?'true':'false')+'" aria-label="'+(liberarTravaPeriodo?'Desativar liberação integral para ':'Liberar pagamento integral para ')+esc(t.nome)+'" title="'+(liberarTravaPeriodo?'Clique para voltar à trava de 10 dias úteis':'Clique para liberar o saldo aprovado integral')+'" style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;border:1px solid '+(liberarTravaPeriodo?'#86efac':'#cbd5e1')+';background:'+(liberarTravaPeriodo?'#f0fdf4':'#fff')+';border-radius:9px;padding:5px 8px;cursor:pointer;color:#16324f"><span aria-hidden="true" style="font-size:18px">'+(liberarTravaPeriodo?'🔓':'🔒')+'</span><small>'+(liberarTravaPeriodo?'Liberado':'Bloqueado')+'</small></button>';
     const periodoHtml='<span style="white-space:nowrap">'+periodoStr+'</span>'+(liberarTravaPeriodo?'<small style="display:block;margin-top:3px;color:#15803d">Saldo total liberado</small>':'');
@@ -4839,10 +4844,7 @@ function criarAbaPagamento(nome, list) {
 }
 
 function chamadosPagamentoPeriodo(dt1, dt2) {
-  let list = D.ch.filter(c => c.st === 'concluida' && !c.ex?.pagamentoExcluido);
-  if (dt1) { list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= dt1 && !!dataEncerramentoChamado(c)); }
-  if (dt2) { list = list.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= dt2 && !!dataEncerramentoChamado(c)); }
-  return servicosPagamentoUnicos(list);
+  return rlChamadosConcluidosPeriodo(dt1,dt2).filter(c=>!c.ex?.pagamentoExcluido);
 }
 
 function preservarTextosLongosExcel(wb) {
@@ -4876,32 +4878,38 @@ function gerarConsolidadoPagamentos() {
   const dt2 = el('rl-dt2') ? el('rl-dt2').value : '';
   if (dt1 && dt2 && new Date(dt1) > new Date(dt2)) { alert('A data inicial não pode ser maior que a data final.'); return; }
   const list = chamadosPagamentoPeriodo(dt1, dt2);
-  if (!list.length) { alert('Não existem serviços concluídos no período selecionado.'); return; }
+  const proximoPeriodo=rlProximoPeriodoUtil(dt2,10);
+  const chamadosProximoPeriodo=rlChamadosConcluidosPeriodo(proximoPeriodo.inicio,proximoPeriodo.fim);
+  const tecnicosComSaldoAprovado=D.tc.filter(t=>rlResumoFinanceiroTecnico(t.u,dt1,dt2,list).saldoHistorico>0).map(t=>t.u);
+  const usuarios=Array.from(new Set([...list.map(c=>c.te).filter(Boolean),...chamadosProximoPeriodo.map(c=>c.te).filter(Boolean),...tecnicosComSaldoAprovado]));
+  if (!usuarios.length) { alert('Não existem serviços concluídos ou saldo aprovado para exportar.'); return; }
 
   const grupos = {};
   list.forEach(c => { (grupos[c.te] ||= []).push(c); });
   const usadas = new Set(['TOTAL','LPU']);
-  const abas = Object.keys(grupos).map(u => ({u, nome:nt(u) || u || 'Técnico', aba:nomeAbaExcel(nt(u) || u || 'Técnico', usadas), chamados:grupos[u]}));
+  const abas = usuarios.map(u => ({u, nome:nt(u) || u || 'Técnico', aba:nomeAbaExcel(nt(u) || u || 'Técnico', usadas), chamados:grupos[u]||[], financeiro:rlResumoFinanceiroTecnico(u,dt1,dt2,list)}));
   const periodo = (dt1 && dt2) ? new Date(dt1+'T00:00:00').toLocaleDateString('pt-BR') + ' A ' + new Date(dt2+'T00:00:00').toLocaleDateString('pt-BR') : 'BASE COMPLETA';
-  const totalDados = [['TOTAL - PERÍODO ' + periodo],[],['PARCEIRO','APROVADO NO PERÍODO','SERVIÇOS APROVADOS','SALDO APROVADO','QTDE OS','PENDENTES','REJEITADAS']];
+  const totalDados = [['TOTAL - PERÍODO ' + periodo],[],['PARCEIRO','VALOR BRUTO DE REFERÊNCIA','SERVIÇOS APROVADOS','PERÍODO APROVADO (10 DIAS ÚTEIS)','QTDE OS','PENDENTES','REJEITADAS']];
+  let somaPeriodoAprovado=0,somaAprovados=0,somaOs=0,somaPendentes=0,somaRejeitadas=0;
   abas.forEach(a => {
     const aprovados=a.chamados.filter(c=>c.ap?.status==='aprovado'&&!c.ex?.pagamentoExcluido);
-    const bruto=totalAprovadoServicos(aprovados);
-    const tecnicoId=D.tc.find(t=>t.u===a.u)?._id;
-    const pago=rlValorPagoDentroDoFiltro(tecnicoId,dt1,dt2);
+    const resumo=a.financeiro;
+    somaPeriodoAprovado+=resumo.saldo;
+    somaAprovados+=aprovados.length;
+    somaOs+=a.chamados.length;
+    somaPendentes+=a.chamados.filter(c=>!c.ap||c.ap.status==='pendente').length;
+    somaRejeitadas+=a.chamados.filter(c=>c.ap&&c.ap.status==='rejeitado').length;
     totalDados.push([
       a.nome,
-      dt1&&dt2?bruto:'—',
+      resumo.bruto,
       aprovados.length,
-      Math.max(0,bruto-pago),
+      resumo.saldo,
       a.chamados.length,
       a.chamados.filter(c=>!c.ap||c.ap.status==='pendente').length,
       a.chamados.filter(c=>c.ap&&c.ap.status==='rejeitado').length
     ]);
   });
-  const aprovadoPeriodo=dt1&&dt2?totalAprovadoServicos(list.filter(c=>c.ap?.status==='aprovado')):'—';
-  const saldoTotal=Math.max(0,totalAprovadoServicos(list.filter(c=>c.ap?.status==='aprovado'))-abas.reduce((s,a)=>s+rlValorPagoDentroDoFiltro(D.tc.find(t=>t.u===a.u)?._id,dt1,dt2),0));
-  totalDados.push([],['TOTAL',aprovadoPeriodo,list.filter(c=>c.ap?.status==='aprovado').length,saldoTotal,list.length]);
+  totalDados.push([],['TOTAL',abas.reduce((s,a)=>s+a.financeiro.bruto,0),somaAprovados,somaPeriodoAprovado,somaOs,somaPendentes,somaRejeitadas]);
   const wsTotal = XLSX.utils.aoa_to_sheet(totalDados);
   wsTotal['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
   wsTotal['!cols']=[{wch:38},{wch:20},{wch:20},{wch:20},{wch:12},{wch:12},{wch:12}];
