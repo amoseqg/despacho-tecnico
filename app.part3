@@ -3532,13 +3532,18 @@ function opPl(u, focoId=null) {
   const regiao = tec ? tec.r : 'capital';
 
   let chamados = D.ch.filter(c => c.te === u && c.st === 'concluida');
-  if (RL_DT1_ATUAL) {
-    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= RL_DT1_ATUAL && !!dataEncerramentoChamado(c));
+  if (PL_FOCO_ID) {
+    const selecionado=D.ch.find(c=>String(c.id)===PL_FOCO_ID&&c.te===u&&c.st==='concluida'&&!c.ex?.pagamentoExcluido);
+    chamados=selecionado?[selecionado]:[];
+  } else {
+    if (RL_DT1_ATUAL) {
+      chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= RL_DT1_ATUAL && !!dataEncerramentoChamado(c));
+    }
+    if (RL_DT2_ATUAL) {
+      chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= RL_DT2_ATUAL && !!dataEncerramentoChamado(c));
+    }
+    chamados = servicosPagamentoUnicos(chamados);
   }
-  if (RL_DT2_ATUAL) {
-    chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= RL_DT2_ATUAL && !!dataEncerramentoChamado(c));
-  }
-  chamados = servicosPagamentoUnicos(chamados);
   if (chamados.length === 0) return;
   const filtroProtocolo=el('pl-filtro-protocolo');if(filtroProtocolo)filtroProtocolo.value='';
 
@@ -6509,6 +6514,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
 <script src="/appearance.js?v=1"></script>
-<script src="/admin-alerts.js?v=2.5.0"></script>\n<script src="/health-monitor.js?v=2.1.0"></script>
+<script src="/admin-alerts.js?v=2.5.0"></script>\n<script src="/health-monitor.js?v=2.1.1"></script>
 </body>
 </html>
