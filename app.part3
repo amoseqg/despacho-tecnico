@@ -2505,7 +2505,7 @@ function rAt() {
   const chamadosUnicos=S?.t==='adm'?servicosPagamentoUnicos(visiveis.filter(c=>!c.ex?.pagamentoExcluido),true):visiveis;
   const emAtendimento=chamadosUnicos.filter(c=>c.st==='andamento');
   const concluidosUnicos=chamadosUnicos.filter(c=>c.st==='concluida'&&!c.ex?.pagamentoExcluido);
-  const aguardandoAprovacao=concluidosUnicos.filter(c=>!c.ap||c.ap.status==='pendente');
+  const aguardandoAprovacao=concluidosUnicos.filter(c=>!c.ap||c.ap.status==='pendente'||c.ap.status==='rejeitado');
   const list = [...emAtendimento,...aguardandoAprovacao].filter(c=>{
     if(!filtroTecnico) return true;
     const nome=nt(c.te)||D.tc.find(t=>t.u===c.te)?.n||c.te||'';
@@ -2517,7 +2517,7 @@ function rAt() {
   }).filter(c=>{
     if(!filtroAcao) return true;
     const emAtendimento=c.st==='andamento';
-    const estaAguardandoAprovacao=c.st==='concluida'&&(!c.ap||c.ap.status==='pendente');
+    const estaAguardandoAprovacao=c.st==='concluida'&&(!c.ap||c.ap.status==='pendente'||c.ap.status==='rejeitado');
     if(filtroAcao==='aprovar') return estaAguardandoAprovacao;
     if(filtroAcao==='redirecionar'||filtroAcao==='rastreamento') return emAtendimento;
     if(filtroAcao==='suporte') return administrador&&emAtendimento;
@@ -2532,16 +2532,17 @@ function rAt() {
     const t = aguardandoEncerramento ? null : tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
     const marcador=aguardandoEncerramento
-      ? '<span class="badge b-pag-pendente">Concluído, aguardando aprovação</span>'
+      ? (c.ap?.status==='rejeitado'?(Date.parse(c.cc||'')>Date.parse(c.ap.data||'')?'<span class="badge b-pag-pendente">Correção reenviada — aguardando nova análise</span>':'<span class="badge b-rejeitado">Rejeitado — aguardando nova análise</span>'):'<span class="badge b-pag-pendente">Concluído, aguardando aprovação</span>')
       : `<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span>`;
     const administrador=SB_PROFILE?.tipo==='admin'||S?.t==='adm';
     const pendenciaAdmin=administrador&&c.st==='andamento'
       ? (c.pendenciaAtiva?(window.NexoFieldExpediente?.botao(c)||'<span class="badge b-pendente">⏸ Pendência ativa</span>'):`<button type="button" class="btn btn-y nf-pendenciar-expediente" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">⏸ Pendenciar chamado</button>`)
       : (window.NexoFieldExpediente?.botao(c)||'');
+    const marcadorRejeicaoAtivo=!aguardandoEncerramento&&c.ap?.status==='rejeitado'?'<span class="badge b-rejeitado" style="display:block;margin-top:4px">Rejeitado — aguardando correção técnica</span>':'';
     const acao=aguardandoEncerramento
-      ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
+      ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
       : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${administrador?`<button class="btn btn-p btn-suporte-tec" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">🤝 Suporte técnico</button>`:''}${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
-    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td style='white-space:nowrap'>${c.cr?new Date(c.cr).toLocaleString('pt-BR'):'—'}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
+    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td style='white-space:nowrap'>${c.cr?new Date(c.cr).toLocaleString('pt-BR'):'—'}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}${marcadorRejeicaoAtivo}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
   }).join('') || '<tr><td colspan="7" class="empty">Nenhum chamado em atendimento ou aguardando aprovação</td></tr>';
   tb.onclick=event=>{
     if(event.target.closest('button,a,input,select,textarea,[role="button"]')) return;
@@ -2831,7 +2832,7 @@ async function nfChatCarregarMensagens(){
   }
 }
 setInterval(()=>{if(SB_PROFILE)void nfChatAtualizarBadge();},15000);
-function abrirAprovacaoAtendimento(usuario) {
+function abrirAprovacaoAtendimento(usuario,id) {
   if(!usuario)return;
   RL_DT1_ATUAL='';RL_DT2_ATUAL='';
   const inicio=el('rl-dt1'),fim=el('rl-dt2');
@@ -2839,7 +2840,7 @@ function abrirAprovacaoAtendimento(usuario) {
   if(fim)fim.value='';
   document.querySelector('.nav button[data-tab="rl"]')?.click();
   rRl('','',true);
-  opPl(usuario);
+  opPl(usuario,id||null);
 }
 
 let RL_DT1_ATUAL = '';
@@ -3519,9 +3520,11 @@ async function abrirAjusteValorParceiro(id,acao){
 }
 
 let PLU = null;
+let PL_FOCO_ID = null;
 
-function opPl(u) {
+function opPl(u, focoId=null) {
   PLU = u;
+  PL_FOCO_ID = focoId ? String(focoId) : null;
   const tec = D.tc.find(x => x.u === u);
   const nome = tec ? tec.n : nt(u);
   const regiao = tec ? tec.r : 'capital';
@@ -3534,6 +3537,7 @@ function opPl(u) {
     chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= RL_DT2_ATUAL && !!dataEncerramentoChamado(c));
   }
   chamados = servicosPagamentoUnicos(chamados);
+  if(PL_FOCO_ID)chamados=chamados.filter(c=>String(c.id)===PL_FOCO_ID);
   if (chamados.length === 0) return;
   const filtroProtocolo=el('pl-filtro-protocolo');if(filtroProtocolo)filtroProtocolo.value='';
 
@@ -3553,7 +3557,8 @@ function opPl(u) {
     const itensMaterial=normalizarMateriaisUtilizados(ex);
     const misc=itensMaterial.length?itensMaterial.map(m=>`${m.nome} ${m.quantidade} ${m.unidade} × ${moedaMaterial(m.valorUnitario)} = ${moedaMaterial(m.total)}`).join('; '):'—';
     const qtd=itensMaterial.length?itensMaterial.map(m=>`${m.quantidade} ${m.unidade}`).join(' / '):'—';
-    return `<tr data-protocolo="${escM(c.pr||'')}"><td>${esc(c.pr||'—')}</td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
+    const correcaoReenviada=ap.status==='rejeitado'&&Date.parse(c.cc||'')>Date.parse(c.ap?.data||'');
+    return `<tr data-protocolo="${escM(c.pr||'')}"><td>${esc(c.pr||'—')}</td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'&&!correcaoReenviada?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
   el('pl-tb-body').innerHTML = rows;
@@ -3627,6 +3632,19 @@ function opApv(tipo,id) {
   el('m-ap').classList.add('a');
 }
 
+async function sbReabrirChamadoRejeitado(c, motivo) {
+  if(!SB_PROFILE||SB_PROFILE.tipo!=='admin')throw new Error('Somente administradores podem devolver um chamado para correção.');
+  const agora=new Date().toISOString();
+  const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('chamados').update({
+    status:'andamento',iniciado_em:agora,concluido_em:null,atualizado_em:agora
+  }).eq('id',c.id).eq('status','concluida').select('id,status,iniciado_em,concluido_em').single());
+  if(error)throw error;
+  if(!data||data.status!=='andamento')throw new Error('O servidor não confirmou o retorno do chamado para correção técnica.');
+  c.st='andamento';c.am=data.iniciado_em||agora;c.cc=null;
+  c.ajuste={motivo,reabertoEm:agora};
+  return data;
+}
+
 async function cfAp() {
   if(S?.t!=='adm' || !APSERVICO || !['aprovado','rejeitado'].includes(APT))return;
   const obs = el('ap-obs').value.trim();
@@ -3635,9 +3653,10 @@ async function cfAp() {
   // quando há itens aprovados. A confirmação deve seguir a mesma regra visual,
   // permitindo corrigir a decisão anterior sem deixar o modal travado.
   const alvos=D.ch.filter(c=>{
-    if(c.id!==APSERVICO || c.te!==PLU || c.st!=='concluida' || c.ex?.pagamentoExcluido) return false;
+    if(String(c.id)!==String(APSERVICO) || c.te!==PLU || c.st!=='concluida' || c.ex?.pagamentoExcluido) return false;
     const status=c.ap?.status||'pendente';
-    return APT==='aprovado' ? status!=='aprovado' : status!=='rejeitado';
+    const correcaoReenviada=status==='rejeitado'&&Date.parse(c.cc||'')>Date.parse(c.ap?.data||'');
+    return APT==='aprovado' ? status!=='aprovado' : status!=='rejeitado'||correcaoReenviada;
   });
   if(!alvos.length){alert(APT==='aprovado'?'Todos os serviços já estão aprovados.':'Todos os serviços já estão rejeitados.');return;}
   const btn=el('btn-cf-ap'),textoBtn=btn?.textContent;
@@ -3647,10 +3666,17 @@ async function cfAp() {
     alvos.forEach(c=>{
       c.ap={status:APT,obs:APT==='rejeitado'?obs:'',data:confirmadoEm,admin:S.n};
     });
+    if(APT==='rejeitado')await sbReabrirChamadoRejeitado(alvos[0],obs);
     lsSet('dd',D);
     el('m-ap').classList.remove('a');
-    rRl(RL_DT1_ATUAL,RL_DT2_ATUAL);rDb();opPl(PLU);
-    alert(APT==='aprovado'?'Serviço aprovado e confirmado no servidor!':'Serviço rejeitado e confirmado no servidor.');
+    rRl(RL_DT1_ATUAL,RL_DT2_ATUAL);rDb();
+    if(APT==='aprovado'){
+      opPl(PLU,APSERVICO);
+      alert('Serviço aprovado e confirmado no servidor. O protocolo está atualizado em Relatórios.');
+    }else{
+      document.querySelector('.nav button[data-tab="at"]')?.click();rAt();rTat();
+      alert('Serviço rejeitado. O chamado voltou para a área do técnico para correção e permanece nas ações com o status de rejeitado.');
+    }
   }catch(err){
     sbShowError('Não foi possível salvar a aprovação',err);
     await sbRecarregarDados();
@@ -3882,16 +3908,17 @@ function rTat() {
   const al = el('t-al');
   if(al) al.innerHTML = list.length ? list.map(c => {
     const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
-    const validacaoStatus=c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':''));
+    const validacaoStatus=c.ap?.status==='rejeitado'?'<span class="badge b-rejeitado">Correção solicitada pelo administrador</span>':(c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'')));
     return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div>
     ${dadosSite(c)}
      <div class="os-r"><b>Descrição:</b> ${valorInfo(c.de)}</div>
     <div class="os-r"><b>Skill necessária:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
     ${infoReincidencia(c).html}
     ${validacaoStatus?`<div style="margin-top:8px">${validacaoStatus}</div>`:''}
+    ${c.ap?.status==='rejeitado'&&c.ap?.obs?`<div class="trava" style="margin-top:8px"><b>Motivo da correção:</b><br>${valorInfo(c.ap.obs)}</div>`:''}
     ${window.NexoFieldPendencias?.resumoTecnico(c.id)||''}
     ${window.NexoFieldReaprazamento?.resumoTecnico(c.id)||''}
-    <div class="nf-acoes-atendimento"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar')}</button>${window.NexoFieldReaprazamento?.botao(c)||''}${window.NexoFieldExpediente?.resumo(c.id)||''}${!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
+    <div class="nf-acoes-atendimento"><button class="btn btn-p btn-ex" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">${c.ap?.status==='rejeitado'?'🛠️ Corrigir serviço':(c.validacaoOperador?'✅ Revisar e encerrar':(c.ex?.enviadoValidacaoEm?'👁️ Ver acompanhamento':'📝 Executar'))}</button>${window.NexoFieldReaprazamento?.botao(c)||''}${window.NexoFieldExpediente?.resumo(c.id)||''}${!c.pendenciaAtiva?`<button class="btn btn-y nf-solicitar-pendencia" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">⏸ Solicitar pendência</button>`:''}</div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado em atendimento</h3></div>';
 }
 
@@ -4675,7 +4702,7 @@ async function cfEx() {
   if(!c) return;
   const btn=el('btn-cf-ex'), textoBtn=btn?.textContent;
   const anterior={ex:c.ex,st:c.st,cc:c.cc,ap:c.ap,ajuste:c.ajuste};
-  const eraAjuste = !!c.ajuste;
+  const eraAjuste = !!c.ajuste || c.ap?.status==='rejeitado';
   if(!validarCamposEncerramento())return;
   if(String(el('ex-atv').value||'').startsWith('Serviços sob demanda|')){
     const valor=Number(el('ex-avulso').value);
@@ -5248,7 +5275,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-exportar-aplicacoes-pendentes')) { exportarListaAplicacoesPendentes(); }
     if(t.classList.contains('btn-fechar-aplicacoes-material')) { t.closest('dialog')?.close(); }
     if(t.classList.contains('btn-ap-servico')) { opApv(t.dataset.status,t.dataset.id); }
-    if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u); }
+    if(t.classList.contains('btn-at-revisar')) { abrirAprovacaoAtendimento(t.dataset.u,t.dataset.id); }
     if(t.classList.contains('btn-valor-parceiro')) { abrirAjusteValorParceiro(t.dataset.id,t.dataset.acao); }
     if(t.classList.contains('btn-ver-pl')) { opPl(t.dataset.u); }
     if(t.classList.contains('btn-rl-aprovados')) { abrirDetalheRelatorioServicos(t.dataset.u,'aprovados'); }
