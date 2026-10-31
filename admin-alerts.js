@@ -75,7 +75,7 @@
     const state=loadState(),notifications=due(state,model,now);
     if(notifications.length){
       banner.textContent=`Lembrete: ${model.calls.length} chamado(s) aberto(s) e ${model.deliveries.length} entrega(s) pendente(s). Confira a Central de alertas.`;
-      banner.hidden=false;panel.querySelector('details').open=true;
+      banner.hidden=false;
       for(const k of notifications)state[k]=now;
       // Guarda só o histórico recente deste administrador; nunca confirma para outro.
       for(const k of Object.keys(state))if(now-state[k]>2*DAY)delete state[k];
