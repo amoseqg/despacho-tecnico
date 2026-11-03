@@ -3062,11 +3062,17 @@ async function rlAbrirPedido(usuario){
     if(!numero){mostrarStatus('Informe o número do pedido.','#b42318');campoNumero.focus();return;}
     if(valorAtual<=0){mostrarStatus('Não há saldo aprovado disponível neste período.','#b42318');return;}
     if(!emailValido(email)){mostrarStatus('O cadastro do técnico não possui um e-mail válido. Corrija o e-mail do perfil antes de salvar.','#b42318');return;}
-    const assunto=encodeURIComponent(`Pedido ${numero} — emissão de nota fiscal`);
-    const corpo=encodeURIComponent(`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nPeríodo aprovado: ${formatarDataBrasil(periodoInicio)} a ${formatarDataBrasil(periodoFim)}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`);
-    const mailtoUrl=`mailto:${encodeURIComponent(email)}?subject=${assunto}&body=${corpo}`;
+    const assunto=`Pedido ${numero} — emissão de nota fiscal`;
+    const corpo=`Olá, ${perfil.n}.\n\nSegue o pedido para emissão da nota fiscal:\n\nNúmero do pedido: ${numero}\nPeríodo aprovado: ${formatarDataBrasil(periodoInicio)} a ${formatarDataBrasil(periodoFim)}\nValor: ${rlValorMoeda(valorAtual)}\n\nAtenciosamente,\nMÉTODO Telecom`;
+    const outlookUrl=new URL('https://outlook.office.com/mail/deeplink/compose');
+    outlookUrl.searchParams.set('to',email);
+    outlookUrl.searchParams.set('subject',assunto);
+    outlookUrl.searchParams.set('body',corpo);
     let janelaEmail=null;
     try{janelaEmail=window.open('about:blank','_blank');}catch(_){}
+    if(janelaEmail&&!janelaEmail.closed){
+      try{janelaEmail.document.title='Preparando e-mail';janelaEmail.document.body.innerHTML='<p style="font:16px system-ui;padding:24px;color:#16324f">Salvando o pedido e preparando o e-mail no Outlook…</p>';}catch(_){}
+    }
     botaoSalvar.disabled=true;
     mostrarStatus('Salvando pedido e preparando o e-mail...');
     try{
@@ -3083,12 +3089,22 @@ async function rlAbrirPedido(usuario){
         botaoConfirmar.disabled=true;
       }else{
         botaoConfirmar.disabled=false;
+        let abriuOutlook=false;
         if(janelaEmail&&!janelaEmail.closed){
-          janelaEmail.location.href=mailtoUrl;
+          try{janelaEmail.location.replace(outlookUrl.href);abriuOutlook=true;}catch(_){try{janelaEmail.close();}catch(__){}}
+        }
+        if(abriuOutlook){
           mostrarStatus('✅ Pedido salvo. O e-mail foi aberto para envio; confirme abaixo depois de enviar.','#9a6700');
         }else{
-          status.innerHTML='✅ Pedido salvo. A abertura automática foi bloqueada pelo navegador. <a href="'+esc(mailtoUrl)+'" target="_blank" rel="noopener">Clique aqui para abrir o e-mail</a> e confirme abaixo depois de enviar.';
+          status.textContent='✅ Pedido salvo. O navegador bloqueou a abertura automática. Use o botão abaixo para abrir o e-mail no Outlook e confirme depois de enviar.';
           status.style.color='#9a6700';
+          const link=document.createElement('a');
+          link.href=outlookUrl.href;
+          link.target='_blank';
+          link.rel='noopener noreferrer';
+          link.textContent='Abrir e-mail no Outlook';
+          link.style.cssText='display:inline-block;margin:8px 8px 0 0;padding:8px 12px;border-radius:8px;background:#0f6cbd;color:#fff;text-decoration:none;font-weight:600';
+          status.append(document.createElement('br'),link);
         }
       }
     }catch(error){
