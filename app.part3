@@ -628,15 +628,34 @@ function atualizarCamposRegiao() {
   atualizarTecnicosChamado();
 }
 
-function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='', skill='') {
+function osServicoPrazoISO(inicioIso,diasUteis=3){
+  const data=new Date(inicioIso);
+  if(!Number.isFinite(data.getTime()))return null;
+  let restantes=Math.max(1,Number(diasUteis)||3);
+  while(restantes>0){
+    data.setDate(data.getDate()+1);
+    const dia=data.getDay(),ano=data.getFullYear();
+    const chave=ano+'-'+String(data.getMonth()+1).padStart(2,'0')+'-'+String(data.getDate()).padStart(2,'0');
+    const feriados=rlFeriadosRecife(ano);
+    if(dia!==0&&dia!==6&&!feriados.has(chave))restantes--;
+  }
+  return data.toISOString();
+}
+function slaTextoChamado(c){return c?.tipoOs==='servico'?'3 dias úteis':slaRegiao(c?.re,skillChamado(c));}
+function tm(iso, reg, pausadoSegundos=0, pendenciaDesde='', skill='', osServico=false) {
   const sla=skill==='vistoria'?{v:24*3600,a:36*3600,r:48*3600}:(SLA[reg]||SLA.capital);
   const inicio=new Date(iso).getTime(),agora=Date.now();
   const pendencia=new Date(pendenciaDesde).getTime();
   const pausaAtiva=pendenciaDesde&&Number.isFinite(pendencia)?Math.max(0,Math.floor((agora-pendencia)/1000)):0;
-  const decorrido=iso&&Number.isFinite(inicio)?Math.max(0,Math.floor((agora-inicio)/1000)-Math.max(0,Number(pausadoSegundos)||0)-pausaAtiva):0;
-  const restante=sla.r-decorrido,vencido=restante<0;
+  const pausado=Math.max(0,Number(pausadoSegundos)||0)+pausaAtiva;
+  const decorrido=iso&&Number.isFinite(inicio)?Math.max(0,Math.floor((agora-inicio)/1000)-pausado):0;
+  const prazoServico=osServico?Date.parse(osServicoPrazoISO(iso,3)):NaN;
+  const restante=osServico&&Number.isFinite(prazoServico)?prazoServico-agora+pausado:sla.r-decorrido;
+  const vencido=restante<0;
   let c='t-g';
-  if(vencido)c='t-c';else if(decorrido>=sla.a)c='t-r';else if(decorrido>=sla.v)c='t-y';
+  if(vencido)c='t-c';
+  else if(osServico?restante<=48*3600:decorrido>=sla.a)c='t-r';
+  else if(osServico?restante<=24*3600:decorrido>=sla.v)c='t-y';
   const tempo=Math.max(0,restante),h=String(Math.floor(tempo/3600)).padStart(2,'0'),m=String(Math.floor(tempo%3600/60)).padStart(2,'0'),sec=String(tempo%60).padStart(2,'0');
   return {t:(vencido?'Prazo vencido · ':'Restam ')+`${h}:${m}:${sec}`+(pendenciaDesde?' · Pausado':''),c,s:decorrido,restante};
 }
@@ -1759,7 +1778,7 @@ async function addOsServico() {
     id:'CH-'+Date.now(),pr:identificador,sdm:'',abertura:'OS de Serviços',si:site,ci:circuito,re:regiao,skill,area:regiao==='capital'?area:'',
     en:endereco,cid:cidade,contato,horario,velocidade:'',prtm:'',pvfTotal:'',de:descricao,dtexec:el('os-servico-data').value,
     tipoOs:'servico',osPeConectado:el('os-servico-pe').value.trim(),atividadeServico:atividade,
-    st:'pendente',te:tecnico,mr:'',tr:[],dt:null,ex:null,cr:ag(),ae:null,am:null,cc:null
+    st:'pendente',te:tecnico,mr:'',tr:[],dt:null,ex:null,cr:new Date().toISOString(),ae:null,am:null,cc:null
   };
   const btn=el('btn-criar-os-servico'),textoBtn=btn?.innerHTML;
   try{
@@ -2292,7 +2311,7 @@ function rCh() {
       <div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="badge b-pendente">Aguardando o técnico</span></div>
       ${dadosSite(c)}
       <div class="os-r"><b>Quem abriu:</b> ${esc(c.abertura || '—')}</div>
-      <div class="os-r"><b>Região operacional:</b> ${esc(c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior')))} — SLA ${slaRegiao(c.re,skillChamado(c))}</div>
+      <div class="os-r"><b>Região operacional:</b> ${esc(c.regiaoOperacional || (c.re === 'capital' ? nomeArea(c.area) : (c.re === 'noronha' ? 'Fernando de Noronha' : 'Interior')))} — SLA ${slaTextoChamado(c)}</div>
       <div class="os-r"><b>Skill:</b> ${nomeSkill(skillChamado(c))}${c.re === 'capital' ? ` — <b>Área:</b> ${nomeArea(c.area)}` : ''}</div>
       ${c.dt && c.dt.tipo === 'liberacao-area' ? '<div class="os-r"><span class="badge b-recusado">Liberação excepcional</span></div>' : ''}
       ${infoReincidencia(c).html}
@@ -2529,7 +2548,7 @@ function rAt() {
   });
   tb.innerHTML = list.map(c => {
     const aguardandoEncerramento = c.st === 'concluida';
-    const t = aguardandoEncerramento ? null : tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
+    const t = aguardandoEncerramento ? null : tm(c.tipoOs==='servico'?c.cr:c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c),c.tipoOs==='servico');
     const fluxoPortal=c.solicitanteId?(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'<span class="badge b-andamento">Execução técnica</span>')):'';
     const marcador=aguardandoEncerramento
       ? (c.ap?.status==='rejeitado'?(Date.parse(c.cc||'')>Date.parse(c.ap.data||'')?'<span class="badge b-pag-pendente">Correção reenviada — aguardando nova análise</span>':'<span class="badge b-rejeitado">Rejeitado — aguardando nova análise</span>'):'<span class="badge b-pag-pendente">Concluído, aguardando aprovação</span>')
@@ -3916,7 +3935,7 @@ function rTdb() {
   const list = chamadosDoTecnico('andamento');
   const tmEl = el('t-tm');
   if(tmEl) tmEl.innerHTML = list.length ? list.map(c => {
-    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
+    const t = tm(c.tipoOs==='servico'?c.cr:c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c),c.tipoOs==='servico');
     return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span><span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div><div class="os-r"><b>Site:</b> ${valorInfo(c.si)}</div></div>`;
   }).join('') : '<div class="empty">Nenhum chamado em atendimento</div>';
 }
@@ -3941,7 +3960,7 @@ function rTat() {
   const list = chamadosDoTecnico('andamento');
   const al = el('t-al');
   if(al) al.innerHTML = list.length ? list.map(c => {
-    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
+    const t = tm(c.tipoOs==='servico'?c.cr:c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c),c.tipoOs==='servico');
     const validacaoStatus=c.ap?.status==='rejeitado'?'<span class="badge b-rejeitado">Correção solicitada pelo administrador</span>':(c.pendenciaAtiva?'<span class="badge b-pendente">⏸ Pendência autorizada</span>':(c.validacaoOperador?'<span class="badge b-concluida">✓ Operador validou</span>':(c.ex?.enviadoValidacaoEm?'<span class="badge b-andamento">Execução técnica</span>':'')));
     return `<div class="os"><div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span>${seloTipoOs(c)}<span class="timer ${t.c}" data-prazo-id="${c.id}">${t.t}</span></div>
     ${dadosSite(c)}
@@ -4642,7 +4661,7 @@ function abrirDetalheChamadoFoto(id){
   const regiao=c.re==='capital'?nomeArea(c.area):(c.re==='interior'?'Interior':(c.re==='noronha'?'Fernando de Noronha':'Não definida'));
   el('detalhe-foto-chamado-conteudo').innerHTML=`<div class="os-h"><strong>${esc(identificacaoOs(c))} — ${esc(c.si||'Cliente não informado')}</strong></div>
     ${dadosSite(c)}${dadosAberturaPortal(c)}
-    <div class="os-r"><b>Região:</b> ${esc(regiao)} — SLA ${esc(slaRegiao(c.re,skillChamado(c)))}</div>
+    <div class="os-r"><b>Região:</b> ${esc(regiao)} — SLA ${esc(slaTextoChamado(c))}</div>
     <div class="os-r"><b>Skill necessária:</b> ${esc(nomeSkill(skillChamado(c)))}</div>
     <div class="info" style="margin-top:10px"><b>Descrição do chamado</b><div style="margin-top:6px;white-space:pre-wrap">${valorInfo(c.de||'Não informada')}</div></div>
     <div class="os-r" style="margin-top:8px"><b>Técnico:</b> ${esc(nt(c.te)||'—')} • <b>Encerrado:</b> ${c.cc?esc(new Date(c.cc).toLocaleString('pt-BR')):'—'}</div>`;
@@ -4720,7 +4739,7 @@ async function opEx(id) {
 
   if (TI) clearInterval(TI);
   TI = setInterval(() => {
-    const t = tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
+    const t = tm(c.tipoOs==='servico'?c.cr:c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c),c.tipoOs==='servico');
     const elm = el('ex-tm');
     if (elm) { elm.textContent = t.t; elm.className = 'timer ' + t.c; }
   }, 1000);
@@ -5059,7 +5078,7 @@ function startLoop() {
     const chamados=new Map(D.ch.map(c=>[String(c.id),c]));
     document.querySelectorAll('[data-prazo-id]').forEach(node=>{
       const c=chamados.get(node.dataset.prazoId);if(!c)return;
-      const t=tm(c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c));
+      const t=tm(c.tipoOs==='servico'?c.cr:c.am,c.re,c.prazoPausadoSegundos,c.pendenciaAtiva?c.pendenciaDesde:'',skillChamado(c),c.tipoOs==='servico');
       node.textContent=t.t;node.className='timer '+t.c;
     });
   },1000);
@@ -5805,7 +5824,7 @@ async function sbLoadAll(){
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'', dataPeriodoPagamento:ajustesPeriodoMap.get(String(c.id))||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
-      solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', operadora:c.operadora||'', vencimento:c.vencimento_em||'',pendenciaAtiva:!!c.pendencia_ativa,pendenciaDesde:c.pendencia_desde||'',prazoPausadoSegundos:Number(c.prazo_pausado_segundos||0),
+      solicitanteId:c.solicitante_id||'', solicitanteNome:c.solicitante_nome||'', solicitanteEmail:c.solicitante_email||'', operadora:c.operadora||'', vencimento:c.tipo_os==='servico'?(osServicoPrazoISO(c.criado_em)||c.vencimento_em||''):(c.vencimento_em||''),pendenciaAtiva:!!c.pendencia_ativa,pendenciaDesde:c.pendencia_desde||'',prazoPausadoSegundos:Number(c.prazo_pausado_segundos||0),
       dt:c.liberacao_area?{tipo:'liberacao-area',admin:sbNameById(c.liberacao_area_admin),d:c.liberacao_area_em,area:c.area,regiaoOperacional:c.regiao_operacional}:null,
       cr:c.criado_em, ae:c.aceito_em, am:c.iniciado_em, cc:c.concluido_em,
       tr:trRows.map(x=>({de:sbUserById(x.de_tecnico_id),para:sbUserById(x.para_tecnico_id),m:x.motivo||'',d:x.criado_em,admin:sbNameById(x.realizado_por)||'Administrador',adminId:x.realizado_por,_dbid:x.id})),
@@ -5891,7 +5910,7 @@ async function sbSeedSitesIfNeeded(){
 function sbChamadoRow(c){
   const criadoEm=sbIso(c.cr)||new Date().toISOString();
   const horasSla=Number(String(slaRegiao(c.re,skillChamado(c))).replace(/h$/,''))||6;
-  const vencimento=sbIso(c.vencimento)||new Date(Date.parse(criadoEm)+horasSla*60*60*1000).toISOString();
+  const vencimento=c.tipoOs==='servico'?(osServicoPrazoISO(criadoEm)||sbIso(c.vencimento)||new Date(Date.parse(criadoEm)+horasSla*60*60*1000).toISOString()):(sbIso(c.vencimento)||new Date(Date.parse(criadoEm)+horasSla*60*60*1000).toISOString());
   return {
     protocolo:c.pr||'', sdm:c.sdm||null, abertura_origem:c.abertura||null, circuito:c.ci||'', site_nome:c.si||null, cidade:c.cid||null,
     endereco:c.en||null, contato:c.contato||null, horario_expediente:c.horario||null, velocidade:c.velocidade||null, prtm:c.prtm||null,
