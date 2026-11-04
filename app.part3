@@ -2514,20 +2514,24 @@ function exportarBaseChamadosFechados(dt1,dt2){
 function dataAtendimentoFormatada(valor) {
   if(!valor) return '—';
   const texto=String(valor).trim();
-  // Interpreta textos brasileiros como dia/mês/ano, sem depender do locale do navegador.
+  // Textos brasileiros são lidos explicitamente como dia/mês/ano.
   const brasileira=texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
-  let data;
   if(brasileira) {
-    const [,dia,mes,ano,hora='0',minuto='0',segundo='0']=brasileira;
-    data=new Date(Number(ano),Number(mes)-1,Number(dia),Number(hora),Number(minuto),Number(segundo));
+    const [,dia,mes,ano,hora,minuto,segundo]=brasileira;
+    const data=new Date(Number(ano),Number(mes)-1,Number(dia));
     if(data.getFullYear()!==Number(ano)||data.getMonth()!==Number(mes)-1||data.getDate()!==Number(dia)) return texto;
-  } else {
-    const isoData=texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    data=isoData
-      ? new Date(Number(isoData[1]),Number(isoData[2])-1,Number(isoData[3]))
-      : new Date(texto);
+    const dataFormatada=dia.padStart(2,'0')+'/'+mes.padStart(2,'0')+'/'+ano;
+    return hora===undefined ? dataFormatada : dataFormatada+', '+hora.padStart(2,'0')+':'+minuto+':'+(segundo||'00');
   }
-  return Number.isNaN(data.getTime()) ? texto : data.toLocaleString('pt-BR');
+  const isoData=texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(isoData) return isoData[3]+'/'+isoData[2]+'/'+isoData[1];
+  const data=new Date(texto);
+  if(Number.isNaN(data.getTime())) return texto;
+  const partes=new Intl.DateTimeFormat('pt-BR',{
+    timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric',
+    hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23'
+  }).formatToParts(data).reduce((obj,parte)=>(obj[parte.type]=parte.value,obj),{});
+  return partes.day+'/'+partes.month+'/'+partes.year+', '+partes.hour+':'+partes.minute+':'+partes.second;
 }
 
 function rAt() {
