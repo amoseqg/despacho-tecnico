@@ -2702,12 +2702,37 @@ function abrirInformacaoChamado(id){
   const chamado=D.ch.find(c=>String(c.id)===String(id));
   if(!chamado) return;
   const dialog=document.createElement('dialog');
-  dialog.style.cssText='width:min(760px,calc(100% - 28px));max-height:88vh;border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';
+  dialog.style.cssText='width:min(820px,calc(100% - 28px));max-height:88vh;overflow:auto;border:0;border-radius:14px;padding:0;box-shadow:0 24px 70px #0005';
+  const tipoOS=chamado.tipoOs==='servico'?'OS de Serviços':'OS de Manutenção';
+  const statusOS=({pendente:'Aguardando técnico',andamento:'Em atendimento',concluida:'Concluído',recusado:'Recusado'})[chamado.st]||chamado.st||'—';
+  const detalhes=[
+    ['Protocolo / OS',identificacaoOs(chamado)],
+    ['SDM',chamado.sdm],
+    ['Site / cliente',chamado.si],
+    ['Circuito',chamado.ci],
+    ['Cidade',chamado.cid],
+    ['Região',nomeRegiao(chamado.re)],
+    ['Endereço',chamado.en],
+    ['Contato',chamado.contato],
+    ['Operadora',chamado.operadora],
+    ['Aberto por',[chamado.solicitanteNome,chamado.solicitanteEmail].filter(Boolean).join(' · ')],
+    ['Tipo de OS',tipoOS],
+    ['Skill necessário',skillChamado(chamado)],
+    ['Técnico responsável',nt(chamado.te)],
+    ['Status',statusOS],
+    ['Incluído em',dataAtendimentoFormatada(chamado.cr)],
+    ['Vencimento',dataAtendimentoFormatada(chamado.vencimento)],
+    ['Horário de atendimento',chamado.horario],
+    ['OS PE Conectado',chamado.osPeConectado],
+    ['Atividade de serviço',chamado.atividadeServico]
+  ];
+  const detalhesHtml=detalhes.map(([rotulo,valor])=>`<div style="min-width:0;padding:9px 11px;background:#f5f7fa;border-radius:8px"><div style="font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b">${esc(rotulo)}</div><div style="margin-top:3px;font-size:13px;color:#16324f;white-space:pre-wrap;overflow-wrap:anywhere">${esc(valor||'—')}</div></div>`).join('');
   dialog.innerHTML=`<form id="at-nota-form" style="padding:20px;font-family:system-ui;display:grid;gap:12px">
     <div><h3 style="margin:0 0 5px;color:#16324f">Detalhes do chamado ${esc(identificacaoOs(chamado))}</h3><div style="color:#526273;font-size:13px">${esc(chamado.si||'Cliente não informado')} · Técnico: ${esc(nt(chamado.te))}</div></div>
+    <section aria-label="Dados principais do chamado" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:8px">${detalhesHtml}</section>
     <div><strong style="font-size:13px;color:#344054">Descrição original</strong><div id="at-nota-descricao" style="margin-top:5px;max-height:130px;overflow:auto;padding:10px;background:#f5f7fa;border-radius:8px;white-space:pre-wrap;font-size:13px"></div></div>
     <div><strong style="font-size:13px;color:#344054">Informações adicionais registradas</strong><div id="at-nota-historico" style="margin-top:5px;max-height:180px;overflow:auto;padding:10px;background:#f5f7fa;border-radius:8px;white-space:pre-wrap;font-size:13px"></div></div>
-    <div><label class="label" for="at-nota-nova">Adicionar informação</label><textarea id="at-nota-nova" class="input" maxlength="4000" rows="5" placeholder="Digite uma informação complementar para este chamado"></textarea></div>
+    <div><label class="label" for="at-nota-nova">Adicionar informação</label><textarea id="at-nota-nova" class="input" maxlength="4000" rows="3" placeholder="Digite uma informação complementar para este chamado"></textarea></div>
     <div style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn btn-s" id="at-nota-cancelar">Fechar</button><button type="submit" class="btn btn-p" id="at-nota-salvar">Salvar informação</button></div>
   </form>`;
   dialog.querySelector('#at-nota-descricao').textContent=String(chamado.de||'Descrição não informada.');
