@@ -2511,6 +2511,25 @@ function exportarBaseChamadosFechados(dt1,dt2){
   XLSX.writeFile(wb,`base_chamados_fechados_${dt1||'inicio'}_a_${dt2||'atual'}.xlsx`);
 }
 
+function dataAtendimentoFormatada(valor) {
+  if(!valor) return '—';
+  const texto=String(valor).trim();
+  // Interpreta textos brasileiros como dia/mês/ano, sem depender do locale do navegador.
+  const brasileira=texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:,?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+  let data;
+  if(brasileira) {
+    const [,dia,mes,ano,hora='0',minuto='0',segundo='0']=brasileira;
+    data=new Date(Number(ano),Number(mes)-1,Number(dia),Number(hora),Number(minuto),Number(segundo));
+    if(data.getFullYear()!==Number(ano)||data.getMonth()!==Number(mes)-1||data.getDate()!==Number(dia)) return texto;
+  } else {
+    const isoData=texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    data=isoData
+      ? new Date(Number(isoData[1]),Number(isoData[2])-1,Number(isoData[3]))
+      : new Date(texto);
+  }
+  return Number.isNaN(data.getTime()) ? texto : data.toLocaleString('pt-BR');
+}
+
 function rAt() {
   const tb = el('tb-at');
   if(!tb) return;
@@ -2561,7 +2580,7 @@ function rAt() {
     const acao=aguardandoEncerramento
       ? `<button class="btn btn-p btn-at-revisar" data-u="${escM(c.te)}" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">📋 Aprovar ou rejeitar</button>`
       : `<button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">👷 Redirecionar</button>${administrador?`<button class="btn btn-p btn-suporte-tec" data-id="${escM(c.id)}" style="padding:4px 7px;font-size:.6rem">🤝 Suporte técnico</button>`:''}${c.solicitanteId?'':`<button class="btn btn-s btn-encerrar-admin" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">✅ Encerrar</button>`}${localizacaoChamadoHtml(c)}${pendenciaAdmin}${SB_PROFILE?.tipo==='admin' ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:4px 7px;font-size:.6rem">🗑️</button>` : ''}`;
-    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td style='white-space:nowrap'>${c.cr?new Date(c.cr).toLocaleString('pt-BR'):'—'}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}${marcadorRejeicaoAtivo}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
+    return `<tr data-at-chamado-id="${escM(c.id)}" style="cursor:pointer" title="Clique para ver detalhes e adicionar informação"><td>${esc(identificacaoOs(c))}${seloTipoOs(c)}${fluxoPortal?'<br>'+fluxoPortal:''}</td><td>${valorInfo(c.si)}</td><td>${nt(c.te)}</td><td style='white-space:nowrap'>${dataAtendimentoFormatada(c.cr)}</td><td>${nomeRegiao(c.re)}</td><td>${marcador}${marcadorRejeicaoAtivo}</td><td><div class="nf-acoes-atendimento">${acao}</div></td></tr>`;
   }).join('') || '<tr><td colspan="7" class="empty">Nenhum chamado em atendimento ou aguardando aprovação</td></tr>';
   tb.onclick=event=>{
     if(event.target.closest('button,a,input,select,textarea,[role="button"]')) return;
