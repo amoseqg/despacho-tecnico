@@ -28,6 +28,7 @@ function inicializarMateriaisPlanilha() {
 D.mat = Array.isArray(D.mat) ? D.mat : [];
 D.mr = Array.isArray(D.mr) ? D.mr : [];
 let S = lsGet('ss', null);
+let ADMIN_TEC_CONTEXT = null;
 let CID = null, EID = null, TI = null, loginType = '';
 let EX_MATERIAIS = [];
 
@@ -495,6 +496,36 @@ function ss() { lsSet('ss', S); }
 function ag() { return new Date().toLocaleString('pt-BR'); }
 function nt(u) { const t = D.tc.find(x => x.u === u); return t ? t.n : u; }
 function adminGeral() { return !!(S && S.t === 'adm' && D.ad.some(a => a.u === S.u && a.p)); }
+const EMAIL_ADMIN_GERAL_ACESSO_TECNICO='amos.gomes@metodotelecom.com.br';
+function adminPodeAcessarPerfilTecnico(){
+  return !!(S?.t==='adm'&&SB_PROFILE?.tipo==='admin'&&SB_PROFILE?.admin_geral===true&&String(SB_PROFILE?.email||'').trim().toLowerCase()===EMAIL_ADMIN_GERAL_ACESSO_TECNICO&&String(S._id||'')===String(SB_PROFILE.id||''));
+}
+function adminMostrarBannerAcessoTecnico(){
+  const painel=el('pt');
+  if(!painel)return;
+  let faixa=el('admin-acesso-tecnico-banner');
+  if(!ADMIN_TEC_CONTEXT){faixa?.remove();return;}
+  if(!faixa){faixa=document.createElement('div');faixa.id='admin-acesso-tecnico-banner';painel.prepend(faixa);}
+  faixa.style.cssText='position:sticky;top:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:11px 16px;margin:0 0 12px;border:1px solid #f2c46d;border-radius:10px;background:#fff7df;color:#6b4c00;font:600 13px/1.4 system-ui';
+  faixa.innerHTML='<span>Modo de apoio do Administrador Geral — perfil de '+escM(ADMIN_TEC_CONTEXT.nome)+'; ações ficam vinculadas à sua sessão administrativa.</span><button type="button" class="btn btn-p" style="padding:7px 12px" onclick="voltarAoMeuPerfilAdmin()">Voltar ao administrador</button>';
+}
+async function acessarPerfilTecnicoComoAdmin(id){
+  if(!adminPodeAcessarPerfilTecnico()){nfToast('Acesso exclusivo ao Administrador Geral autorizado.','erro');return;}
+  if(ADMIN_TEC_CONTEXT){nfToast('Já existe um perfil técnico aberto. Volte ao administrador primeiro.','aviso');return;}
+  const tecnico=D.tc.find(t=>String(t._id)===String(id)&&(t.tipo==='tecnico'||t.tecnicoAtivo===true));
+  if(!tecnico){nfToast('Técnico ativo não encontrado. Atualize a lista e tente novamente.','erro');return;}
+  ADMIN_TEC_CONTEXT={admin:{...S},tecnicoId:String(tecnico._id),nome:tecnico.n};
+  S={t:'tec',n:tecnico.n,u:tecnico.u,r:tecnico.r,_id:tecnico._id,adminAcessando:true};
+  enterTec();
+}
+function voltarAoMeuPerfilAdmin(){
+  if(!ADMIN_TEC_CONTEXT||!adminPodeAcessarPerfilTecnico())return;
+  const sessaoAdmin=ADMIN_TEC_CONTEXT.admin;
+  ADMIN_TEC_CONTEXT=null;
+  S=sessaoAdmin;
+  el('admin-acesso-tecnico-banner')?.remove();
+  enterAdm();
+}
 function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
 function nomeSkill(v) { return ({ voz: 'Voz', dados: 'Dados', infra: 'Infra', wifi: 'WiFi', vistoria: 'Vistoria', vistoria_wifi: 'Vistoria / WiFi', vistoria_voz: 'Vistoria / Voz', dados_vistoria: 'Dados / Vistoria' })[v] || 'Não definida'; }
@@ -835,8 +866,9 @@ function enterTec() {
     ? '<span class="badge b-capital">🏝️ Fernando de Noronha (6h)</span>'
     : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
   el('tr').innerHTML = b;
+  adminMostrarBannerAcessoTecnico();
   tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
-  nfIniciarPresencaTecnico();
+  if(!ADMIN_TEC_CONTEXT)nfIniciarPresencaTecnico();
   startLoop();
 }
 
@@ -1991,8 +2023,9 @@ function renderTc() {
     const sk = ['voz','dados','infra'].every(x => skTec.includes(x)) ? 'Multi-skill (Voz, Dados e Infra)' : skTec.map(nomeSkill).join(', ');
     const ar = areasTec(t).map(nomeArea).join(', ');
     const end=enderecoEntregaTexto(t)||((t.r==='interior'||t.r==='noronha')?'Não cadastrado':'Não se aplica');
-    return `<tr><td>${escM(t.n)}${t.tipo==='admin'?' <span class="badge b-andamento">Administrador + Técnico</span>':''}</td><td>${escM(t.u)}</td><td>${escM(t.e || 'Não cadastrado')}</td><td>${r}</td><td>${escM(end)}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap"><button class="btn btn-p btn-endereco-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Cadastrar ou alterar endereço de entrega">📍 Endereço</button><button class="btn btn-s btn-reset-senha" data-u="${escM(t.u)}" data-email="${escM(t.e || '')}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${t.tipo==='tecnico'?'<button class="btn btn-r btn-rm-tec" data-u="'+escM(t.u)+'" style="padding:4px 8px;font-size:.6rem" title="Excluir técnico">🗑️</button>':'<span class="badge b-andamento">Perfil administrativo preservado</span>'}</div></td></tr>`;
+    return `<tr><td>${escM(t.n)}${t.tipo==='admin'?' <span class="badge b-andamento">Administrador + Técnico</span>':''}</td><td>${escM(t.u)}</td><td>${escM(t.e || 'Não cadastrado')}</td><td>${r}</td><td>${escM(end)}</td><td>${sk}</td><td>${ar}</td><td>${a}</td><td><div style="display:flex;gap:4px;flex-wrap:wrap">${adminPodeAcessarPerfilTecnico()&&t._id?'<button class="btn btn-p btn-acessar-perfil-tecnico" data-id="'+escM(t._id)+'" style="padding:4px 8px;font-size:.6rem" title="Abrir este perfil técnico sem solicitar a senha">👤 Acessar perfil</button>':''}<button class="btn btn-p btn-endereco-tec" data-u="${escM(t.u)}" style="padding:4px 8px;font-size:.6rem" title="Cadastrar ou alterar endereço de entrega">📍 Endereço</button><button class="btn btn-s btn-reset-senha" data-u="${escM(t.u)}" data-email="${escM(t.e || '')}" style="padding:4px 8px;font-size:.6rem" title="Enviar redefinição de senha">🔑 Redefinir</button>${t.tipo==='tecnico'?'<button class="btn btn-r btn-rm-tec" data-u="'+escM(t.u)+'" style="padding:4px 8px;font-size:.6rem" title="Excluir técnico">🗑️</button>':'<span class="badge b-andamento">Perfil administrativo preservado</span>'}</div></td></tr>`;
   }).join('') || '<tr><td colspan="9" class="empty">Nenhum técnico encontrado</td></tr>';
+  tb.querySelectorAll('.btn-acessar-perfil-tecnico').forEach(botao=>botao.addEventListener('click',()=>acessarPerfilTecnicoComoAdmin(botao.dataset.id)));
 }
 async function rTc() {
   const tb=el('tb-tc');
@@ -6208,6 +6241,13 @@ doLogin = async function(){
 };
 
 logout = async function(){ if(SB_PROFILE?.tipo==='tecnico') await nfEncerrarPresencaTecnico(); if(SB_PROFILE?.tipo==='tecnico'&&window.nfDesativarPushAoSair){try{await window.nfDesativarPushAoSair();}catch{console.warn('Alerta não removido do servidor ao sair.');}} await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
+
+logout = (function(sairNormal){
+  return async function(){
+    if(ADMIN_TEC_CONTEXT){voltarAoMeuPerfilAdmin();return;}
+    return sairNormal();
+  };
+})(logout);
 
 salvarMinhaSenha = async function(){
   if(!SB_PROFILE) return;
