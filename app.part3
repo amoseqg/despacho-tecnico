@@ -2097,7 +2097,7 @@ async function adicionarSolicitanteChamados(){
     if(!authData?.user?.id)throw new Error('O servidor de autenticação não retornou a identificação da conta.');
     const {error}=await SB.from('solicitantes_chamados').insert({user_id:authData.user.id,nome,email,operadora,ativo:true,criado_por:SB_PROFILE.id});
     if(error)throw new Error('A conta foi criada, mas a autorização não pôde ser salva: '+error.message);
-    await SB_ACCOUNT_CREATOR.auth.signOut().catch(()=>{});
+    await SB_ACCOUNT_CREATOR.auth.signOut({scope:'local'}).catch(()=>{});
     ['sol-n','sol-e','sol-operadora','sol-s','sol-sc'].forEach(id=>el(id).value='');
     await carregarSolicitantesChamados();
     alert(authData.session?'E-mail autorizado. O solicitante já pode entrar no portal.':'E-mail autorizado. O Supabase pode solicitar a confirmação do e-mail antes do primeiro acesso.');
@@ -5819,7 +5819,36 @@ async function sbExecutarComSessaoAdmin(operacao){
   return resposta;
 }
 
-async function sbExigirSessaoAdmin({renovar=false}={}){
+
+let sbReautenticacaoPendente=null;
+function sbReautenticarAdmin(){
+  if(sbReautenticacaoPendente)return sbReautenticacaoPendente;
+  sbReautenticacaoPendente=new Promise((resolve,reject)=>{
+    const esperado=SB_PROFILE?.id||S?._id;
+    const dialog=document.createElement('dialog');
+    dialog.style.cssText='max-width:420px;width:90%;border:0;border-radius:14px;padding:24px;z-index:2147483647';
+    dialog.innerHTML='<form><h3>Renovar acesso</h3><p>Sua sessão terminou. Confirme seu acesso para continuar. O formulário do chamado será mantido.</p><label>E-mail<input name="email" type="email" autocomplete="username" required class="input" style="width:100%"></label><label>Senha<input name="password" type="password" autocomplete="current-password" required class="input" style="width:100%"></label><p role="alert" style="color:#b91c1c"></p><button type="button" class="btn btn-s">Cancelar</button> <button type="submit" class="btn btn-p">Renovar e continuar</button></form>';
+    const form=dialog.querySelector('form'),email=form.elements.email,senha=form.elements.password,msg=dialog.querySelector('[role="alert"]'),btn=form.querySelector('[type="submit"]');
+    email.value=SB_PROFILE?.email||S?.u||'';
+    const cancel=()=>{dialog.close();dialog.remove();reject(new Error('Acesso não renovado. Os dados do formulário foram mantidos.'));};
+    dialog.addEventListener('cancel',e=>{e.preventDefault();cancel();});
+    form.querySelector('[type="button"]').onclick=cancel;
+    form.onsubmit=async e=>{
+      e.preventDefault();btn.disabled=true;msg.textContent='';
+      try{
+        const {data,error}=await SB.auth.signInWithPassword({email:email.value.trim(),password:senha.value});senha.value='';
+        if(error)throw error;
+        if(esperado&&data.user.id!==esperado){await SB.auth.signOut({scope:'local'});throw new Error('Utilize a mesma conta que iniciou este atendimento.');}
+        dialog.close();dialog.remove();resolve();
+      }catch(err){msg.textContent=err.message||'Não foi possível renovar o acesso.';}
+      finally{btn.disabled=false;}
+    };
+    document.body.append(dialog);dialog.showModal();
+  }).finally(()=>{sbReautenticacaoPendente=null;});
+  return sbReautenticacaoPendente;
+}
+
+async function sbExigirSessaoAdmin({renovar=false,reautenticado=false}={}){
   let usuario=null,erroUsuario=null,renovacaoTentada=false;
   try{
     const {data:{session},error}=await SB.auth.getSession();
@@ -5852,8 +5881,11 @@ async function sbExigirSessaoAdmin({renovar=false}={}){
     const codigo=String(erroUsuario?.code||'').toLowerCase();
     const statusHttp=Number(erroUsuario?.status||0);
     const sessaoInvalida=!erroUsuario||statusHttp===400||statusHttp===401||
-      /session.?missing|session.?expired|refresh.?token|invalid.?grant|user.?not.?found/.test(codigo+' '+String(erroUsuario?.message||'').toLowerCase());
-    if(sessaoInvalida)throw new Error('Sua sessão expirou ou não está mais válida. Entre novamente na área Administrador. Os dados do formulário foram mantidos.');
+      /session.?missing|session.?expired|authsessionmissing|refresh.?token|invalid.?grant|user.?not.?found/.test(codigo+' '+String(erroUsuario?.message||'').toLowerCase());
+    if(sessaoInvalida||/não existe uma sessão ativa/i.test(String(erroUsuario?.message||''))){
+      if(!reautenticado){await sbReautenticarAdmin();return sbExigirSessaoAdmin({reautenticado:true});}
+      throw new Error('Sua sessão não pôde ser validada. Os dados do formulário foram mantidos.');
+    }
     throw new Error('Não foi possível confirmar sua sessão com o Supabase. Verifique a conexão e tente novamente; os dados do formulário foram mantidos. '+(erroUsuario?.message||''));
   }
   const {data:perfil,error:perfilErr}=await SB.from('perfis')
@@ -6252,11 +6284,11 @@ doLogin = async function(){
     else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
     localStorage.setItem('dt_portal',loginType);ss();
     if(S.t==='log')enterLog();else if(S.t==='adm')enterAdm();else {enterTec();nfAbrirChamadoNotificado();}
-  }catch(err){ await SB.auth.signOut().catch(()=>{}); SB_PROFILE=null; el('le').textContent=err?.message||'Falha no login'; el('le').style.display='block'; sbSetConnectionBadge('Não autenticado', false); }
+  }catch(err){ SB_PROFILE=null; el('le').textContent=err?.message||'Falha no login'; el('le').style.display='block'; sbSetConnectionBadge('Não autenticado', false); }
   finally{ if(btn){btn.disabled=false;btn.textContent='Entrar';} }
 };
 
-logout = async function(){ if(SB_PROFILE?.tipo==='tecnico') await nfEncerrarPresencaTecnico(); if(SB_PROFILE?.tipo==='tecnico'&&window.nfDesativarPushAoSair){try{await window.nfDesativarPushAoSair();}catch{console.warn('Alerta não removido do servidor ao sair.');}} await SB.auth.signOut(); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
+logout = async function(){ if(SB_PROFILE?.tipo==='tecnico') await nfEncerrarPresencaTecnico(); if(SB_PROFILE?.tipo==='tecnico'&&window.nfDesativarPushAoSair){try{await window.nfDesativarPushAoSair();}catch{console.warn('Alerta não removido do servidor ao sair.');}} await SB.auth.signOut({scope:'local'}); SB_PROFILE=null; S=null; lsRemove('ss'); localStorage.removeItem('dt_portal'); goHome(); sbSetConnectionBadge('Desconectado', false); };
 
 logout = (function(sairNormal){
   return async function(){
@@ -6375,7 +6407,7 @@ async function sbCriarContaPerfil({nome,usuario,email,senha,tipo,regiao=null,ski
   if(perfilErr){
     throw new Error(`A conta foi criada no Auth, mas não foi possível gravar o perfil: ${perfilErr.message}. Não crie outra conta com o mesmo e-mail; corrija o perfil no Supabase.`);
   }
-  await SB_ACCOUNT_CREATOR.auth.signOut().catch(()=>{});
+  await SB_ACCOUNT_CREATOR.auth.signOut({scope:'local'}).catch(()=>{});
   return {user:novoUsuario,perfil,confirmacaoPendente:!authData.session};
 }
 
@@ -6670,8 +6702,8 @@ document.addEventListener('DOMContentLoaded',()=>{
       if(!site)throw new Error(`Circuito ${circuit} não encontrado na base.`);checks.push({step:'circuito',status:'passed',message:`${site.circuito} — ${site.site}`});
       const history={savedAt:new Date().toISOString(),user,profile:detected,circuit,checks};localStorage.setItem('nexofield_diagnostico_last_v1',JSON.stringify(history));
       resultado.innerHTML=`<b>✓ Autenticação e circuito aprovados</b><br>Usuário: ${safe(display)} · Perfil: ${safe(detected)}<br>Circuito: ${safe(site.circuito)} — ${safe(site.site)}<br><span style="color:var(--gr)">Iniciando o fluxo completo no banco isolado...</span>`;
-      await client.auth.signOut().catch(()=>{});overrideTechs=[{display,synthetic:`Diagnóstico ${detected} · ${circuit}`,user}];await start();
-    }catch(err){password.value='';checks.push({step:'diagnostico',status:'failed',message:String(err?.message||err)});resultado.innerHTML=`<b style="color:var(--r)">Falha localizada</b><br>${safe(err?.message||err)}<br><span style="color:var(--gr)">A senha não foi armazenada.</span>`;localStorage.setItem('nexofield_diagnostico_last_v1',JSON.stringify({savedAt:new Date().toISOString(),user,circuit,checks}));nfToast('Diagnóstico interrompido: '+String(err?.message||err),'erro');await client.auth.signOut().catch(()=>{});
+      await client.auth.signOut({scope:'local'}).catch(()=>{});overrideTechs=[{display,synthetic:`Diagnóstico ${detected} · ${circuit}`,user}];await start();
+    }catch(err){password.value='';checks.push({step:'diagnostico',status:'failed',message:String(err?.message||err)});resultado.innerHTML=`<b style="color:var(--r)">Falha localizada</b><br>${safe(err?.message||err)}<br><span style="color:var(--gr)">A senha não foi armazenada.</span>`;localStorage.setItem('nexofield_diagnostico_last_v1',JSON.stringify({savedAt:new Date().toISOString(),user,circuit,checks}));nfToast('Diagnóstico interrompido: '+String(err?.message||err),'erro');await client.auth.signOut({scope:'local'}).catch(()=>{});
     }finally{password.value='';button.disabled=false;button.textContent='▶ Diagnosticar usuário e circuito';}
   }
   function render(){if(!adminGeral())return;ensureDiagnosticForm();q('lab-iniciar').onclick=start;const techs=technicians();if(q('lab-iniciar-individual'))q('lab-iniciar-individual').onclick=startIndividual;if(restore())return;q('lab-cards').innerHTML=techs.map(card).join('');techs.forEach((t,i)=>showScreen(i,t,'login',{}));setStats(techs.length,0,0,0);}
