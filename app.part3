@@ -4191,14 +4191,26 @@ function tpChamadosAprovados(inicio,fim){
   if(fim)lista=lista.filter(c=>!!dataPeriodoPagamentoChamado(c)&&dataBrasilISO(dataPeriodoPagamentoChamado(c))<=fim);
   return servicosPagamentoUnicos(lista).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
 }
-function tpTabelaServicos(lista){
+function tpTabelaServicos(lista,permitirBusca=false){
   if(!lista.length)return '<div class="empty">Nenhum serviço aprovado neste intervalo.</div>';
   const rows=lista.map(c=>{
-    const data=dataPeriodoPagamentoChamado(c),iso=data?dataBrasilISO(data):'';
+    const data=dataPeriodoPagamentoChamado(c);
     const pago=pagoTecnicoParaData(TPAGAMENTOS,data);
-    return '<tr><td>'+escM(c.pr||'—')+'</td><td>'+escM(c.si||'—')+'</td><td>'+(data?escM(formatarDataBrasil(data)):'—')+'</td><td>'+escM(rlValorMoeda(valorAprovadoServico(c)))+'</td><td><span class="badge '+(pago?'b-aprovado':'b-pag-pendente')+'">'+(pago?'Enviado para pagamento':'Saldo aprovado')+'</span></td></tr>';
+    const busca=permitirBusca?' data-protocolo="'+escM(c.pr||'')+'"':'';
+    return '<tr'+busca+'><td>'+escM(c.pr||'—')+'</td><td>'+escM(c.si||'—')+'</td><td>'+(data?escM(formatarDataBrasil(data)):'—')+'</td><td>'+escM(rlValorMoeda(valorAprovadoServico(c)))+'</td><td><span class="badge '+(pago?'b-aprovado':'b-pag-pendente')+'">'+(pago?'Enviado para pagamento':'Saldo aprovado')+'</span></td></tr>';
   }).join('');
   return '<div style="overflow-x:auto"><table class="table"><thead><tr><th>Protocolo</th><th>Site / Cliente</th><th>Data</th><th>Valor</th><th>Pagamento</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+}
+function tpFiltrarServicosAprovados(){
+  const termo=String(el('tp-filtro-protocolo-aprovado')?.value||'').trim().toLocaleLowerCase('pt-BR');
+  const corpo=el('tp-tabela-aprovados')?.querySelector('tbody');
+  if(!corpo)return;
+  const linhas=[...corpo.querySelectorAll('tr[data-protocolo]')];
+  let visiveis=0;
+  linhas.forEach(linha=>{const mostra=String(linha.dataset.protocolo||'').toLocaleLowerCase('pt-BR').includes(termo);linha.hidden=!mostra;if(mostra)visiveis++;});
+  let vazio=corpo.querySelector('#tp-protocolo-vazio');
+  if(!vazio){vazio=document.createElement('tr');vazio.id='tp-protocolo-vazio';vazio.innerHTML='<td colspan="5" class="empty">Nenhum protocolo aprovado corresponde à busca.</td>';corpo.append(vazio);}
+  vazio.hidden=!termo||visiveis>0;
 }
 async function tpCarregarPagamentos(forcar=false){
   if(S?.t!=='tec'||!SB||!SB_PROFILE?.id||TPAG_CARREGANDO)return;
@@ -4219,6 +4231,7 @@ async function tpCarregarPagamentos(forcar=false){
 }
 function rTap(){
   const resumo=el('tp-resumo-aprovados'),lista=el('tp-lista-aprovados');if(!resumo||!lista||!S?.u)return;
+  const filtroSalvo=el('tp-filtro-protocolo-aprovado')?.value||'';
   const aprovados=tpChamadosAprovados('','');
   const total=totalAprovadoServicos(aprovados);
   const fim=el('tp-dt2')?.value||'2026-10-28';
@@ -4226,7 +4239,8 @@ function rTap(){
   const aprovadosProximo=tpChamadosAprovados(proximo.inicio,proximo.fim);
   const provisionado=Math.max(0,totalAprovadoServicos(aprovadosProximo)-tpPagamentoDentroDoPeriodo(proximo.inicio,proximo.fim));
   resumo.innerHTML='<div class="grid-3" style="gap:8px"><div class="card stat"><div class="l">Serviços aprovados</div><div class="v">'+aprovados.length+'</div></div><div class="card stat"><div class="l">Valor aprovado total</div><div class="v">'+escM(rlValorMoeda(total))+'</div></div><div class="card stat g"><div class="l">Saldo aprovisionado para o próximo período<br><small>'+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</small></div><div class="v">'+escM(rlValorMoeda(provisionado))+'</div></div></div>';
-  lista.innerHTML=tpTabelaServicos(aprovados);
+  lista.innerHTML='<div class="form-group" style="max-width:420px;margin:12px 0"><label class="label" for="tp-filtro-protocolo-aprovado">Buscar protocolo nos serviços aprovados</label><input id="tp-filtro-protocolo-aprovado" class="input" type="search" placeholder="Digite o número do protocolo" autocomplete="off" value="'+escM(filtroSalvo)+'" oninput="tpFiltrarServicosAprovados()"></div><div id="tp-tabela-aprovados">'+tpTabelaServicos(aprovados,true)+'</div>';
+  tpFiltrarServicosAprovados();
   const listaProximo=el('tp-lista-proximo-aprovados');
   if(listaProximo)listaProximo.innerHTML='<h4 style="font-size:.8rem;margin:14px 0 6px">Chamados aprovados do próximo período · '+escM(formatarDataBrasil(proximo.inicio))+' a '+escM(formatarDataBrasil(proximo.fim))+'</h4>'+tpTabelaServicos(aprovadosProximo);
 }
