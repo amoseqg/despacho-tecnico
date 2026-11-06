@@ -498,7 +498,9 @@ function nt(u) { const t = D.tc.find(x => x.u === u); return t ? t.n : u; }
 function adminGeral() { return !!(S && S.t === 'adm' && D.ad.some(a => a.u === S.u && a.p)); }
 const EMAIL_ADMIN_GERAL_ACESSO_TECNICO='amos.gomes@metodotelecom.com.br';
 function adminPodeAcessarPerfilTecnico(){
-  return !!(S?.t==='adm'&&SB_PROFILE?.tipo==='admin'&&SB_PROFILE?.admin_geral===true&&String(SB_PROFILE?.email||'').trim().toLowerCase()===EMAIL_ADMIN_GERAL_ACESSO_TECNICO&&String(S._id||'')===String(SB_PROFILE.id||''));
+  const administradorId=String(ADMIN_TEC_CONTEXT?.admin?._id||S?._id||'');
+  const contextoValido=S?.t==='adm'||!!ADMIN_TEC_CONTEXT;
+  return !!(contextoValido&&SB_PROFILE?.tipo==='admin'&&SB_PROFILE?.admin_geral===true&&String(SB_PROFILE?.email||'').trim().toLowerCase()===EMAIL_ADMIN_GERAL_ACESSO_TECNICO&&administradorId===String(SB_PROFILE.id||''));
 }
 function adminMostrarBannerAcessoTecnico(){
   const painel=el('pt');
@@ -3693,7 +3695,7 @@ function opPl(u, focoId=null) {
     const textoEncerramento=String(ex.relatorio||ex.obs||'');
     const termosProtocolo=[c.pr,identificacaoOs(c),c.sdm,c.osPeConectado,c.osPeconectado,c.os,c.protocolo,c.numeroProtocolo,c.numeroMetodo,c.numero_metodo,c.id,textoEncerramento].filter(Boolean).join(' ');
     const fechamento=dataEncerramentoChamado(c),dataFechamento=fechamento?dataBrasilISO(fechamento):'';
-    const emPeriodo=PL_FOCO_ID||(!RL_DT1_ATUAL&&!RL_DT2_ATUAL)||!!dataFechamento&&(!RL_DT1_ATUAL||dataFechamento>=RL_DT1_ATUAL)&&(!RL_DT2_ATUAL||dataFechamento<=RL_DT2_ATUAL);
+    const emPeriodo=!!PL_FOCO_ID||(!RL_DT1_ATUAL&&!RL_DT2_ATUAL)||!!dataFechamento&&(!RL_DT1_ATUAL||dataFechamento>=RL_DT1_ATUAL)&&(!RL_DT2_ATUAL||dataFechamento<=RL_DT2_ATUAL);
     return `<tr data-periodo="${emPeriodo?'1':'0'}" data-protocolo="${escM(termosProtocolo)}"><td><button type="button" class="pl-protocolo-link" data-id="${escM(c.id)}" title="Abrir máscara de encerramento e ações" style="border:0;background:transparent;color:#174a8b;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${esc(c.pr||'—')}</button></td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'&&!correcaoReenviada?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
