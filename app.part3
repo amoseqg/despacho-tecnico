@@ -3654,11 +3654,13 @@ function opPl(u, focoId=null) {
     const misc=itensMaterial.length?itensMaterial.map(m=>`${m.nome} ${m.quantidade} ${m.unidade} × ${moedaMaterial(m.valorUnitario)} = ${moedaMaterial(m.total)}`).join('; '):'—';
     const qtd=itensMaterial.length?itensMaterial.map(m=>`${m.quantidade} ${m.unidade}`).join(' / '):'—';
     const correcaoReenviada=ap.status==='rejeitado'&&Date.parse(c.cc||'')>Date.parse(c.ap?.data||'');
-    const termosProtocolo=[c.pr,identificacaoOs(c),c.sdm,c.osPeConectado,c.osPeconectado,c.os].filter(Boolean).join(' ');
-    return `<tr data-protocolo="${escM(termosProtocolo)}"><td>${esc(c.pr||'—')}</td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'&&!correcaoReenviada?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
+    const textoEncerramento=String(ex.relatorio||ex.obs||'');
+    const termosProtocolo=[c.pr,identificacaoOs(c),c.sdm,c.osPeConectado,c.osPeconectado,c.os,c.protocolo,c.numeroProtocolo,c.numeroMetodo,c.numero_metodo,c.id,textoEncerramento].filter(Boolean).join(' ');
+    return `<tr data-protocolo="${escM(termosProtocolo)}"><td><button type="button" class="pl-protocolo-link" data-id="${escM(c.id)}" title="Abrir máscara de encerramento e ações" style="border:0;background:transparent;color:#174a8b;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${esc(c.pr||'—')}</button></td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'&&!correcaoReenviada?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
   el('pl-tb-body').innerHTML = rows;
+  el('pl-tb-body').querySelectorAll('.pl-protocolo-link').forEach(botao=>botao.addEventListener('click',()=>abrirMascaraEncerramentoPagamento(botao.dataset.id)));
   if(PL_FOCO_ID){
     const chamadoFoco=D.ch.find(c=>String(c.id)===PL_FOCO_ID);
     const campoFoco=el('pl-filtro-protocolo');
@@ -3707,6 +3709,30 @@ function filtrarProtocoloPlanilha(){
   let vazio=corpo.querySelector('#pl-filtro-vazio');
   if(!vazio){vazio=document.createElement('tr');vazio.id='pl-filtro-vazio';vazio.innerHTML='<td colspan="18" class="empty">Nenhum protocolo corresponde à busca.</td>';corpo.append(vazio);}
   vazio.hidden=!termo||visiveis>0;
+}
+function abrirMascaraEncerramentoPagamento(id){
+  if(S?.t!=='adm')return;
+  const c=D.ch.find(item=>String(item.id)===String(id));
+  if(!c)return;
+  const ex=c.ex||{},status=c.ap?.status||'pendente';
+  const mascara=String(ex.relatorio||ex.obs||'').trim()||'Máscara de encerramento não registrada para este chamado.';
+  const correcaoReenviada=status==='rejeitado'&&Date.parse(c.cc||'')>Date.parse(c.ap?.data||'');
+  const dialog=document.createElement('dialog');
+  dialog.style.cssText='width:min(860px,calc(100% - 28px));max-height:88vh;overflow:auto;border:0;border-radius:14px;padding:22px;color:#16324f;box-shadow:0 24px 70px #0005;font-family:system-ui';
+  const estado={pendente:'Pendente de aprovação',aprovado:'Aprovado',rejeitado:'Rejeitado'}[status]||status;
+  dialog.innerHTML='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px"><div><h3 style="margin:0 0 5px">Máscara de encerramento — protocolo '+esc(c.pr||identificacaoOs(c))+'</h3><div style="color:#526273">'+esc(c.si||'Site não informado')+' · Técnico: '+esc(nt(c.te)||'Não informado')+'</div></div><button type="button" class="btn btn-s" data-fechar>Fechar</button></div><div style="margin:14px 0;padding:10px 12px;border-radius:8px;background:#eff6ff"><b>Status:</b> '+esc(estado)+' · <b>SDM:</b> '+esc(c.sdm||'—')+'</div><pre style="margin:0;padding:16px;border:1px solid #dbe5f0;border-radius:10px;background:#f8fafc;white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.55 ui-monospace,SFMono-Regular,Consolas,monospace">'+esc(mascara)+'</pre><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px" data-acoes></div>';
+  const acoes=dialog.querySelector('[data-acoes]');
+  if(!ex.pagamentoExcluido){
+    const aprovar=document.createElement('button');aprovar.type='button';aprovar.className='btn btn-g';aprovar.textContent='Aprovar';aprovar.disabled=status==='aprovado';
+    aprovar.addEventListener('click',()=>{dialog.close();opApv('aprovado',c.id);});
+    const rejeitar=document.createElement('button');rejeitar.type='button';rejeitar.className='btn btn-r';rejeitar.textContent='Rejeitar';rejeitar.disabled=status==='rejeitado'&&!correcaoReenviada;
+    rejeitar.addEventListener('click',()=>{dialog.close();opApv('rejeitado',c.id);});
+    acoes.append(aprovar,rejeitar);
+  }
+  document.body.append(dialog);
+  dialog.querySelector('[data-fechar]').addEventListener('click',()=>dialog.close());
+  dialog.addEventListener('close',()=>dialog.remove(),{once:true});
+  dialog.showModal();
 }
 function removerBlocosDuplicados(texto){
   const linhas=String(texto||'').replace(/\r\n?/g,'\n').trim().split('\n');
