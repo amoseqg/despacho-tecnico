@@ -3620,18 +3620,21 @@ function opPl(u, focoId=null) {
   const nome = tec ? tec.n : nt(u);
   const regiao = tec ? tec.r : 'capital';
 
-  let chamados = D.ch.filter(c => c.te === u && c.st === 'concluida');
+  const todosConcluidos = D.ch.filter(c => c.te === u && c.st === 'concluida');
+  let chamados = [];
+  let chamadosPeriodo = [];
   if (PL_FOCO_ID) {
-    const selecionado=D.ch.find(c=>String(c.id)===PL_FOCO_ID&&c.te===u&&c.st==='concluida'&&!c.ex?.pagamentoExcluido);
+    const selecionado=todosConcluidos.find(c=>String(c.id)===PL_FOCO_ID&&!c.ex?.pagamentoExcluido);
     chamados=selecionado?[selecionado]:[];
+    chamadosPeriodo=chamados;
   } else {
-    if (RL_DT1_ATUAL) {
-      chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) >= RL_DT1_ATUAL && !!dataEncerramentoChamado(c));
-    }
-    if (RL_DT2_ATUAL) {
-      chamados = chamados.filter(c => dataBrasilISO(dataEncerramentoChamado(c)) <= RL_DT2_ATUAL && !!dataEncerramentoChamado(c));
-    }
-    chamados = servicosPagamentoUnicos(chamados);
+    chamados=servicosPagamentoUnicos(todosConcluidos);
+    chamadosPeriodo=todosConcluidos.filter(c=>{
+      const encerramento=dataEncerramentoChamado(c);
+      const data=encerramento?dataBrasilISO(encerramento):'';
+      return !!data&&(!RL_DT1_ATUAL||data>=RL_DT1_ATUAL)&&(!RL_DT2_ATUAL||data<=RL_DT2_ATUAL);
+    });
+    chamadosPeriodo=servicosPagamentoUnicos(chamadosPeriodo);
   }
   if (chamados.length === 0) return;
   const filtroProtocolo=el('pl-filtro-protocolo');if(filtroProtocolo)filtroProtocolo.value='';
@@ -3656,7 +3659,9 @@ function opPl(u, focoId=null) {
     const correcaoReenviada=ap.status==='rejeitado'&&Date.parse(c.cc||'')>Date.parse(c.ap?.data||'');
     const textoEncerramento=String(ex.relatorio||ex.obs||'');
     const termosProtocolo=[c.pr,identificacaoOs(c),c.sdm,c.osPeConectado,c.osPeconectado,c.os,c.protocolo,c.numeroProtocolo,c.numeroMetodo,c.numero_metodo,c.id,textoEncerramento].filter(Boolean).join(' ');
-    return `<tr data-protocolo="${escM(termosProtocolo)}"><td><button type="button" class="pl-protocolo-link" data-id="${escM(c.id)}" title="Abrir máscara de encerramento e ações" style="border:0;background:transparent;color:#174a8b;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${esc(c.pr||'—')}</button></td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'&&!correcaoReenviada?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
+    const fechamento=dataEncerramentoChamado(c),dataFechamento=fechamento?dataBrasilISO(fechamento):'';
+    const emPeriodo=PL_FOCO_ID||(!RL_DT1_ATUAL&&!RL_DT2_ATUAL)||!!dataFechamento&&(!RL_DT1_ATUAL||dataFechamento>=RL_DT1_ATUAL)&&(!RL_DT2_ATUAL||dataFechamento<=RL_DT2_ATUAL);
+    return `<tr data-periodo="${emPeriodo?'1':'0'}" data-protocolo="${escM(termosProtocolo)}"><td><button type="button" class="pl-protocolo-link" data-id="${escM(c.id)}" title="Abrir máscara de encerramento e ações" style="border:0;background:transparent;color:#174a8b;font:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0">${esc(c.pr||'—')}</button></td><td>${esc(c.si||'—')}</td><td>${ex.co || '—'}</td><td>${ex.cd || '—'}</td><td>${ex.cr || '—'}</td><td>${dtexec}</td><td>${atvNome}</td><td>${misc}</td><td>${qtd}</td><td>${ex.km || '—'}</td><td>${ex.vkm || '—'}</td><td>—</td><td>${ex.tmat || '—'}</td><td>${ex.vatv || '—'}</td><td>${ex.total || '—'}</td><td class="pl-observacao">${valorInfo(removerBlocosDuplicados(ex.relatorio || ex.obs))}</td><td>${apBadge}${ex.valorCorrigido!=null?'<br><small>Valor corrigido</small>':''}</td>${S?.t==='adm'?`<td class="pl-acoes"><div class="pl-acoes-lista">${!ex.pagamentoExcluido?`<button class="btn btn-g btn-ap-servico" data-id="${c.id}" data-status="aprovado" ${ap.status==='aprovado'?'disabled':''}>Aprovar</button><button class="btn btn-r btn-ap-servico" data-id="${c.id}" data-status="rejeitado" ${ap.status==='rejeitado'&&!correcaoReenviada?'disabled':''}>Rejeitar</button>`:''}${podeGerirValoresParceiros()?`${ex.pagamentoExcluido?`<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="restaurar">Restaurar valor</button>`:`<button class="btn btn-p btn-valor-parceiro" data-id="${c.id}" data-acao="corrigir">Corrigir valor</button><button class="btn btn-r btn-valor-parceiro" data-id="${c.id}" data-acao="excluir">Excluir valor</button>`}<button class="btn btn-s btn-valor-parceiro" data-id="${c.id}" data-acao="historico">Histórico</button>`:''}</div>${esc(ex.pagamentoMotivo||'')}</td>`:''}</tr>`;
   }).join('');
 
   el('pl-tb-body').innerHTML = rows;
@@ -3669,12 +3674,12 @@ function opPl(u, focoId=null) {
   filtrarProtocoloPlanilha();
   el('pl-acoes-cab').classList.toggle('hidden',S?.t!=='adm');
 
-  const pendentes = chamados.filter(c => !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente')).length;
-  const aprovados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
-  const rejeitados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'rejeitado').length;
+  const pendentes = chamadosPeriodo.filter(c => !c.ex?.pagamentoExcluido && (!c.ap || c.ap.status === 'pendente')).length;
+  const aprovados = chamadosPeriodo.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
+  const rejeitados = chamadosPeriodo.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'rejeitado').length;
 
   let totalVal = 0;
-  chamados.forEach(c => {
+  chamadosPeriodo.forEach(c => {
     if (c.ex && c.ex.total && !c.ex.pagamentoExcluido) {
       const v = numeroExcel(c.ex.total);
       if (!isNaN(v)) totalVal += v;
@@ -3686,7 +3691,7 @@ function opPl(u, focoId=null) {
 
   const expAp = el('btn-exp-serv-xlsx');
   if (expAp) {
-    const aprovados = chamados.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
+    const aprovados = chamadosPeriodo.filter(c => !c.ex?.pagamentoExcluido && c.ap && c.ap.status === 'aprovado').length;
     expAp.classList.toggle('hidden', !adminGeral() || aprovados === 0);
   }
   el('m-pl').classList.add('a');
@@ -3705,7 +3710,7 @@ function filtrarProtocoloPlanilha(){
   const corpo=el('pl-tb-body'),termo=String(el('pl-filtro-protocolo')?.value||'').trim().toLocaleLowerCase('pt-BR');
   if(!corpo)return;
   const linhas=[...corpo.querySelectorAll('tr[data-protocolo]')];let visiveis=0;
-  linhas.forEach(linha=>{const mostra=!termo||String(linha.dataset.protocolo||'').toLocaleLowerCase('pt-BR').includes(termo);linha.hidden=!mostra;if(mostra)visiveis++;});
+  linhas.forEach(linha=>{const corresponde=String(linha.dataset.protocolo||'').toLocaleLowerCase('pt-BR').includes(termo);const mostra=termo?corresponde:linha.dataset.periodo!=='0';linha.hidden=!mostra;if(mostra)visiveis++;});
   let vazio=corpo.querySelector('#pl-filtro-vazio');
   if(!vazio){vazio=document.createElement('tr');vazio.id='pl-filtro-vazio';vazio.innerHTML='<td colspan="18" class="empty">Nenhum protocolo corresponde à busca.</td>';corpo.append(vazio);}
   vazio.hidden=!termo||visiveis>0;
