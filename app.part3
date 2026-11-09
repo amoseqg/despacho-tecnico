@@ -169,13 +169,14 @@ function siteOsServicoDoBanco(site){return [site.circuito||'',site.site||'',site
 function preencherDadosOsServicoDaDescricao(texto){
   const dados={
     circuito:extrairTextoRotulado(texto,['DESIGNAÇÃO DO CIRCUITO','DESIGNACAO DO CIRCUITO','NÚMERO DO CIRCUITO','NUMERO DO CIRCUITO','CIRCUITO','DESIGNAÇÃO','DESIGNACAO']),
+    osPeConectado:extrairTextoRotulado(texto,['NÚMERO DA OS PE CONECTADO','NUMERO DA OS PE CONECTADO','OS PE CONECTADO','NÚMERO DO SDM','NUMERO DO SDM','SDM']),
     site:extrairTextoRotulado(texto,['SITE / CLIENTE','SITE/CLIENTE','NOME DO SITE','SITE','CLIENTE']),
     cidade:extrairTextoRotulado(texto,['CIDADE','MUNICÍPIO','MUNICIPIO']),
     endereco:extrairTextoRotulado(texto,['ENDEREÇO','ENDERECO']),
     contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL']),
     horario:extrairTextoRotulado(texto,['HORÁRIO DE EXPEDIENTE','HORARIO DE EXPEDIENTE','HORÁRIO DE ATENDIMENTO','HORARIO DE ATENDIMENTO','HORÁRIO','HORARIO','EXPEDIENTE'])
   };
-  const campos={site:'os-servico-site',cidade:'os-servico-cidade',endereco:'os-servico-endereco',contato:'os-servico-contato',horario:'os-servico-horario'};
+  const campos={site:'os-servico-site',cidade:'os-servico-cidade',endereco:'os-servico-endereco',contato:'os-servico-contato',horario:'os-servico-horario',osPeConectado:'os-servico-pe'};
   for(const [chave,id] of Object.entries(campos))if(dados[chave])el(id).value=dados[chave];
   const circuito=el('os-servico-circuito');
   if(dados.circuito&&normalizarCircuito(circuito.value)!==normalizarCircuito(dados.circuito)){
@@ -185,8 +186,8 @@ function preencherDadosOsServicoDaDescricao(texto){
   const descricao=el('os-servico-descricao');
   if(texto.trim()&&descricao?.dataset.preenchimento!=='manual')descricao.value=texto.trim();
   const status=el('os-servico-descricao-status');
-  const encontrados=Object.values(dados).filter(Boolean).length;
-  if(status){status.textContent=encontrados?'✓ '+encontrados+' dado(s) identificado(s) na descrição, mesmo que ainda não estejam cadastrados.'+(dados.circuito?' O novo site será salvo após a OS.':' Informe o circuito acima para incluir o site na base após a OS.'):'Nenhum dado de site identificado. Você pode preencher os campos manualmente.';status.style.color=encontrados?'var(--g)':'var(--y)';}
+  const encontrados=Object.values(dados).filter(Boolean).length,dadosSiteEncontrados=Object.entries(dados).filter(([chave,valor])=>chave!=='osPeConectado'&&valor).length;
+  if(status){status.textContent=encontrados?'✓ '+encontrados+' dado(s) identificado(s) na descrição.'+(dados.osPeConectado?' Número da OS PE Conectado preenchido.':'')+(dadosSiteEncontrados?(dados.circuito?' O novo site será salvo após a OS.':' Informe o circuito acima para incluir o site na base após a OS.'):' Complete manualmente os dados do site que não foram informados.'):'Nenhum dado de site ou número de OS identificado. Você pode preencher os campos manualmente.';status.style.color=encontrados?'var(--g)':'var(--y)';}
   return dados;
 }
 async function buscarCircuitoOsServico(){
@@ -273,7 +274,7 @@ function normalizarRotuloDescricao(v){
 function extrairTextoRotulado(texto,rotulos){
   const linhas=String(texto||'').split(/\r?\n/);
   const chaves=rotulos.map(normalizarRotuloDescricao);
-  const todosRotulos=['SITE','SITE/CLIENTE','SITE / CLIENTE','CLIENTE','ENDERECO','CIDADE','CONTATO','RESPONSAVEL LOCAL','PROTOCOLO','SDM','CIRCUITO','NUMERO DO CIRCUITO','DESIGNACAO','DESIGNACAO DO CIRCUITO','HORARIO','HORARIO DE EXPEDIENTE','HORARIO DE ATENDIMENTO','EXPEDIENTE','REGIAO','SKILL','MOTIVO','MOTIVO DO CHAMADO','DESCRICAO DO PROBLEMA','DEFEITO RECLAMADO'];
+  const todosRotulos=['SITE','SITE/CLIENTE','SITE / CLIENTE','CLIENTE','ENDERECO','CIDADE','CONTATO','RESPONSAVEL LOCAL','PROTOCOLO','SDM','NUMERO DO SDM','NUMERO DA OS PE CONECTADO','OS PE CONECTADO','CIRCUITO','NUMERO DO CIRCUITO','DESIGNACAO','DESIGNACAO DO CIRCUITO','HORARIO','HORARIO DE EXPEDIENTE','HORARIO DE ATENDIMENTO','EXPEDIENTE','REGIAO','SKILL','MOTIVO','MOTIVO DO CHAMADO','DESCRICAO DO PROBLEMA','DEFEITO RECLAMADO'];
   for(let i=0;i<linhas.length;i++){
     const original=String(linhas[i]||'').trim();
     const normal=normalizarRotuloDescricao(original);
@@ -1829,7 +1830,7 @@ async function addOsServico() {
     D.ch.push(novoChamado);SB_LOADED_CH.add(data.id);lsSet('dd',D);
     ['os-servico-descricao-colada','os-servico-pe','os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
     delete el('os-servico-descricao').dataset.preenchimento;
-    el('os-servico-descricao-status').textContent='Cole a descrição para carregar circuito, cliente, endereço, cidade, contato e horário.';el('os-servico-descricao-status').style.color='var(--gr)';
+    el('os-servico-descricao-status').textContent='Cole a descrição para carregar circuito, OS PE Conectado, cliente, endereço, cidade, contato e horário.';el('os-servico-descricao-status').style.color='var(--gr)';
     delete el('os-servico-circuito').dataset.circuitoEncontrado;el('os-servico-circuito-opcoes').classList.add('hidden');
     el('os-servico-circuito-status').textContent='Sem circuito? Informe Site / Cliente, Cidade e os demais dados manualmente.';el('os-servico-circuito-status').style.color='var(--gr)';
     el('os-servico-atividade').value='';el('os-servico-skill').value='';el('os-servico-area').value='';el('os-servico-tecnico').innerHTML='<option value="">Selecione...</option>';
@@ -3480,6 +3481,16 @@ function rRlHistoricoEncerramentos(limparAoApagar=false){
   area.querySelectorAll('.btn-rl-hist-detalhe').forEach(b=>b.addEventListener('click',()=>rlAbrirDetalheHistoricoEncerramento(b.dataset.id)));
 }
 
+function normalizarBuscaTecnico(texto){return String(texto||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase('pt-BR').replace(/\\s+/g,' ').trim();}
+function rlFiltrarParceiroPeriodo(){
+  const container=el('rl-cards');if(!container)return;
+  const termo=normalizarBuscaTecnico(container.querySelector('#rl-filtro-tecnico')?.value);
+  const status=container.querySelector('#rl-filtro-tecnico-status');
+  const linhas=[...container.querySelectorAll('#rl-table-scroll tbody tr')];let visiveis=0;
+  linhas.forEach(linha=>{const nome=normalizarBuscaTecnico(linha.cells[0]?.textContent),corresponde=!termo||nome.includes(termo);if(corresponde){linha.hidden=false;linha.style.removeProperty('display');visiveis++;}else{linha.hidden=true;linha.style.setProperty('display','none','important');}});
+  if(status)status.textContent=termo?visiveis+' parceiro(s)/técnico(s) encontrado(s)':linhas.length+' técnico(s) no período.';
+}
+
 function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
   const container = el('rl-cards');
   if(!container) return;
@@ -3575,13 +3586,13 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
     </table>
   </div>`;
   container.insertAdjacentHTML('afterbegin','<div style="max-width:420px;margin:0 0 12px"><label for="rl-filtro-tecnico" style="display:block;font-size:12px;font-weight:650;margin-bottom:5px">Pesquisar nome do parceiro/técnico</label><div style="display:flex;gap:8px"><input id="rl-filtro-tecnico" type="search" class="input" placeholder="Digite o nome do parceiro" autocomplete="off" style="flex:1"><button type="button" class="btn btn-p" id="rl-buscar-tecnico" aria-label="Pesquisar técnico" title="Pesquisar técnico">🔍</button></div><small id="rl-filtro-tecnico-status" aria-live="polite" style="display:block;margin-top:5px;color:#667085"></small></div>');
-  const campoBuscaTecnico=container.querySelector('#rl-filtro-tecnico'),statusBuscaTecnico=container.querySelector('#rl-filtro-tecnico-status');
-  const normalizarBuscaTecnico=texto=>String(texto||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase('pt-BR').replace(/\\s+/g,' ').trim();
-  const filtrarTecnicosRelatorio=()=>{const termo=normalizarBuscaTecnico(campoBuscaTecnico?.value),linhasTecnicos=[...container.querySelectorAll('#rl-table-scroll tbody tr')];let visiveis=0;linhasTecnicos.forEach(linha=>{const nome=normalizarBuscaTecnico(linha.cells[0]?.textContent),corresponde=!termo||nome.includes(termo);linha.hidden=!corresponde;if(corresponde)visiveis++;});if(statusBuscaTecnico)statusBuscaTecnico.textContent=termo?visiveis+' parceiro(s)/técnico(s) encontrado(s)':linhasTecnicos.length+' técnico(s) no período.';};
-  container.querySelector('#rl-buscar-tecnico')?.addEventListener('click',filtrarTecnicosRelatorio);
-  campoBuscaTecnico?.addEventListener('input',filtrarTecnicosRelatorio);
+  const campoBuscaTecnico=container.querySelector('#rl-filtro-tecnico');
+  const filtrarTecnicosRelatorio=()=>rlFiltrarParceiroPeriodo();
+  if(campoBuscaTecnico)campoBuscaTecnico.oninput=filtrarTecnicosRelatorio;
+  if(campoBuscaTecnico)campoBuscaTecnico.onsearch=filtrarTecnicosRelatorio;
+  const botaoBuscaTecnico=container.querySelector('#rl-buscar-tecnico');
+  if(botaoBuscaTecnico)botaoBuscaTecnico.onclick=filtrarTecnicosRelatorio;
   campoBuscaTecnico?.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();filtrarTecnicosRelatorio();}});
-  campoBuscaTecnico?.addEventListener('search',filtrarTecnicosRelatorio);
   filtrarTecnicosRelatorio();
   rlAtualizarBarraRolagemInferior();
   container.querySelectorAll('.btn-rl-periodo-toggle').forEach(button=>button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();void rlAlternarTravaPeriodo(button.dataset.u);}));
