@@ -182,10 +182,10 @@ function preencherDadosOsServicoDaDescricao(texto){
     contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL']),
     horario:extrairTextoRotulado(texto,['HORÁRIO DE EXPEDIENTE','HORARIO DE EXPEDIENTE','HORÁRIO DE ATENDIMENTO','HORARIO DE ATENDIMENTO','HORÁRIO','HORARIO','EXPEDIENTE'])
   };
-  const campos={site:'os-servico-site',cidade:'os-servico-cidade',endereco:'os-servico-endereco',contato:'os-servico-contato',horario:'os-servico-horario',osPeConectado:'os-servico-pe'};
-  for(const [chave,id] of Object.entries(campos))if(dados[chave])el(id).value=dados[chave];
   const circuito=el('os-servico-circuito');
   if(circuitoInvalido){circuito.value='';delete circuito.dataset.circuitoEncontrado;limparDadosSiteOsServico();}
+  const campos={site:'os-servico-site',cidade:'os-servico-cidade',endereco:'os-servico-endereco',contato:'os-servico-contato',horario:'os-servico-horario',osPeConectado:'os-servico-pe'};
+  for(const [chave,id] of Object.entries(campos))if(dados[chave])el(id).value=dados[chave];
   if(dados.circuito&&normalizarCircuito(circuito.value)!==normalizarCircuito(dados.circuito)){
     circuito.value=dados.circuito;delete circuito.dataset.circuitoEncontrado;
     setTimeout(buscarCircuitoOsServico,0);
