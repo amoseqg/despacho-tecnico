@@ -3481,7 +3481,7 @@ function rRlHistoricoEncerramentos(limparAoApagar=false){
   area.querySelectorAll('.btn-rl-hist-detalhe').forEach(b=>b.addEventListener('click',()=>rlAbrirDetalheHistoricoEncerramento(b.dataset.id)));
 }
 
-function normalizarBuscaTecnico(texto){return String(texto||'').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLocaleLowerCase('pt-BR').replace(/\\s+/g,' ').trim();}
+function normalizarBuscaTecnico(texto){return normalizarRotuloDescricao(texto).replaceAll(' ','');}
 function rlFiltrarParceiroPeriodo(){
   const container=el('rl-cards');if(!container)return;
   const termo=normalizarBuscaTecnico(container.querySelector('#rl-filtro-tecnico')?.value);
