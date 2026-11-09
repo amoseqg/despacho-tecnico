@@ -470,7 +470,7 @@ function selecionarCircuitoDaDescricao(valor){
 }
 
 function nomeAtividadeOsServico(c){return ({instalacao:'Instalação',alteracao:'Alteração',mudanca_endereco:'Mudança de endereço',vistoria:'Vistoria',retirada:'Retirada',sob_demanda:'Serviços sob demanda'})[c.atividadeServico]||'Serviço';}
-function identificacaoOs(c){return c?.tipoOs==='servico'?'OS de Serviço • '+(c.pr||'Sem identificador'):(c?.pr||'—');}
+function identificacaoOs(c){return c?.tipoOs==='servico'?'OS de Serviço • '+(String(c.osPeConectado||'').trim()||c.pr||'Sem identificador'):(c?.pr||'—');}
 function seloTipoOs(c){return c?.tipoOs==='servico'?'<span class="badge b-andamento">🛠️ OS de Serviços</span>':'';}
 function dadosSite(c) {
   if(c?.tipoOs==='servico')return `<div class="os-r"><b>Tipo de OS:</b> OS de Serviços — ${esc(nomeAtividadeOsServico(c))}</div>
