@@ -176,9 +176,9 @@ function preencherDadosOsServicoDaDescricao(texto){
   const dados={
     circuito:circuitoInvalido?'':circuitoExtraido,
     osPeConectado:extrairTextoRotulado(texto,['NÚMERO DA OS PE CONECTADO','NUMERO DA OS PE CONECTADO','OS PE CONECTADO','NÚMERO DO SDM','NUMERO DO SDM','SDM']),
-    site:extrairTextoRotulado(texto,['SITE / CLIENTE','SITE/CLIENTE','NOME DO SITE','SITE','CLIENTE']),
+    site:extrairTextoRotulado(texto,['SITE / CLIENTE','SITE/CLIENTE','NOME DO CLIENTE','NOME DO SITE','CLIENTE','SITE']),
     cidade:extrairTextoRotulado(texto,['CIDADE','MUNICÍPIO','MUNICIPIO']),
-    endereco:extrairTextoRotulado(texto,['ENDEREÇO','ENDERECO']),
+    endereco:extrairTextoRotulado(texto,['ENDEREÇO DO CLIENTE','ENDERECO DO CLIENTE','ENDEREÇO DO SITE','ENDERECO DO SITE','ENDEREÇO','ENDERECO']),
     contato:extrairTextoRotulado(texto,['CONTATO','RESPONSÁVEL LOCAL','RESPONSAVEL LOCAL']),
     horario:extrairTextoRotulado(texto,['HORÁRIO DE EXPEDIENTE','HORARIO DE EXPEDIENTE','HORÁRIO DE ATENDIMENTO','HORARIO DE ATENDIMENTO','HORÁRIO','HORARIO','EXPEDIENTE'])
   };
@@ -194,7 +194,7 @@ function preencherDadosOsServicoDaDescricao(texto){
   if(texto.trim()&&descricao?.dataset.preenchimento!=='manual')descricao.value=texto.trim();
   const status=el('os-servico-descricao-status');
   const encontrados=Object.values(dados).filter(Boolean).length,dadosSiteEncontrados=Object.entries(dados).filter(([chave,valor])=>chave!=='osPeConectado'&&valor).length;
-  if(status){status.textContent=encontrados?'✓ '+encontrados+' dado(s) identificado(s) na descrição.'+(dados.osPeConectado?' Número da OS PE Conectado preenchido.':'')+(circuitoInvalido?' Circuito indicado como inválido foi ignorado; os dados do cliente colados foram mantidos.':dadosSiteEncontrados?(dados.circuito?' O novo site será salvo após a OS.':' Informe o circuito acima para incluir o site na base após a OS.'):' Complete manualmente os dados do site que não foram informados.'):'Nenhum dado de site ou número de OS identificado. Você pode preencher os campos manualmente.';status.style.color=encontrados?'var(--g)':'var(--y)';}
+  if(status){status.textContent=encontrados?'✓ '+encontrados+' dado(s) identificado(s) na descrição.'+(dados.site?' Cliente preenchido.':'')+(dados.endereco?' Endereço preenchido.':'')+(dados.osPeConectado?' Número da OS PE Conectado preenchido.':'')+(circuitoInvalido?' Circuito inválido ignorado; os dados colados foram mantidos.':dadosSiteEncontrados?(dados.circuito?' O novo site será salvo após a OS.':' Informe o circuito acima para incluir o site na base após a OS.'):' Complete manualmente os dados do site que não foram informados.'):'Nenhum dado de site ou número de OS identificado. Você pode preencher os campos manualmente.';status.style.color=encontrados?'var(--g)':'var(--y)';}
   return dados;
 }
 async function buscarCircuitoOsServico(){
@@ -281,7 +281,7 @@ function normalizarRotuloDescricao(v){
 function extrairTextoRotulado(texto,rotulos){
   const linhas=String(texto||'').split(/\r?\n/);
   const chaves=rotulos.map(normalizarRotuloDescricao);
-  const todosRotulos=['SITE','SITE/CLIENTE','SITE / CLIENTE','CLIENTE','ENDERECO','CIDADE','CONTATO','RESPONSAVEL LOCAL','PROTOCOLO','SDM','NUMERO DO SDM','NUMERO DA OS PE CONECTADO','OS PE CONECTADO','CIRCUITO','NUMERO DO CIRCUITO','DESIGNACAO','DESIGNACAO DO CIRCUITO','HORARIO','HORARIO DE EXPEDIENTE','HORARIO DE ATENDIMENTO','EXPEDIENTE','REGIAO','SKILL','MOTIVO','MOTIVO DO CHAMADO','DESCRICAO DO PROBLEMA','DEFEITO RECLAMADO'];
+  const todosRotulos=['SITE','SITE/CLIENTE','SITE / CLIENTE','NOME DO CLIENTE','NOME DO SITE','CLIENTE','ENDERECO DO CLIENTE','ENDERECO DO SITE','ENDERECO','CIDADE','CONTATO','RESPONSAVEL LOCAL','PROTOCOLO','SDM','NUMERO DO SDM','NUMERO DA OS PE CONECTADO','OS PE CONECTADO','CIRCUITO','NUMERO DO CIRCUITO','DESIGNACAO','DESIGNACAO DO CIRCUITO','HORARIO','HORARIO DE EXPEDIENTE','HORARIO DE ATENDIMENTO','EXPEDIENTE','REGIAO','SKILL','MOTIVO','MOTIVO DO CHAMADO','DESCRICAO DO PROBLEMA','DEFEITO RECLAMADO'];
   for(let i=0;i<linhas.length;i++){
     const original=String(linhas[i]||'').trim();
     const normal=normalizarRotuloDescricao(original);
