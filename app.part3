@@ -526,7 +526,12 @@ async function acessarPerfilTecnicoComoAdmin(id){
   if(!tecnico){nfToast('Técnico ativo não encontrado. Atualize a lista e tente novamente.','erro');return;}
   ADMIN_TEC_CONTEXT={admin:{...S},tecnicoId:String(tecnico._id),nome:tecnico.n};
   S={t:'tec',n:tecnico.n,u:tecnico.u,r:tecnico.r,_id:tecnico._id,adminAcessando:true};
-  enterTec();
+  try{enterTec();}catch(err){
+    console.error('Falha ao abrir o perfil técnico:',err);
+    const admin=ADMIN_TEC_CONTEXT?.admin;ADMIN_TEC_CONTEXT=null;
+    if(admin){S=admin;try{enterAdm();}catch(retornoErr){console.error('Falha ao retornar ao administrador:',retornoErr);}}
+    nfToast('Não foi possível carregar o perfil técnico. A sessão do administrador foi restaurada.','erro');
+  }
 }
 function voltarAoMeuPerfilAdmin(){
   if(!ADMIN_TEC_CONTEXT||!adminPodeAcessarPerfilTecnico())return;
@@ -876,7 +881,7 @@ function enterTec() {
     ? '<span class="badge b-capital">🏝️ Fernando de Noronha (6h)</span>'
     : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
   el('tr').innerHTML = b;
-  habilitarAbaFornecimento();
+  try{habilitarAbaFornecimento();}catch(err){console.warn('Falha ao preparar a aba Fornecimento:',err);}
   adminMostrarBannerAcessoTecnico();
   tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
   if(!ADMIN_TEC_CONTEXT)nfIniciarPresencaTecnico();
@@ -947,10 +952,10 @@ function tecTab(btn, a) {
 // ========== FORNECIMENTO DE MATERIAIS ==========
 const FORNECIMENTO_TECNICO_ID='8f114d16-8147-44a2-8bab-53bde4b7fd23';
 const FORNECIMENTO_BUCKET='fornecimentos-tecnicos';
-function ehTecnicoFornecimento(){return String(SB_PROFILE?.id||'')===FORNECIMENTO_TECNICO_ID;}
+function ehTecnicoFornecimento(){return String(S?._id||'')===FORNECIMENTO_TECNICO_ID&&!ADMIN_TEC_CONTEXT;}
 function habilitarAbaFornecimento(){
- const b=el('btn-tab-fornecimento');
- if(b)b.classList.toggle('hidden',!ehTecnicoFornecimento());
+ try{const b=el('btn-tab-fornecimento');if(b)b.classList.toggle('hidden',!ehTecnicoFornecimento());}
+ catch(err){console.warn('Não foi possível atualizar a aba Fornecimento:',err);}
 }
 async function rFornecimentoTec(){
  const box=el('fn-status-tecnico');if(!box||!SB||!SB_PROFILE||!ehTecnicoFornecimento())return;
