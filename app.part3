@@ -519,22 +519,6 @@ function adminMostrarBannerAcessoTecnico(){
   faixa.style.cssText='position:sticky;top:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:11px 16px;margin:0 0 12px;border:1px solid #f2c46d;border-radius:10px;background:#fff7df;color:#6b4c00;font:600 13px/1.4 system-ui';
   faixa.innerHTML='<span>Modo de apoio do Administrador Geral — perfil de '+escM(ADMIN_TEC_CONTEXT.nome)+'; ações ficam vinculadas à sua sessão administrativa.</span><button type="button" class="btn btn-p" style="padding:7px 12px" onclick="voltarAoMeuPerfilAdmin()">Voltar ao administrador</button>';
 }
-function forcarPainelTecnicoVisivel(){
- const painel=el('pt');if(!painel)throw new Error('Painel do técnico não encontrado.');
- painel.classList.remove('hidden');painel.style.setProperty('display','block','important');
- const admin=el('pa');if(admin)admin.classList.add('hidden');
- const db=el('t-db');
- document.querySelectorAll('#nv2 button').forEach(b=>b.classList.toggle('a',b.dataset.tab==='db'));
- ['db','dp','at','co','ar','pg','pp','mt','fn','lab'].forEach(x=>{
-  const e=el('t-'+x);if(!e)return;
-  e.classList.toggle('hidden',x!=='db');
-  if(x==='db')e.style.setProperty('display','block','important');else e.style.removeProperty('display');
- });
- if(!db)throw new Error('Dashboard do técnico não encontrado.');
- if(el('tn'))el('tn').textContent=S?.n||'';
- try{rTdb();}catch(err){console.error('Dashboard do técnico aberto, mas dados não renderizaram:',err);}
- window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;
-}
 async function acessarPerfilTecnicoComoAdmin(id){
   if(!adminPodeAcessarPerfilTecnico()){nfToast('Acesso exclusivo ao Administrador Geral autorizado.','erro');return;}
   if(ADMIN_TEC_CONTEXT){nfToast('Já existe um perfil técnico aberto. Volte ao administrador primeiro.','aviso');return;}
@@ -542,20 +526,11 @@ async function acessarPerfilTecnicoComoAdmin(id){
   if(!tecnico){nfToast('Técnico ativo não encontrado. Atualize a lista e tente novamente.','erro');return;}
   ADMIN_TEC_CONTEXT={admin:{...S},tecnicoId:String(tecnico._id),nome:tecnico.n};
   S={t:'tec',n:tecnico.n,u:tecnico.u,r:tecnico.r,_id:tecnico._id,adminAcessando:true};
-  try{
-    try{enterTec();}catch(err){console.warn('Abertura padrão do perfil falhou; aplicando navegação direta:',err);forcarPainelTecnicoVisivel();}
-    try{adminMostrarBannerAcessoTecnico();}catch(err){console.warn('Não foi possível mostrar o aviso administrativo:',err);}
-    if(el('pt')?.classList.contains('hidden')||el('t-db')?.classList.contains('hidden'))throw new Error('A tela do técnico não foi exibida.');
-  }catch(err){
+  try{enterTec();}catch(err){
     console.error('Falha ao abrir o perfil técnico:',err);
     const admin=ADMIN_TEC_CONTEXT?.admin;ADMIN_TEC_CONTEXT=null;
-    if(admin){
-      S=admin;
-      el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
-      hide('pt');hide('t1');hide('t0');show('pa');
-      if(el('an'))el('an').textContent=S.n||'';
-    }
-    nfToast('Falha ao abrir perfil: '+(err?.message||'erro ao renderizar a tela'),'erro');
+    if(admin){S=admin;try{enterAdm();}catch(retornoErr){console.error('Falha ao retornar ao administrador:',retornoErr);}}
+    nfToast('Não foi possível carregar o perfil técnico. A sessão do administrador foi restaurada.','erro');
   }
 }
 function voltarAoMeuPerfilAdmin(){
@@ -564,9 +539,7 @@ function voltarAoMeuPerfilAdmin(){
   ADMIN_TEC_CONTEXT=null;
   S=sessaoAdmin;
   el('admin-acesso-tecnico-banner')?.remove();
-  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   enterAdm();
-  window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;
 }
 function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
@@ -761,7 +734,6 @@ function showLogin(t) {
 }
 
 function goHome() {
-  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   hide('t1'); hide('pa'); hide('pt'); hide('plog');
   show('t0');
 }
@@ -887,7 +859,6 @@ function doLogin() {
 }
 
 function enterAdm() {
-  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   hide('t0'); hide('t1'); hide('pt'); show('pa');
   el('an').textContent = S.n;
   const labButton=el('nv')?.querySelector('[data-tab="lab"]');
@@ -897,7 +868,6 @@ function enterAdm() {
 }
 
 function enterLog() {
-  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   hide('t0'); hide('t1'); hide('pa'); hide('pt'); show('plog');
   el('ln').textContent = S.n;
   rLog();
@@ -906,16 +876,16 @@ function enterLog() {
 
 function enterTec() {
   hide('t0'); hide('t1'); hide('pa'); show('pt');
-  if(el('tn'))el('tn').textContent=S?.n||'';
+  el('tn').textContent = S.n;
   const b = S.r === 'noronha'
     ? '<span class="badge b-capital">🏝️ Fernando de Noronha (6h)</span>'
     : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
   el('tr').innerHTML = b;
-  try{adminMostrarBannerAcessoTecnico();}catch(err){console.warn('Falha ao preparar o aviso de acesso:',err);}
-  forcarPainelTecnicoVisivel();
-  setTimeout(()=>{try{habilitarAbaFornecimento();}catch(err){console.warn('Falha ao preparar a aba Fornecimento:',err);}},0);
-  if(!ADMIN_TEC_CONTEXT){try{nfIniciarPresencaTecnico();}catch(err){console.warn('Falha ao iniciar presença técnica:',err);}}
-  try{startLoop();}catch(err){console.warn('Falha ao iniciar atualização dos prazos:',err);}
+  try{habilitarAbaFornecimento();}catch(err){console.warn('Falha ao preparar a aba Fornecimento:',err);}
+  adminMostrarBannerAcessoTecnico();
+  tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
+  if(!ADMIN_TEC_CONTEXT)nfIniciarPresencaTecnico();
+  startLoop();
 }
 
 // ========== ABAS ==========
@@ -963,9 +933,9 @@ function admTab(btn, a) {
 function tecTab(btn, a) {
   document.querySelectorAll('#nv2 button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','dp','at','co','ar','pg','pp','mt','lab'].forEach(x => {
+  ['db','dp','at','co','ar','pg','pp','mt','fn','lab'].forEach(x => {
     const e = el('t-'+x);
-    if(e){e.style.removeProperty('display');e.classList.toggle('hidden', x !== a);}
+    if(e) e.classList.toggle('hidden', x !== a);
   });
   if (a === 'db') rTdb();
   if (a === 'dp') rTdp();
@@ -975,7 +945,6 @@ function tecTab(btn, a) {
   if (a === 'pg') { rTap(); void tpCarregarPagamentos(); }
   if (a === 'pp') { rTpp(); void tpCarregarPagamentos(); }
   if (a === 'mt') rTmat();
-  const painelFornecimento=el('t-fn');if(painelFornecimento)painelFornecimento.classList.toggle('hidden',a!=='fn');
   if (a === 'fn') rFornecimentoTec();
   if (a === 'lab' && window.NexoFieldLab) window.NexoFieldLab.renderTech();
 }
