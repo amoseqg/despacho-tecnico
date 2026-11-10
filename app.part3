@@ -2941,7 +2941,7 @@ async function nfChatCarregarMensagens(){
     if(NF_CHAT_PENDING){NF_CHAT_PENDING=false;setTimeout(()=>{void nfChatCarregarMensagens();},120);}
   }
 }
-setInterval(()=>{if(SB_PROFILE)void nfChatAtualizarBadge();},15000);
+setInterval(()=>{if(SB_PROFILE&&document.visibilityState==='visible')void nfChatAtualizarBadge();},60000);
 function abrirAprovacaoAtendimento(usuario,id) {
   if(!usuario)return;
   const chamadoFoco=D.ch.find(c=>String(c.id)===String(id)&&c.te===usuario&&c.st==='concluida');
@@ -6593,7 +6593,7 @@ let SB_REFRESH_PENDING=false;
 let SB_REFRESH_TIMER=null;
 let SB_REALTIME_ATIVO=false;
 let SB_ULTIMA_ATUALIZACAO=0;
-const SB_INTERVALO_MINIMO_ATUALIZACAO=2500;
+const SB_INTERVALO_MINIMO_ATUALIZACAO=10000;
 function sbProgramarRecarregamento(delay=180){
   clearTimeout(SB_REFRESH_TIMER);
   const restante=Math.max(0,SB_INTERVALO_MINIMO_ATUALIZACAO-(Date.now()-SB_ULTIMA_ATUALIZACAO));
