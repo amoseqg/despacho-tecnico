@@ -5814,7 +5814,19 @@ function sbNum(v){
  const n=Number(s);return Number.isFinite(n)?n:0;
 }
 
-function sbIso(v){ if(!v) return null; const d=new Date(v); return isNaN(d)?null:d.toISOString(); }
+function sbIso(v){
+  if(!v)return null;
+  const texto=String(v).trim();
+  // Datas locais exibidas como dd/mm/aaaa devem ser interpretadas no padrão brasileiro.
+  const br=texto.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{4})(?:,?\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?)?$/);
+  if(br){
+    const dia=Number(br[1]),mes=Number(br[2]),ano=Number(br[3]),hora=Number(br[4]||0),minuto=Number(br[5]||0),segundo=Number(br[6]||0);
+    const d=new Date(ano,mes-1,dia,hora,minuto,segundo);
+    if(d.getFullYear()!==ano||d.getMonth()!==mes-1||d.getDate()!==dia||d.getHours()!==hora||d.getMinutes()!==minuto||d.getSeconds()!==segundo)return null;
+    return d.toISOString();
+  }
+  const d=new Date(v);return isNaN(d)?null:d.toISOString();
+}
 function sbIdByUser(u){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x.u===u); return p?._id||null; }
 function sbUserById(id){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x._id===id); return p?.u||''; }
 function sbNameById(id){ const p=[...(D.tc||[]),...(D.ad||[])].find(x=>x._id===id); return p?.n||''; }
