@@ -519,6 +519,22 @@ function adminMostrarBannerAcessoTecnico(){
   faixa.style.cssText='position:sticky;top:0;z-index:1000;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:11px 16px;margin:0 0 12px;border:1px solid #f2c46d;border-radius:10px;background:#fff7df;color:#6b4c00;font:600 13px/1.4 system-ui';
   faixa.innerHTML='<span>Modo de apoio do Administrador Geral — perfil de '+escM(ADMIN_TEC_CONTEXT.nome)+'; ações ficam vinculadas à sua sessão administrativa.</span><button type="button" class="btn btn-p" style="padding:7px 12px" onclick="voltarAoMeuPerfilAdmin()">Voltar ao administrador</button>';
 }
+function forcarPainelTecnicoVisivel(){
+ const painel=el('pt');if(!painel)throw new Error('Painel do técnico não encontrado.');
+ painel.classList.remove('hidden');painel.style.setProperty('display','block','important');
+ const admin=el('pa');if(admin)admin.classList.add('hidden');
+ const db=el('t-db');
+ document.querySelectorAll('#nv2 button').forEach(b=>b.classList.toggle('a',b.dataset.tab==='db'));
+ ['db','dp','at','co','ar','pg','pp','mt','fn','lab'].forEach(x=>{
+  const e=el('t-'+x);if(!e)return;
+  e.classList.toggle('hidden',x!=='db');
+  if(x==='db')e.style.setProperty('display','block','important');else e.style.removeProperty('display');
+ });
+ if(!db)throw new Error('Dashboard do técnico não encontrado.');
+ if(el('tn'))el('tn').textContent=S?.n||'';
+ try{rTdb();}catch(err){console.error('Dashboard do técnico aberto, mas dados não renderizaram:',err);}
+ window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;
+}
 async function acessarPerfilTecnicoComoAdmin(id){
   if(!adminPodeAcessarPerfilTecnico()){nfToast('Acesso exclusivo ao Administrador Geral autorizado.','erro');return;}
   if(ADMIN_TEC_CONTEXT){nfToast('Já existe um perfil técnico aberto. Volte ao administrador primeiro.','aviso');return;}
@@ -527,14 +543,16 @@ async function acessarPerfilTecnicoComoAdmin(id){
   ADMIN_TEC_CONTEXT={admin:{...S},tecnicoId:String(tecnico._id),nome:tecnico.n};
   S={t:'tec',n:tecnico.n,u:tecnico.u,r:tecnico.r,_id:tecnico._id,adminAcessando:true};
   try{
-    enterTec();
-    window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;
+    try{enterTec();}catch(err){console.warn('Abertura padrão do perfil falhou; aplicando navegação direta:',err);}
+    forcarPainelTecnicoVisivel();
+    try{adminMostrarBannerAcessoTecnico();}catch(err){console.warn('Não foi possível mostrar o aviso administrativo:',err);}
     if(el('pt')?.classList.contains('hidden')||el('t-db')?.classList.contains('hidden'))throw new Error('A tela do técnico não foi exibida.');
   }catch(err){
     console.error('Falha ao abrir o perfil técnico:',err);
     const admin=ADMIN_TEC_CONTEXT?.admin;ADMIN_TEC_CONTEXT=null;
     if(admin){
       S=admin;
+      el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
       hide('pt');hide('t1');hide('t0');show('pa');
       if(el('an'))el('an').textContent=S.n||'';
     }
@@ -547,6 +565,7 @@ function voltarAoMeuPerfilAdmin(){
   ADMIN_TEC_CONTEXT=null;
   S=sessaoAdmin;
   el('admin-acesso-tecnico-banner')?.remove();
+  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   enterAdm();
   window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;
 }
@@ -885,7 +904,7 @@ function enterLog() {
 
 function enterTec() {
   hide('t0'); hide('t1'); hide('pa'); show('pt');
-  el('tn').textContent = S.n;
+  if(el('tn'))el('tn').textContent=S?.n||'';
   const b = S.r === 'noronha'
     ? '<span class="badge b-capital">🏝️ Fernando de Noronha (6h)</span>'
     : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
