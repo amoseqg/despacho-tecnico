@@ -543,8 +543,7 @@ async function acessarPerfilTecnicoComoAdmin(id){
   ADMIN_TEC_CONTEXT={admin:{...S},tecnicoId:String(tecnico._id),nome:tecnico.n};
   S={t:'tec',n:tecnico.n,u:tecnico.u,r:tecnico.r,_id:tecnico._id,adminAcessando:true};
   try{
-    try{enterTec();}catch(err){console.warn('Abertura padrão do perfil falhou; aplicando navegação direta:',err);}
-    forcarPainelTecnicoVisivel();
+    try{enterTec();}catch(err){console.warn('Abertura padrão do perfil falhou; aplicando navegação direta:',err);forcarPainelTecnicoVisivel();}
     try{adminMostrarBannerAcessoTecnico();}catch(err){console.warn('Não foi possível mostrar o aviso administrativo:',err);}
     if(el('pt')?.classList.contains('hidden')||el('t-db')?.classList.contains('hidden'))throw new Error('A tela do técnico não foi exibida.');
   }catch(err){
@@ -762,6 +761,7 @@ function showLogin(t) {
 }
 
 function goHome() {
+  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   hide('t1'); hide('pa'); hide('pt'); hide('plog');
   show('t0');
 }
@@ -887,6 +887,7 @@ function doLogin() {
 }
 
 function enterAdm() {
+  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   hide('t0'); hide('t1'); hide('pt'); show('pa');
   el('an').textContent = S.n;
   const labButton=el('nv')?.querySelector('[data-tab="lab"]');
@@ -896,6 +897,7 @@ function enterAdm() {
 }
 
 function enterLog() {
+  el('pt')?.style.removeProperty('display');el('t-db')?.style.removeProperty('display');
   hide('t0'); hide('t1'); hide('pa'); hide('pt'); show('plog');
   el('ln').textContent = S.n;
   rLog();
@@ -911,6 +913,7 @@ function enterTec() {
   el('tr').innerHTML = b;
   adminMostrarBannerAcessoTecnico();
   tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
+  forcarPainelTecnicoVisivel();
   setTimeout(()=>{try{habilitarAbaFornecimento();}catch(err){console.warn('Falha ao preparar a aba Fornecimento:',err);}},0);
   if(!ADMIN_TEC_CONTEXT)nfIniciarPresencaTecnico();
   startLoop();
@@ -963,7 +966,7 @@ function tecTab(btn, a) {
   if (btn) btn.classList.add('a');
   ['db','dp','at','co','ar','pg','pp','mt','lab'].forEach(x => {
     const e = el('t-'+x);
-    if(e) e.classList.toggle('hidden', x !== a);
+    if(e){e.style.removeProperty('display');e.classList.toggle('hidden', x !== a);}
   });
   if (a === 'db') rTdb();
   if (a === 'dp') rTdp();
