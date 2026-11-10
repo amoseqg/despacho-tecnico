@@ -528,6 +528,7 @@ async function acessarPerfilTecnicoComoAdmin(id){
   S={t:'tec',n:tecnico.n,u:tecnico.u,r:tecnico.r,_id:tecnico._id,adminAcessando:true};
   try{
     enterTec();
+    window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;
     if(el('pt')?.classList.contains('hidden')||el('t-db')?.classList.contains('hidden'))throw new Error('A tela do técnico não foi exibida.');
   }catch(err){
     console.error('Falha ao abrir o perfil técnico:',err);
@@ -547,6 +548,7 @@ function voltarAoMeuPerfilAdmin(){
   S=sessaoAdmin;
   el('admin-acesso-tecnico-banner')?.remove();
   enterAdm();
+  window.scrollTo(0,0);document.documentElement.scrollTop=0;document.body.scrollTop=0;
 }
 function emailValido(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function selecionados(nome) { return Array.from(document.querySelectorAll(`input[name="${nome}"]:checked`)).map(x => x.value); }
