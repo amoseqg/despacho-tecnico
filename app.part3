@@ -890,7 +890,7 @@ function enterTec() {
   el('tr').innerHTML = b;
   adminMostrarBannerAcessoTecnico();
   tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
-  try{habilitarAbaFornecimento();}catch(err){console.warn('Falha ao preparar a aba Fornecimento:',err);}
+  setTimeout(()=>{try{habilitarAbaFornecimento();}catch(err){console.warn('Falha ao preparar a aba Fornecimento:',err);}},0);
   if(!ADMIN_TEC_CONTEXT)nfIniciarPresencaTecnico();
   startLoop();
 }
@@ -940,7 +940,7 @@ function admTab(btn, a) {
 function tecTab(btn, a) {
   document.querySelectorAll('#nv2 button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','dp','at','co','ar','pg','pp','mt','fn','lab'].forEach(x => {
+  ['db','dp','at','co','ar','pg','pp','mt','lab'].forEach(x => {
     const e = el('t-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -952,6 +952,7 @@ function tecTab(btn, a) {
   if (a === 'pg') { rTap(); void tpCarregarPagamentos(); }
   if (a === 'pp') { rTpp(); void tpCarregarPagamentos(); }
   if (a === 'mt') rTmat();
+  const painelFornecimento=el('t-fn');if(painelFornecimento)painelFornecimento.classList.toggle('hidden',a!=='fn');
   if (a === 'fn') rFornecimentoTec();
   if (a === 'lab' && window.NexoFieldLab) window.NexoFieldLab.renderTech();
 }
