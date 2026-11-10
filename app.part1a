@@ -1757,6 +1757,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
      <button data-tab="pg">✅ Serviços aprovados</button>
      <button data-tab="pp">📅 Aprovados por período</button>
      <button data-tab="mt">📦 Material</button>
+     <button data-tab="fn" id="btn-tab-fornecimento" class="hidden">📄 Fornecimento</button>
     <button data-tab="lab">🧪 Meu teste</button>
   </div>
   <div class="content">
