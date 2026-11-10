@@ -911,12 +911,11 @@ function enterTec() {
     ? '<span class="badge b-capital">🏝️ Fernando de Noronha (6h)</span>'
     : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
   el('tr').innerHTML = b;
-  adminMostrarBannerAcessoTecnico();
-  tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
+  try{adminMostrarBannerAcessoTecnico();}catch(err){console.warn('Falha ao preparar o aviso de acesso:',err);}
   forcarPainelTecnicoVisivel();
   setTimeout(()=>{try{habilitarAbaFornecimento();}catch(err){console.warn('Falha ao preparar a aba Fornecimento:',err);}},0);
-  if(!ADMIN_TEC_CONTEXT)nfIniciarPresencaTecnico();
-  startLoop();
+  if(!ADMIN_TEC_CONTEXT){try{nfIniciarPresencaTecnico();}catch(err){console.warn('Falha ao iniciar presença técnica:',err);}}
+  try{startLoop();}catch(err){console.warn('Falha ao iniciar atualização dos prazos:',err);}
 }
 
 // ========== ABAS ==========
