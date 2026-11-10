@@ -6871,5 +6871,162 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/reaprazamentos.js?v=1.0.0"></script>
 <script src="/appearance.js?v=1"></script>
 <script src="/admin-alerts.js?v=2.5.0"></script>\n<script src="/health-monitor.js?v=2.1.1"></script>
+<script id="nf-session-navigation-guard-v1">
+(function(){
+  function nfForcarPainelPerfil(tipo){
+    ['t0','t1','pa','pt','plog'].forEach(hide);
+    if(tipo==='adm'){
+      show('pa');
+      document.querySelectorAll('#nv button').forEach(b=>b.classList.toggle('a',b.dataset.tab==='db'));
+      ['db','tc','online','ch','at','rl','ml','ad','vi','ft','aq','pn','lab'].forEach(x=>el('v-'+x)?.classList.toggle('hidden',x!=='db'));
+      try{if(el('an'))el('an').textContent=S?.n||'';rDb();}catch(e){console.error('Falha ao desenhar o dashboard do administrador:',e);}
+    }else if(tipo==='tec'){
+      show('pt');
+      document.querySelectorAll('#nv2 button').forEach(b=>b.classList.toggle('a',b.dataset.tab==='db'));
+      ['db','dp','at','co','ar','pg','pp','mt','fn','lab'].forEach(x=>el('t-'+x)?.classList.toggle('hidden',x!=='db'));
+      try{if(el('tn'))el('tn').textContent=S?.n||'';habilitarAbaFornecimento();adminMostrarBannerAcessoTecnico();rTdb();}catch(e){console.error('Falha ao desenhar o painel técnico:',e);}
+    }else if(tipo==='log'){
+      show('plog');
+      try{if(el('ln'))el('ln').textContent=S?.n||'';rLog();}catch(e){console.error('Falha ao desenhar o painel logístico:',e);}
+    }
+    try{startLoop();}catch(e){console.warn('Atualização em segundo plano indisponível:',e);}
+  }
+
+  var nfEnterAdmOriginal=enterAdm;
+  enterAdm=function(){
+    try{nfEnterAdmOriginal();}
+    catch(e){console.error('Falha no carregamento inicial do administrador:',e);nfForcarPainelPerfil('adm');}
+    if(S?.t==='adm'&&el('pa')?.classList.contains('hidden'))nfForcarPainelPerfil('adm');
+  };
+  var nfEnterTecOriginal=enterTec;
+  enterTec=function(){
+    try{nfEnterTecOriginal();}
+    catch(e){console.error('Falha no carregamento inicial do técnico:',e);nfForcarPainelPerfil('tec');}
+    if(S?.t==='tec'&&el('pt')?.classList.contains('hidden'))nfForcarPainelPerfil('tec');
+  };
+  var nfEnterLogOriginal=enterLog;
+  enterLog=function(){
+    try{nfEnterLogOriginal();}
+    catch(e){console.error('Falha no carregamento inicial da logística:',e);nfForcarPainelPerfil('log');}
+    if(S?.t==='log'&&el('plog')?.classList.contains('hidden'))nfForcarPainelPerfil('log');
+  };
+
+  goHome=function(){
+    ['pa','pt','plog','t1'].forEach(hide);
+    show('t0');
+  };
+
+  doLogin=async function(){
+    var email=String(el('lu')?.value||'').trim().toLowerCase();
+    var senha=String(el('lp')?.value||'');
+    var erroEl=el('le');
+    var btn=el('btn-login');
+    if(erroEl)erroEl.style.display='none';
+    if(!email||!senha||!email.includes('@')){
+      if(erroEl){erroEl.textContent='Informe o e-mail cadastrado e a senha.';erroEl.style.display='block';}
+      return;
+    }
+    if(btn){btn.disabled=true;btn.textContent='Entrando...';}
+    var perfilValidado=false;
+    try{
+      var auth=await SB.auth.signInWithPassword({email:email,password:senha});
+      if(auth.error)throw auth.error;
+      if(!auth.data?.user?.id)throw new Error('O Supabase autenticou, mas não retornou o usuário.');
+      var consulta=await SB.from('perfis').select('*').eq('id',auth.data.user.id).single();
+      if(consulta.error)throw consulta.error;
+      var p=consulta.data;
+      if(!p||!p.ativo)throw new Error('Usuário desativado ou perfil não encontrado.');
+      var temLogistica=p.tipo==='admin'||p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'));
+      if(loginType==='adm'&&p.tipo!=='admin')throw new Error('Este usuário não possui perfil de administrador.');
+      if(loginType==='log'&&!temLogistica)throw new Error('Este usuário não possui acesso à área logística.');
+      if(loginType==='tec'&&p.tipo!=='tecnico'&&p.tambem_tecnico!==true)throw new Error('Este usuário não possui perfil de técnico.');
+
+      SB_PROFILE=loginType==='tec'&&p.tipo!=='tecnico'?Object.assign({},p,{tipo:'tecnico'}):p;
+      if(loginType==='log')S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
+      else if(loginType==='adm')S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
+      else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
+      perfilValidado=true;
+      localStorage.setItem('dt_portal',loginType);
+      ss();
+
+      if(S.t==='adm')enterAdm();else if(S.t==='log')enterLog();else enterTec();
+
+      // O acesso ao perfil não depende de tabelas auxiliares. Sincronização com erro
+      // mantém a área aberta e informa a falha, em vez de deixar a tela em branco.
+      try{
+        if(S.t==='adm'){
+          await sbSeedMaterialsIfNeeded().catch(e=>console.warn('Semente de materiais não carregada:',e));
+          await sbSeedSitesIfNeeded().catch(e=>console.warn('Semente de sites não carregada:',e));
+          await sbSeedSchoolsIfNeeded().catch(e=>console.warn('Semente de escolas não carregada:',e));
+        }
+        await sbLoadAll();
+        if(S?.t==='adm')rDb();else if(S?.t==='tec')rTdb();else if(S?.t==='log')rLog();
+      }catch(loadErr){
+        console.error('A área foi aberta, mas a sincronização de dados falhou:',loadErr);
+        sbSetConnectionBadge('Acesso aberto · falha ao sincronizar',false);
+        try{nfToast('Seu acesso foi validado. Alguns dados não carregaram; atualize a página ou tente novamente.','aviso');}catch(e){}
+      }
+      if(S?.t==='tec'&&!ADMIN_TEC_CONTEXT)try{nfAbrirChamadoNotificado();}catch(e){console.warn('Não foi possível abrir a notificação do chamado:',e);}
+    }catch(err){
+      console.error('Falha no login:',err);
+      if(perfilValidado&&SB_PROFILE&&S){
+        nfForcarPainelPerfil(S.t);
+        sbSetConnectionBadge('Acesso aberto · sincronização pendente',false);
+        try{nfToast('Acesso validado. A área foi aberta; atualize os dados em instantes.','aviso');}catch(e){}
+      }else{
+        SB_PROFILE=null;S=null;lsRemove('ss');localStorage.removeItem('dt_portal');
+        goHome();hide('t0');show('t1');
+        if(erroEl){erroEl.textContent=String(err?.message||'Não foi possível entrar. Verifique o acesso e tente novamente.');erroEl.style.display='block';}
+        sbSetConnectionBadge('Não autenticado',false);
+      }
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent='Entrar';}
+    }
+  };
+
+  sbRestoreSession=async function(){
+    try{
+      var atual=await SB.auth.getSession();
+      var session=atual?.data?.session;
+      if(!session){
+        SB_PROFILE=null;S=null;lsRemove('ss');localStorage.removeItem('dt_portal');
+        goHome();sbSetConnectionBadge('Aguardando login',true);return;
+      }
+      var consulta=await SB.from('perfis').select('*').eq('id',session.user.id).single();
+      if(consulta.error)throw consulta.error;
+      var p=consulta.data;
+      if(!p||!p.ativo)throw new Error('Usuário desativado ou perfil não encontrado.');
+      var portal=localStorage.getItem('dt_portal');
+      var modoTecnico=portal==='tec'&&(p.tipo==='tecnico'||p.tambem_tecnico===true);
+      SB_PROFILE=modoTecnico&&p.tipo!=='tecnico'?Object.assign({},p,{tipo:'tecnico'}):p;
+      if(portal==='log'&&(p.tipo==='admin'||p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica'))))S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
+      else if(modoTecnico)S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
+      else if(p.tipo==='admin')S={t:'adm',n:p.nome,u:p.usuario,p:!!p.admin_geral,_id:p.id};
+      else if(p.tipo==='logistica'||(Array.isArray(p.areas)&&p.areas.includes('logistica')))S={t:'log',n:p.nome,u:p.usuario,_id:p.id};
+      else S={t:'tec',n:p.nome,u:p.usuario,r:p.regiao,_id:p.id};
+      ss();
+      if(S.t==='adm')enterAdm();else if(S.t==='log')enterLog();else enterTec();
+      try{await sbLoadAll();if(S?.t==='adm')rDb();else if(S?.t==='tec')rTdb();else if(S?.t==='log')rLog();}
+      catch(e){console.error('Sessão válida; falha ao sincronizar dados:',e);sbSetConnectionBadge('Acesso aberto · falha ao sincronizar',false);try{nfToast('Sua sessão continua válida, mas alguns dados não carregaram.','aviso');}catch(err){}}
+      if(S?.t==='tec'&&!ADMIN_TEC_CONTEXT)try{reabrirExecucaoRascunho();nfAbrirChamadoNotificado();}catch(e){console.warn('Não foi possível restaurar a atividade do técnico:',e);}
+    }catch(err){
+      console.error('Falha ao restaurar sessão:',err);
+      SB_PROFILE=null;S=null;lsRemove('ss');localStorage.removeItem('dt_portal');
+      goHome();sbSetConnectionBadge('Sessão inválida',false);
+    }
+  };
+
+  acessarPerfilTecnicoComoAdmin=function(id){
+    if(!adminPodeAcessarPerfilTecnico()){nfToast('Acesso exclusivo ao Administrador Geral autorizado.','erro');return;}
+    if(ADMIN_TEC_CONTEXT){nfToast('Já existe um perfil técnico aberto. Volte ao administrador primeiro.','aviso');return;}
+    var tecnico=D.tc.find(t=>String(t._id)===String(id)&&(t.tipo==='tecnico'||t.tecnicoAtivo===true));
+    if(!tecnico){nfToast('Técnico ativo não encontrado. Atualize a lista e tente novamente.','erro');return;}
+    ADMIN_TEC_CONTEXT={admin:Object.assign({},S),tecnicoId:String(tecnico._id),nome:tecnico.n};
+    S={t:'tec',n:tecnico.n,u:tecnico.u,r:tecnico.r,_id:tecnico._id,adminAcessando:true};
+    try{enterTec();if(el('pt')?.classList.contains('hidden'))nfForcarPainelPerfil('tec');}
+    catch(err){console.error('Falha ao abrir perfil técnico:',err);nfForcarPainelPerfil('tec');}
+  };
+})();
+</script>
 </body>
 </html>
