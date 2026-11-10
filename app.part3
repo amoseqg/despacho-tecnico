@@ -876,6 +876,7 @@ function enterTec() {
     ? '<span class="badge b-capital">🏝️ Fernando de Noronha (6h)</span>'
     : (S.r === 'capital' ? '<span class="badge b-capital">🏙️ Capital (6h)</span>' : '<span class="badge b-interior">🌾 Interior (8h)</span>');
   el('tr').innerHTML = b;
+  habilitarAbaFornecimento();
   adminMostrarBannerAcessoTecnico();
   tecTab(el('nv2').querySelector('[data-tab="db"]'), 'db');
   if(!ADMIN_TEC_CONTEXT)nfIniciarPresencaTecnico();
@@ -927,7 +928,7 @@ function admTab(btn, a) {
 function tecTab(btn, a) {
   document.querySelectorAll('#nv2 button').forEach(b => b.classList.remove('a'));
   if (btn) btn.classList.add('a');
-  ['db','dp','at','co','ar','pg','pp','mt','lab'].forEach(x => {
+  ['db','dp','at','co','ar','pg','pp','mt','fn','lab'].forEach(x => {
     const e = el('t-'+x);
     if(e) e.classList.toggle('hidden', x !== a);
   });
@@ -939,7 +940,87 @@ function tecTab(btn, a) {
   if (a === 'pg') { rTap(); void tpCarregarPagamentos(); }
   if (a === 'pp') { rTpp(); void tpCarregarPagamentos(); }
   if (a === 'mt') rTmat();
+  if (a === 'fn') rFornecimentoTec();
   if (a === 'lab' && window.NexoFieldLab) window.NexoFieldLab.renderTech();
+}
+
+// ========== FORNECIMENTO DE MATERIAIS ==========
+const FORNECIMENTO_TECNICO_ID='8f114d16-8147-44a2-8bab-53bde4b7fd23';
+const FORNECIMENTO_BUCKET='fornecimentos-tecnicos';
+function ehTecnicoFornecimento(){return String(SB_PROFILE?.id||'')===FORNECIMENTO_TECNICO_ID;}
+function habilitarAbaFornecimento(){
+ const b=el('btn-tab-fornecimento');
+ if(b)b.classList.toggle('hidden',!ehTecnicoFornecimento());
+}
+async function rFornecimentoTec(){
+ const box=el('fn-status-tecnico');if(!box||!SB||!SB_PROFILE||!ehTecnicoFornecimento())return;
+ box.innerHTML='<div class="empty">Carregando documentos...</div>';
+ try{
+  const {data,error}=await SB.from('fornecimentos_tecnicos').select('*').eq('tecnico_id',SB_PROFILE.id).order('enviado_em',{ascending:false});
+  if(error)throw error;
+  box.innerHTML=(data||[]).length?'<h4 style="margin:14px 0 8px">Documentos enviados</h4>'+data.map(x=>{
+   const estado=x.status==='aprovado'?'✅ Aprovado':x.status==='reprovado'?'❌ Reprovado':'⏳ Aguardando aprovação';
+   return '<div class="info" style="margin:6px 0"><strong>'+escM(x.nome_original)+'</strong> — '+estado+'<br><small>Enviado em '+escM(new Date(x.enviado_em).toLocaleString('pt-BR'))+'</small>'+(x.motivo_reprovacao?'<br>Motivo: '+escM(x.motivo_reprovacao):'')+'</div>';
+  }).join(''):'<div class="info">Nenhum documento enviado ainda.</div>';
+ }catch(e){box.innerHTML='<div class="info" style="color:var(--r)">Não foi possível carregar o envio: '+escM(e.message||'erro')+'</div>';}
+ const btn=el('btn-fn-enviar');if(btn&&!btn.dataset.bound){btn.dataset.bound='1';btn.addEventListener('click',enviarFornecimentoTec);}
+}
+async function enviarFornecimentoTec(){
+ const file=el('fn-arquivo')?.files?.[0],btn=el('btn-fn-enviar'),box=el('fn-status-tecnico');
+ if(!ehTecnicoFornecimento()||!SB_PROFILE||!file)return nfToast('Selecione o documento que deseja enviar.','erro');
+ const mimeOk=['application/pdf','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','image/jpeg','image/png'].includes(file.type);
+ if(!mimeOk||file.size>15*1024*1024){nfToast('Envie PDF, Word ou imagem com até 15 MB.','erro');return;}
+ btn.disabled=true;btn.textContent='Enviando documento...';
+ let path='';
+ try{
+  const ext=(file.name.split('.').pop()||'pdf').toLowerCase().replace(/[^a-z0-9]/g,'');
+  path=SB_PROFILE.id+'/'+crypto.randomUUID()+'-'+Date.now()+'.'+ext;
+  const {error:upErr}=await SB.storage.from(FORNECIMENTO_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
+  if(upErr)throw upErr;
+  const {error}=await SB.from('fornecimentos_tecnicos').insert({tecnico_id:SB_PROFILE.id,caminho:path,nome_original:file.name,tipo_mime:file.type,tamanho_bytes:file.size,descricao:el('fn-descricao')?.value?.trim()||''});
+  if(error)throw error;
+  el('fn-arquivo').value='';el('fn-descricao').value='';
+  nfToast('Documento enviado para aprovação.','sucesso');await rFornecimentoTec();
+ }catch(e){
+  if(path)await SB.storage.from(FORNECIMENTO_BUCKET).remove([path]).catch(()=>{});
+  nfToast('Não foi possível enviar o documento: '+(e.message||'erro'),'erro');
+ }finally{btn.disabled=false;btn.textContent='📤 Enviar documento para aprovação';}
+}
+async function rFornecimentosAdmin(){
+ const box=el('rel-fornecimentos-admin');if(!box||SB_PROFILE?.tipo!=='admin')return;
+ try{
+  const {data,error}=await SB.from('fornecimentos_tecnicos').select('*').order('enviado_em',{ascending:false});
+  if(error)throw error;
+  box.innerHTML=(data||[]).length?'<div style="overflow-x:auto"><table class="table"><thead><tr><th>Técnico</th><th>Documento</th><th>Enviado em</th><th>Status</th></tr></thead><tbody>'+data.map(x=>{
+   const t=(D.tc||[]).find(y=>String(y._id)===String(x.tecnico_id));
+   const status=x.status==='aprovado'?'✅ Aprovado':x.status==='reprovado'?'❌ Reprovado':'⏳ Aguardando aprovação';
+   return '<tr><td><button type="button" class="btn btn-s btn-forn-abrir" data-id="'+escM(x.id)+'">'+escM(t?.n||'Técnico')+'</button></td><td>'+escM(x.nome_original)+'</td><td>'+escM(new Date(x.enviado_em).toLocaleString('pt-BR'))+'</td><td>'+status+'</td></tr>';
+  }).join('')+'</tbody></table></div>':'<div class="empty">Nenhum técnico enviou documento de fornecimento.</div>';
+  box.querySelectorAll('.btn-forn-abrir').forEach(b=>b.addEventListener('click',()=>abrirFornecimentoAdmin(b.dataset.id)));
+ }catch(e){box.innerHTML='<div class="info" style="color:var(--r)">Erro ao carregar fornecimentos: '+escM(e.message||'erro')+'</div>';}
+}
+async function abrirFornecimentoAdmin(id){
+ try{
+  const {data:x,error}=await SB.from('fornecimentos_tecnicos').select('*').eq('id',id).single();if(error)throw error;
+  const t=(D.tc||[]).find(y=>String(y._id)===String(x.tecnico_id));
+  const {data:link,error:linkErr}=await SB.storage.from(FORNECIMENTO_BUCKET).createSignedUrl(x.caminho,600);if(linkErr)throw linkErr;
+  let dlg=el('fornecimento-admin-dialog');
+  if(!dlg){dlg=document.createElement('dialog');dlg.id='fornecimento-admin-dialog';dlg.style.cssText='width:min(900px,94vw);max-height:92vh;overflow:auto;border:0;border-radius:14px;padding:22px';document.body.appendChild(dlg);}
+  const preview=x.tipo_mime==='application/pdf'?'<iframe title="Documento de fornecimento" src="'+escM(link.signedUrl)+'" style="width:100%;height:55vh;border:1px solid var(--b);border-radius:8px"></iframe>':x.tipo_mime.startsWith('image/')?'<img alt="Documento enviado" src="'+escM(link.signedUrl)+'" style="display:block;max-width:100%;max-height:55vh;margin:auto">':'<p><a class="btn btn-s" target="_blank" rel="noopener" href="'+escM(link.signedUrl)+'">📄 Abrir / baixar documento</a></p>';
+  dlg.innerHTML='<h3>Fornecimento — '+escM(t?.n||'Técnico')+'</h3><p><strong>Arquivo:</strong> '+escM(x.nome_original)+'<br><strong>Enviado em:</strong> '+escM(new Date(x.enviado_em).toLocaleString('pt-BR'))+'<br><strong>Status:</strong> '+escM(x.status==='aprovado'?'Aprovado':x.status==='reprovado'?'Reprovado':'Aguardando aprovação')+(x.descricao?'<br><strong>Observação:</strong> '+escM(x.descricao):'')+(x.motivo_reprovacao?'<br><strong>Motivo:</strong> '+escM(x.motivo_reprovacao):'')+'</p>'+preview+'<div style="display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:16px">'+(x.status==='aguardando_aprovacao'?'<button class="btn btn-p" id="fn-admin-aprovar">✅ Aprovar</button><button class="btn btn-r" id="fn-admin-reprovar">❌ Reprovar</button>':'')+'<button class="btn btn-s" id="fn-admin-fechar">Fechar</button></div>';
+  dlg.querySelector('#fn-admin-fechar').onclick=()=>dlg.close();
+  if(x.status==='aguardando_aprovacao'){
+   dlg.querySelector('#fn-admin-aprovar').onclick=()=>decidirFornecimento(x.id,'aprovado');
+   dlg.querySelector('#fn-admin-reprovar').onclick=()=>{const motivo=prompt('Informe o motivo da reprovação:');if(motivo?.trim())decidirFornecimento(x.id,'reprovado',motivo.trim());};
+  }
+  dlg.showModal();
+ }catch(e){nfToast('Não foi possível abrir o documento: '+(e.message||'erro'),'erro');}
+}
+async function decidirFornecimento(id,status,motivo=''){
+ try{
+  const {error}=await SB.from('fornecimentos_tecnicos').update({status,avaliado_por:SB_PROFILE.id,avaliado_em:new Date().toISOString(),motivo_reprovacao:motivo||null}).eq('id',id);if(error)throw error;
+  el('fornecimento-admin-dialog')?.close();nfToast(status==='aprovado'?'Fornecimento aprovado.':'Fornecimento reprovado.','sucesso');await rFornecimentosAdmin();
+ }catch(e){nfToast('Não foi possível salvar a avaliação: '+(e.message||'erro'),'erro');}
 }
 
 // ========== MATERIAIS / LOGÍSTICA ==========
