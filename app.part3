@@ -3259,8 +3259,15 @@ async function rlAbrirPedido(usuario){
       registro={...registro,status:'enviado',email_enviado_em:pagamento.enviado_em||new Date().toISOString()};
       RL_PEDIDOS_APROVACAO.set(perfil._id,registro);
       RL_PEDIDOS_CARREGADOS=true;
-      mostrarStatus('✅ Envio confirmado; o valor foi descontado do saldo aprovado.','#137333');
-      rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
+      mostrarStatus('✅ Envio confirmado; o valor foi arquivado no histórico e o período avançou.','#137333');
+      const proximoPeriodoPedido=rlProximoPeriodoUtil(periodoFim,10);
+      if(proximoPeriodoPedido.inicio&&proximoPeriodoPedido.fim){
+        rRl(proximoPeriodoPedido.inicio,proximoPeriodoPedido.fim,false,false);
+        nfToast('Pedido enviado e arquivado no histórico. O formulário do próximo período está disponível.','sucesso');
+        dialog.close();
+      }else{
+        rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
+      }
     }catch(error){
       sbShowError('Não foi possível registrar o envio',error);
       mostrarStatus('Não foi possível registrar o envio. Veja a mensagem exibida e tente novamente.','#b42318');
