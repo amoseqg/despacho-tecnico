@@ -3066,7 +3066,7 @@ function rlAbrirChamadosProximoPeriodo(usuario){
 function rlPedidoHtml(usuario){
   const perfil=D.tc.find(t=>t.u===usuario),pedidoSalvo=perfil?RL_PEDIDOS_APROVACAO.get(perfil._id):null;
   const pago=perfil&&RL_DT1_ATUAL&&RL_DT2_ATUAL?rlPagamentoDoPeriodo(perfil._id,RL_DT1_ATUAL,RL_DT2_ATUAL):null;
-  if(pago)return `<div><span class="badge b-aprovado">✅ Pedido ${esc(pago.numero_pedido)} enviado</span><small style="display:block;margin-top:5px;color:#526273">${esc(rlValorMoeda(pago.valor))} · ${esc(formatarDataBrasil(pago.enviado_em))}</small></div>`;
+  if(pago)return `<div><button type="button" class="btn btn-rl-pedido-proximo" data-u="${esc(usuario)}" style="border:0;border-radius:8px;padding:7px 12px;background:#e8f0ff;color:#174ea6;font-weight:700;cursor:pointer">Pedido próximo período</button><small style="display:block;margin-top:5px;color:#526273">Anterior enviado fica no histórico</small></div>`;
   const pedido=pedidoSalvo&&pedidoSalvo.periodo_inicio===RL_DT1_ATUAL&&pedidoSalvo.periodo_fim===RL_DT2_ATUAL?pedidoSalvo:null;
   if(!pedido)return `<button type="button" class="btn btn-rl-pedido" data-u="${esc(usuario)}" style="border:0;border-radius:8px;padding:7px 12px;background:#e8f0ff;color:#174ea6;font-weight:700;cursor:pointer">Pedido</button>`;
   const status=pedido.status==='enviado'
@@ -3080,6 +3080,9 @@ function rlAtualizarCelulasPedido(){
     celula.innerHTML=rlPedidoHtml(celula.dataset.u);
     celula.querySelector('.btn-rl-pedido')?.addEventListener('click',event=>{
       event.preventDefault();event.stopPropagation();void rlAbrirPedido(celula.dataset.u);
+    });
+    celula.querySelector('.btn-rl-pedido-proximo')?.addEventListener('click',event=>{
+      event.preventDefault();event.stopPropagation();void rlAbrirPedido(celula.dataset.u,true);
     });
     celula.querySelector('.btn-rl-pedido-limpar')?.addEventListener('click',event=>{
       event.preventDefault();event.stopPropagation();void rlLimparPedido(celula.dataset.u);
@@ -3133,11 +3136,12 @@ async function rlAlternarTravaPeriodo(usuario){
   }
 }
 
-async function rlAbrirPedido(usuario){
+async function rlAbrirPedido(usuario,usarProximoPeriodo=false){
   if(S?.t!=='adm')return;
   const perfil=D.tc.find(t=>t.u===usuario);
   if(!perfil?._id){nfToast('Não foi possível localizar o cadastro deste técnico.','erro');return;}
-  const periodoInicio=RL_DT1_ATUAL,periodoFim=RL_DT2_ATUAL;
+  let periodoInicio=RL_DT1_ATUAL,periodoFim=RL_DT2_ATUAL;
+  if(usarProximoPeriodo){const faixaPedido=rlProximoPeriodoUtil(RL_DT2_ATUAL,10);periodoInicio=faixaPedido.inicio;periodoFim=faixaPedido.fim;}
   if(!periodoInicio||!periodoFim||periodoFim<periodoInicio){nfToast('Selecione as datas do período aprovado antes de gerar o pedido.','erro');return;}
   if(!RL_PEDIDOS_CARREGADOS){nfToast('Aguarde o carregamento dos valores de pagamento e tente novamente.','');return;}
   const pagamentoExistente=rlPagamentoDoPeriodo(perfil._id,periodoInicio,periodoFim);
@@ -3147,7 +3151,7 @@ async function rlAbrirPedido(usuario){
   const resumo=RL_PERIODOS_VALORES.get(usuario)||{bruto:0,pago:0,saldo:0};
   const email=String(perfil.e||'').trim();
   const liberarTravaPeriodo=resumo.liberarTrava===true;
-  const valorAtual=Number(resumo.saldo)||0;
+  const valorAtual=Number(usarProximoPeriodo?resumo.proximo:resumo.saldo)||0;
   const valorBruto=Number(resumo.bruto)||0;
   const dialog=document.createElement('dialog');
   dialog.style.cssText='width:min(620px,calc(100% - 28px));max-height:88vh;overflow:auto;border:0;border-radius:16px;padding:22px;box-shadow:0 24px 70px #0005;color:#16324f;font-family:system-ui';
