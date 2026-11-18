@@ -77,7 +77,7 @@ rlAbrirChamadosProximoPeriodo=function(usuario){
  const campoColado=form.elements.dados_colados;
  function extrairCampoColado(texto,rotulos){
   const rotulo=rotulos.join('|');
-  const re=new RegExp('(?:^|\\s)(?:'+rotulo+')\\s*[:：-]\\s*([\\s\\S]*?)(?=\\s+(?:PROTOCOLO|SDM|CIRCUITO|CLIENTE|SITE(?:\\s*\\/\\s*CLIENTE)?|CIDADE|SKILL(?:\\s*NECESSARIA)?|A?REA|SERVICO(?:\\s*REALIZADO)?|DATA|VALOR|DESCRI(?:C|Ç)(?:AO|ÃO)|ENDERECO)\\s*[:：]|[\\n\\r]|$)','i');
+  const re=new RegExp('(?:^|\\s)(?:'+rotulo+')\\s*[:：-]\\s*([\\s\\S]*?)(?=\\s+(?:PROTOCOLO|SDM|CIRCUITO|CLIENTE|SITE(?:\\s*\\/\\s*CLIENTE)?|CIDADE|SKILL(?:\\s*NECESS(?:ARIA|ÁRIA))?|A?REA|SERVICO(?:\\s*REALIZADO)?|DATA|VALOR|DESCRI(?:C|Ç)(?:AO|ÃO)|ENDERECO)\\s*[:：]|[\\n\\r]|$)','i');
   const m=texto.match(re);return m?m[1].trim().replace(/[;,\\s]+$/,''):'';
  }
  function preencherPeloTextoColado(){
@@ -87,10 +87,10 @@ rlAbrirChamadosProximoPeriodo=function(usuario){
   const circuito=extrairCampoColado(texto,['CIRCUITO']);
   const site=extrairCampoColado(texto,['SITE\\s*\\/\\s*CLIENTE','CLIENTE','SITE']);
   const cidade=extrairCampoColado(texto,['CIDADE','MUNICIPIO','MUNICÍPIO']);
-  const skillTexto=extrairCampoColado(texto,['SKILL(?:\\s*NECESSARIA)?','HABILIDADE']);
+  const skillTexto=extrairCampoColado(texto,['SKILL(?:\\s*NECESS(?:ARIA|ÁRIA))?','HABILIDADE']);
   const servico=extrairCampoColado(texto,['SERVICO\\s*REALIZADO','ATIVIDADE','SERVICO']);
   const descricao=extrairCampoColado(texto,['DESCRI(?:C|Ç)(?:AO|ÃO)(?:\\s*\\/\\s*OBSERVA(?:C|Ç)(?:AO|ÃO))?','OBSERVA(?:C|Ç)(?:AO|ÃO)']);
-  const data=texto.match(/(?:DATA(?:\s+PARA\s+CONTABILIZACAO)?|ENCERRADO(?:\s+EM)?)\s*[:：-]?\s*(\d{2})[\/.-](\d{2})[\/.-](\d{4})/i);
+  const data=texto.match(/(?:DATA(?:\s+PARA\s+CONTABILIZA(?:CAO|ÇÃO))?|ENCERRADO(?:\s+EM)?)\s*[:：-]?\s*(\d{2})[\/.-](\d{2})[\/.-](\d{4})/i);
   const valor=texto.match(/(?:VALOR(?:\s+A\s+PAGAR)?|PAGAMENTO)\s*[:：-]?\s*(?:R\$\s*)?([\d.]+,\d{2}|\d+(?:\.\d{1,2})?)/i);
   const set=(nome,v)=>{if(v)form.elements[nome].value=v;};
   if(protocolo)form.elements.protocolo.value=protocolo;
