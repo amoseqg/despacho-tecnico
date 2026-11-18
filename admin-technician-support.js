@@ -37,13 +37,44 @@ rlAbrirChamadosProximoPeriodo=function(usuario){
  const area=document.createElement('section');
  area.dataset.lancamentoManualPagamento='1';
  area.style.cssText='margin-top:14px;padding:14px;border:1px solid #c9d9ef;border-radius:12px;background:#f7faff';
- area.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>Lançamento manual para pagamento</b><div style="font-size:.82rem;color:#526273;margin-top:3px">Registre os dados do chamado concluído e o valor aprovado. A data informada define o período de contabilização.</div></div><button type="button" class="btn btn-p" data-abrir-lancamento>＋ Inserir chamado e valor</button></div><form data-form-lancamento hidden style="margin-top:12px"><div class="grid-2" style="gap:10px"><div class="form-group"><label class="label">Protocolo *</label><input class="input" name="protocolo" maxlength="100" required></div><div class="form-group"><label class="label">SDM</label><input class="input" name="sdm" maxlength="100"></div><div class="form-group"><label class="label">Site / cliente *</label><input class="input" name="site" maxlength="250" required></div><div class="form-group"><label class="label">Circuito</label><input class="input" name="circuito" maxlength="150"></div><div class="form-group"><label class="label">Cidade</label><input class="input" name="cidade" maxlength="120"></div><div class="form-group"><label class="label">Skill</label><select class="input" name="skill"><option value="voz">Voz</option><option value="dados">Dados</option><option value="wifi">WiFi</option><option value="infra">Infra</option><option value="vistoria">Vistoria</option></select></div><div class="form-group"><label class="label">Serviço realizado *</label><input class="input" name="servico" maxlength="200" required placeholder="Ex.: Incidente de voz capital"></div><div class="form-group"><label class="label">Data para contabilização *</label><input class="input" name="data" type="date" required></div><div class="form-group"><label class="label">Valor a pagar (R$) *</label><input class="input" name="valor" type="number" min="0.01" max="1000000" step="0.01" required></div><div class="form-group"><label class="label">Descrição / observação</label><input class="input" name="descricao" maxlength="1000"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button type="button" class="btn btn-s" data-cancelar-lancamento>Cancelar</button><button type="submit" class="btn btn-p" data-salvar-lancamento>Salvar lançamento</button></div></form>';
+ area.innerHTML='<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><b>Lançamento manual para pagamento</b><div style="font-size:.82rem;color:#526273;margin-top:3px">Registre os dados do chamado concluído e o valor aprovado. A data informada define o período de contabilização.</div></div><button type="button" class="btn btn-p" data-abrir-lancamento>＋ Inserir chamado e valor</button></div><form data-form-lancamento hidden style="margin-top:12px"><div class="grid-2" style="gap:10px"><div class="form-group"><label class="label">Protocolo *</label><input class="input" name="protocolo" maxlength="100" required></div><div class="form-group"><label class="label">SDM</label><input class="input" name="sdm" maxlength="100"></div><div class="form-group"><label class="label">Site / cliente *</label><input class="input" name="site" maxlength="250" required></div><div class="form-group"><label class="label">Circuito</label><input class="input" name="circuito" maxlength="150"></div><div class="form-group"><label class="label">Cidade</label><input class="input" name="cidade" maxlength="120"></div><div class="form-group"><label class="label">Skill</label><select class="input" name="skill"><option value="voz">Voz</option><option value="dados">Dados</option><option value="wifi">WiFi</option><option value="infra">Infra</option><option value="vistoria">Vistoria</option><option value="vistoria_wifi">Vistoria / WiFi</option><option value="vistoria_voz">Vistoria / Voz</option><option value="dados_vistoria">Dados / Vistoria</option></select></div><div class="form-group"><label class="label">Serviço realizado *</label><input class="input" name="servico" maxlength="200" required placeholder="Ex.: Incidente de voz capital"></div><div class="form-group"><label class="label">Data para contabilização *</label><input class="input" name="data" type="date" required></div><div class="form-group"><label class="label">Valor a pagar (R$) *</label><input class="input" name="valor" type="number" min="0.01" max="1000000" step="0.01" required></div><div class="form-group"><label class="label">Descrição / observação</label><input class="input" name="descricao" maxlength="1000"></div></div><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:10px"><button type="button" class="btn btn-s" data-cancelar-lancamento>Cancelar</button><button type="submit" class="btn btn-p" data-salvar-lancamento>Salvar lançamento</button></div></form>';
  const heading=dialog.querySelector('h3')?.parentElement?.parentElement;
  if(heading)heading.insertAdjacentElement('afterend',area);else dialog.prepend(area);
  const form=area.querySelector('[data-form-lancamento]');
  const dataInicio=rlProximoPeriodoUtil(RL_DT2_ATUAL,10).inicio||new Date().toISOString().slice(0,10);
  form.elements.data.value=dataInicio;
- const skill=Array.isArray(tecnico.sk)?tecnico.sk[0]:'';if(['voz','dados','wifi','infra','vistoria'].includes(skill))form.elements.skill.value=skill;
+ const statusAuto=document.createElement('div');statusAuto.style.cssText='margin:0 0 10px;color:#526273;font-size:.82rem';form.prepend(statusAuto);
+ let protocoloCarregado='';
+ function preencherChamadoPeloProtocolo(){
+  const protocolo=String(form.elements.protocolo.value||'').trim().toLocaleLowerCase('pt-BR');
+  if(protocolo===protocoloCarregado)return;
+  protocoloCarregado=protocolo;
+  if(!protocolo){statusAuto.textContent='';return;}
+  const encontrados=D.ch.filter(c=>String(c.pr||'').trim().toLocaleLowerCase('pt-BR')===protocolo).sort((a,b)=>new Date(b.cr||0)-new Date(a.cr||0));
+  const chamado=encontrados[0];
+  if(!chamado){
+   statusAuto.textContent='Protocolo não localizado. Você pode preencher os dados manualmente.';
+   if(form.dataset.autoFillProtocol){['sdm','site','circuito','cidade','servico','valor','descricao'].forEach(nome=>form.elements[nome].value='');form.elements.data.value=dataInicio;delete form.dataset.autoFillProtocol;}
+   return;
+  }
+  form.dataset.autoFillProtocol=protocolo;
+  statusAuto.textContent='Chamado localizado. Dados preenchidos; ao salvar, o protocolo existente será reaproveitado e seu valor/data de pagamento serão atualizados.';
+  form.elements.sdm.value=chamado.sdm||'';
+  form.elements.site.value=chamado.si||'';
+  form.elements.circuito.value=chamado.ci||'';
+  form.elements.cidade.value=chamado.cid||'';
+  const skillChamado=String(chamado.skill||'dados');
+  if(!Array.from(form.elements.skill.options).some(o=>o.value===skillChamado)){const option=document.createElement('option');option.value=skillChamado;option.textContent=nomeSkill(skillChamado);form.elements.skill.append(option);}
+  form.elements.skill.value=skillChamado;
+  form.elements.servico.value=chamado.ex?.atv||chamado.atividadeServico||'';
+  form.elements.data.value=dataBrasilISO(dataPeriodoPagamentoChamado(chamado))||dataInicio;
+  const valorExistente=Number(numeroExcel(chamado.ex?.total))||0;
+  form.elements.valor.value=valorExistente?valorExistente.toFixed(2):'';
+  form.elements.descricao.value=chamado.ex?.relatorio||chamado.ex?.obs||chamado.de||'';
+ }
+ form.elements.protocolo.addEventListener('input',preencherChamadoPeloProtocolo);
+ form.elements.protocolo.addEventListener('change',preencherChamadoPeloProtocolo);
+ const skill=Array.isArray(tecnico.sk)?tecnico.sk[0]:'';if(['voz','dados','wifi','infra','vistoria','vistoria_wifi','vistoria_voz','dados_vistoria'].includes(skill)){if(!Array.from(form.elements.skill.options).some(o=>o.value===skill)){const option=document.createElement('option');option.value=skill;option.textContent=nomeSkill(skill);form.elements.skill.append(option);}form.elements.skill.value=skill;}
  area.querySelector('[data-abrir-lancamento]').addEventListener('click',()=>{form.hidden=!form.hidden;});
  area.querySelector('[data-cancelar-lancamento]').addEventListener('click',()=>{form.reset();form.hidden=true;form.elements.data.value=dataInicio;});
  form.addEventListener('submit',async event=>{
