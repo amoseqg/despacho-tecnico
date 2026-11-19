@@ -3108,10 +3108,18 @@ async function rlCarregarPedidosAprovacao(){
     if(pedidos.error)throw pedidos.error;
     if(pagamentos.error)throw pagamentos.error;
     RL_PEDIDOS_APROVACAO=new Map((pedidos.data||[]).map(p=>[p.tecnico_id,p]));
-    RL_PAGAMENTOS_PERIODOS=new Map((pagamentos.data||[]).map(p=>[rlPeriodoKey(p.tecnico_id,p.periodo_inicio,p.periodo_fim),p]));
+    const pagamentosRegistrados=pagamentos.data||[];
+    RL_PAGAMENTOS_PERIODOS=new Map(pagamentosRegistrados.map(p=>[rlPeriodoKey(p.tecnico_id,p.periodo_inicio,p.periodo_fim),p]));
     RL_PEDIDOS_CARREGADOS=true;
     rlAtualizarCelulasPedido();
-    if(!el('v-rl')?.classList.contains('hidden'))rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
+    const ultimoPeriodoPago=pagamentosRegistrados.filter(p=>/^\\d{4}-\\d{2}-\\d{2}$/.test(String(p.periodo_fim||''))).sort((a,b)=>String(b.periodo_fim).localeCompare(String(a.periodo_fim)))[0];
+    const periodoSequencial=ultimoPeriodoPago?rlProximoPeriodoUtil(ultimoPeriodoPago.periodo_fim,10):null;
+    if(periodoSequencial?.inicio&&periodoSequencial?.fim&&!el('v-rl')?.classList.contains('hidden')){
+      const inicio=el('rl-dt1'),fim=el('rl-dt2');
+      if(inicio)inicio.value=periodoSequencial.inicio;
+      if(fim)fim.value=periodoSequencial.fim;
+      rRl(periodoSequencial.inicio,periodoSequencial.fim,false,false);
+    }else if(!el('v-rl')?.classList.contains('hidden'))rRl(RL_DT1_ATUAL,RL_DT2_ATUAL,false,false);
   }catch(error){sbShowError('Não foi possível carregar os pedidos e pagamentos por período',error);}
   finally{RL_PEDIDOS_CARREGANDO=false;}
 }
@@ -3605,7 +3613,7 @@ function rRl(dt1, dt2, forcarExibicao, carregarPedidos=true) {
 
   container.innerHTML = `<div id="rl-table-scroll" style="overflow-x:auto">
     <table class="table" style="width:100%;min-width:1510px;font-size:12px">
-      <thead><tr><th>Técnico</th><th>Liberar trava do período</th><th>Período aprovado (10 dias úteis)</th><th>Serviços aprovados</th><th>Saldo aprovisionado para o próximo período<br><small>${esc(formatarDataBrasil(proximoPeriodo.inicio))} a ${esc(formatarDataBrasil(proximoPeriodo.fim))}</small></th><th>Nível de produtividade<br><small>limite R$ 4.000 por técnico</small></th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
+      <thead><tr><th>Técnico</th><th>Liberar trava do período</th><th>Período aprovado (10 dias úteis)<br><small>${esc(formatarDataBrasil(periodoInicio))} a ${esc(formatarDataBrasil(periodoFim))}</small></th><th>Serviços aprovados</th><th>Saldo aprovisionado para o próximo período<br><small>${esc(formatarDataBrasil(proximoPeriodo.inicio))} a ${esc(formatarDataBrasil(proximoPeriodo.fim))}</small></th><th>Nível de produtividade<br><small>limite R$ 4.000 por técnico</small></th><th>Serviços não aprovados</th><th>Validação técnica</th><th>Localidade</th><th>Aprovação</th></tr></thead>
       <tbody>${linhas}</tbody>
     </table>
   </div>`;
@@ -6791,7 +6799,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.44"></script>
+<script src="/release-info.js?v=2.6.45"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
