@@ -3112,7 +3112,7 @@ async function rlCarregarPedidosAprovacao(){
     RL_PAGAMENTOS_PERIODOS=new Map(pagamentosRegistrados.map(p=>[rlPeriodoKey(p.tecnico_id,p.periodo_inicio,p.periodo_fim),p]));
     RL_PEDIDOS_CARREGADOS=true;
     rlAtualizarCelulasPedido();
-    const ultimoPeriodoPago=pagamentosRegistrados.filter(p=>/^\\d{4}-\\d{2}-\\d{2}$/.test(String(p.periodo_fim||''))).sort((a,b)=>String(b.periodo_fim).localeCompare(String(a.periodo_fim)))[0];
+    const ultimoPeriodoPago=pagamentosRegistrados.filter(p=>/^\d{4}-\d{2}-\d{2}$/.test(String(p.periodo_fim||''))).sort((a,b)=>String(b.periodo_fim).localeCompare(String(a.periodo_fim)))[0];
     const periodoSequencial=ultimoPeriodoPago?rlProximoPeriodoUtil(ultimoPeriodoPago.periodo_fim,10):null;
     if(periodoSequencial?.inicio&&periodoSequencial?.fim&&!el('v-rl')?.classList.contains('hidden')){
       const inicio=el('rl-dt1'),fim=el('rl-dt2');
@@ -6799,7 +6799,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.45"></script>
+<script src="/release-info.js?v=2.6.46"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
