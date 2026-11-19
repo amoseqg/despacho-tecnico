@@ -2604,6 +2604,7 @@ function rAt() {
     const emAtendimento=c.st==='andamento';
     const estaAguardandoAprovacao=c.st==='concluida'&&(!c.ap||c.ap.status==='pendente'||c.ap.status==='rejeitado');
     if(filtroAcao==='aprovar') return estaAguardandoAprovacao;
+    if(filtroAcao==='execucao') return emAtendimento;
     if(filtroAcao==='redirecionar'||filtroAcao==='rastreamento') return emAtendimento;
     if(filtroAcao==='suporte') return administrador&&emAtendimento;
     if(filtroAcao==='encerrar') return emAtendimento&&!c.solicitanteId;
@@ -6790,7 +6791,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 <script src="/tecnico-push.js?v=1.0.2"></script>
 <script src="/vistorias.js?v=2.5.1"></script>
 <script src="/tracking.js?v=1.4.1"></script>
-<script src="/release-info.js?v=2.6.10"></script>
+<script src="/release-info.js?v=2.6.44"></script>
 <script src="/pendencias.js?v=2.5.0"></script>
 <script src="/expediente-admin.js?v=2.5.1"></script>
 <script src="/reaprazamentos.js?v=1.0.0"></script>
