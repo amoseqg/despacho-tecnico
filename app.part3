@@ -1808,6 +1808,7 @@ async function addOsServico() {
   const area=el('os-servico-area').value;
   const tecnico=String(el('os-servico-tecnico').value||'').trim();
   const descricao=el('os-servico-descricao').value.trim();
+  const arquivoOs=el('os-servico-anexo')?.files?.[0]||null;
   if(!atividade){alert('Selecione o tipo de serviço.');el('os-servico-atividade').focus();return;}
   if(!site||!cidade||!descricao){alert('Preencha Site / Cliente, Cidade e a descrição do serviço.');return;}
   if(!regiao||!skill){alert('Selecione a região e a skill necessária.');return;}
@@ -1815,6 +1816,8 @@ async function addOsServico() {
   if(!tecnico){alert('Selecione o técnico responsável.');return;}
   const perfilTecnico=D.tc.find(t=>t.u===tecnico);
   if(!perfilTecnico?._id){alert('O técnico selecionado não possui vínculo válido com o servidor. Atualize a página e tente novamente.');return;}
+  if(arquivoOs&&(!/\.pdf$/i.test(arquivoOs.name)||(arquivoOs.type&&arquivoOs.type!=='application/pdf'))){alert('Anexe a OS em formato PDF.');el('os-servico-anexo')?.focus();return;}
+  if(arquivoOs&&arquivoOs.size>20*1024*1024){alert('O PDF da OS pode ter no máximo 20 MB.');el('os-servico-anexo')?.focus();return;}
   const identificador='OS-SERV-'+Date.now().toString(36).toUpperCase()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
   const novoChamado={
     id:'CH-'+Date.now(),pr:identificador,sdm:'',abertura:'OS de Serviços',si:site,ci:circuito,re:regiao,skill,area:regiao==='capital'?area:'',
@@ -1832,11 +1835,33 @@ async function addOsServico() {
     if(error)throw error;
     if(!data?.id||data.status!=='pendente'||data.tecnico_id!==linha.tecnico_id)throw new Error('O servidor não confirmou a OS de Serviços e o técnico selecionado.');
     novoChamado.id=data.id;novoChamado.st=data.status;novoChamado.cr=data.criado_em||novoChamado.cr;
+    if(arquivoOs){
+      const caminho=`${linha.tecnico_id}/${data.id}/${Date.now()}-${crypto.randomUUID()}.pdf`;
+      let arquivoEnviado=false;
+      try{
+        if(btn)btn.textContent='Enviando OS anexada...';
+        const {error:uploadError}=await sbExecutarComSessaoAdmin(()=>SB.storage.from('os-servicos').upload(caminho,arquivoOs,{contentType:'application/pdf',upsert:false}));
+        if(uploadError)throw uploadError;
+        arquivoEnviado=true;
+        const {error:metadataError}=await sbExecutarComSessaoAdmin(()=>SB.from('chamados').update({
+          os_anexo_caminho:caminho,os_anexo_nome:arquivoOs.name,os_anexo_mime:'application/pdf',os_anexo_tamanho_bytes:arquivoOs.size
+        }).eq('id',data.id));
+        if(metadataError)throw metadataError;
+        Object.assign(novoChamado,{osAnexoCaminho:caminho,osAnexoNome:arquivoOs.name,osAnexoMime:'application/pdf',osAnexoTamanhoBytes:arquivoOs.size});
+      }catch(anexoErr){
+        try{
+          if(arquivoEnviado)await sbExecutarComSessaoAdmin(()=>SB.storage.from('os-servicos').remove([caminho]));
+          await sbExecutarComSessaoAdmin(()=>SB.from('chamados').delete().eq('id',data.id));
+        }catch(limpezaErr){console.error('Falha ao limpar OS incompleta:',limpezaErr);}
+        throw new Error('Não foi possível anexar o PDF. A OS não foi criada. '+(anexoErr?.message||anexoErr));
+      }
+    }
     let erroCadastroSite=null;
     try{await salvarCadastroSiteOsServico(novoChamado);}catch(erro){erroCadastroSite=erro;console.error('OS salva, mas o cadastro do circuito/site falhou:',erro);}
     D.ch.push(novoChamado);SB_LOADED_CH.add(data.id);lsSet('dd',D);
-    ['os-servico-descricao-colada','os-servico-pe','os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
+    ['os-servico-descricao-colada','os-servico-pe','os-servico-circuito','os-servico-site','os-servico-cidade','os-servico-endereco','os-servico-contato','os-servico-horario','os-servico-descricao','os-servico-data','os-servico-anexo'].forEach(id=>{const campo=el(id);if(campo)campo.value='';});
     delete el('os-servico-descricao').dataset.preenchimento;
+    if(el('os-servico-anexo-status'))el('os-servico-anexo-status').textContent='Opcional. O técnico responsável poderá abrir este arquivo no portal.';
     el('os-servico-descricao-status').textContent='Cole a descrição para carregar circuito, OS PE Conectado, cliente, endereço, cidade, contato e horário.';el('os-servico-descricao-status').style.color='var(--gr)';
     delete el('os-servico-circuito').dataset.circuitoEncontrado;el('os-servico-circuito-opcoes').classList.add('hidden');
     el('os-servico-circuito-status').textContent='Sem circuito? Informe Site / Cliente, Cidade e os demais dados manualmente.';el('os-servico-circuito-status').style.color='var(--gr)';
@@ -4895,6 +4920,17 @@ async function opEx(id) {
   if (!extra) { extra = document.createElement('div'); extra.id = 'ex-site-extra'; card.insertBefore(extra, card.lastElementChild); }
   extra.innerHTML = `<div class="os-r"><b>Cidade:</b> ${valorInfo(c.cid)}</div><div class="os-r"><b>Contato:</b> ${valorInfo(c.contato)}</div><div class="os-r"><b>Horário:</b> ${valorInfo(c.horario)}</div>${osServico?'':'<div class="grid-3"><div class="os-r"><b>Velocidade:</b> '+valorInfo(c.velocidade)+'</div><div class="os-r"><b>PRTM:</b> '+valorInfo(c.prtm)+'</div><div class="os-r"><b>PVF Total:</b> '+valorInfo(c.pvfTotal)+'</div></div>'}${c.exclusaoPortal?`<div class="info" style="border-left:4px solid var(--r)"><b>Chamado excluído pelo operador:</b> ${esc(c.exclusaoPortal.nome)} — ${new Date(c.exclusaoPortal.data).toLocaleString('pt-BR')}</div>`:''}`;
 
+  if(osServico&&c.osAnexoCaminho){
+    const {data,error}=await SB.storage.from('os-servicos').createSignedUrl(c.osAnexoCaminho,600);
+    if(!error&&data?.signedUrl){
+      const link=document.createElement('a');
+      link.className='btn btn-s';link.style.cssText='display:inline-block;margin-top:8px;text-decoration:none';
+      link.href=data.signedUrl;link.target='_blank';link.rel='noopener noreferrer';
+      link.textContent='📄 Abrir OS anexada'+(c.osAnexoNome?' — '+c.osAnexoNome:'');
+      extra.appendChild(link);
+    }
+  }
+
   const opts = '<option value="">Selecione...</option>' + cidades.map(ci => `<option>${ci}</option>`).join('');
   el('ex-co').innerHTML = opts;
   el('ex-cr').innerHTML = opts;
@@ -5337,6 +5373,17 @@ document.addEventListener('DOMContentLoaded', function() {
   el('btn-copiar-link-portal')?.addEventListener('click', copiarLinkPortalChamados);
   el('tb-solicitantes')?.addEventListener('click', eventoSolicitanteChamados);
   if(btnAddCh) btnAddCh.addEventListener('click', addCh);
+  (function instalarCampoAnexoOsServico(){
+    const descricao=el('os-servico-descricao')?.closest('.form-group');
+    if(!descricao||el('os-servico-anexo'))return;
+    const grupo=document.createElement('div');grupo.className='form-group';
+    grupo.innerHTML='<label class="label" for="os-servico-anexo">Anexar OS (PDF, até 20 MB)</label><input class="input" type="file" id="os-servico-anexo" accept=".pdf,application/pdf"><small id="os-servico-anexo-status" role="status" style="display:block;margin-top:5px;color:#64748b">Opcional. O técnico responsável poderá abrir este arquivo no portal.</small>';
+    descricao.insertAdjacentElement('afterend',grupo);
+  })();
+  el('os-servico-anexo')?.addEventListener('change',function(){
+    const arquivo=this.files?.[0],status=el('os-servico-anexo-status');
+    if(status)status.textContent=arquivo?('Arquivo selecionado: '+arquivo.name+' — será enviado com a OS.'):'Opcional. O técnico responsável poderá abrir este arquivo no portal.';
+  });
   el('btn-criar-os-servico')?.addEventListener('click',addOsServico);
   let osServicoDescricaoTimer=null;
   el('os-servico-descricao-colada')?.addEventListener('input',function(){
@@ -6060,7 +6107,7 @@ async function sbLoadAll(){
   D.ch=(cR.data||[]).map(c=>{
     const ex=exMap.get(c.id), validacao=validacaoMap.get(c.id), exclusaoPortal=exclusaoPortalMap.get(c.id), ap=apMap.get(c.id), trRows=trMap.get(c.id)||[];
     const legacy={
-      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'', atualizadoEm:c.atualizado_em||'',
+      id:c.id, pr:c.protocolo, sdm:c.sdm||'', abertura:c.abertura_origem||'', ramal:c.numero_ramal||'', si:c.site_nome||'', ci:c.circuito||'', tipoOs:c.tipo_os||'manutencao', osPeConectado:c.os_pe_conectado||'', atividadeServico:c.atividade_servico||'', osAnexoCaminho:c.os_anexo_caminho||'', osAnexoNome:c.os_anexo_nome||'', osAnexoMime:c.os_anexo_mime||'', osAnexoTamanhoBytes:Number(c.os_anexo_tamanho_bytes||0), atualizadoEm:c.atualizado_em||'',
       re:c.regiao, skill:c.skill, area:c.area||'', en:c.endereco||'', de:c.descricao||'', informacoesAdicionais:c.informacoes_adicionais, dtexec:c.data_execucao||'', dataPeriodoPagamento:ajustesPeriodoMap.get(String(c.id))||'',
       regiaoOperacional:c.regiao_operacional||'', tecnicosIndicados:c.tecnicos_indicados||'', cid:c.cidade||'', contato:c.contato||'', horario:c.horario_expediente||'',
       velocidade:c.velocidade||'', prtm:c.prtm||'', pvfTotal:c.pvf_total??'', st:c.status, te:sbUserById(c.tecnico_id), mr:c.motivo_recusa||'',
@@ -6158,7 +6205,7 @@ function sbChamadoRow(c){
     regiao:c.re, skill:c.skill, area:c.re==='capital'?(c.area||null):null, tecnico_id:sbIdByUser(c.te), criado_por:SB_PROFILE?.id||null,
     descricao:c.de||null, informacoes_adicionais:c.informacoesAdicionais??null, data_execucao:c.dtexec||null, status:c.st||'pendente', motivo_recusa:c.mr||null,
     solicitante_id:c.solicitanteId||null, solicitante_nome:c.solicitanteNome||null, solicitante_email:c.solicitanteEmail||null, numero_ramal:c.ramal||null, vencimento_em:vencimento,
-    tipo_os:c.tipoOs==='servico'?'servico':'manutencao', os_pe_conectado:c.osPeConectado||null, atividade_servico:c.atividadeServico||null,
+    tipo_os:c.tipoOs==='servico'?'servico':'manutencao', os_pe_conectado:c.osPeConectado||null, atividade_servico:c.atividadeServico||null, os_anexo_caminho:c.osAnexoCaminho||null, os_anexo_nome:c.osAnexoNome||null, os_anexo_mime:c.osAnexoMime||null, os_anexo_tamanho_bytes:c.osAnexoTamanhoBytes||null,
     liberacao_area:!!c.dt, liberacao_area_admin:c.dt?SB_PROFILE?.id:null, liberacao_area_em:c.dt?sbIso(c.dt.d):null,
     criado_em:criadoEm, aceito_em:sbIso(c.ae), iniciado_em:sbIso(c.am), concluido_em:sbIso(c.cc), atualizado_em:new Date().toISOString()
   };
