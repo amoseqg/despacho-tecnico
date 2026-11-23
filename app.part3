@@ -2402,7 +2402,7 @@ function rCh() {
     <div class="os-r"><b>Técnico:</b> ${nt(c.te)}</div>
     <div class="os-r"><b>Motivo:</b> ${c.mr}</div>
     <div class="os-r"><b>Data Execução:</b> ${dtexec}</div>
-    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}${(SB_PROFILE?.tipo==='admin'||S?.t==='adm') ? `<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button>` : ''}</div></div>`;
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn btn-p btn-redir" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">👷 Redirecionar</button>${window.NexoFieldExpediente?.botao(c)||''}<button class="btn btn-r btn-del-ch" data-id="${c.id}" style="padding:6px 10px;font-size:.7rem">🗑️ Excluir</button></div></div>`;
   }).join('') : '<div class="empty"><h3>Nenhum chamado recusado</h3></div>';
 }
 function rDb() {
@@ -3987,6 +3987,61 @@ function opRedirecionar(id) {
   el('m-dp').classList.add('a');
 }
 
+function chamadoVisivel(chamado){return chamado?.arquivado!==true;}
+
+function renderArquivoChamados(){
+  const lista=el('lista-arquivados'),campo=el('busca-arquivados-admin');
+  if(!lista)return;
+  const termo=String(campo?.value||'').trim().toLocaleLowerCase('pt-BR');
+  const arquivados=D.ch.filter(c=>c.arquivado===true).filter(c=>{
+    const texto=[identificacaoOs(c),c.pr,c.sdm,c.ci,c.si,c.te?nt(c.te):'',c.st].join(' ').toLocaleLowerCase('pt-BR');
+    return !termo||texto.includes(termo);
+  }).sort((a,b)=>new Date(b.atualizadoEm||b.cr||0)-new Date(a.atualizadoEm||a.cr||0));
+  lista.innerHTML=arquivados.length?arquivados.map(c=>`<article class="os">
+    <div class="os-h"><span class="os-id">${esc(identificacaoOs(c))}</span><span class="badge b-recusado">Arquivado</span></div>
+    ${dadosSite(c)}
+    <div class="os-r"><b>Técnico:</b> ${esc(c.te?nt(c.te):'—')}</div>
+    <div class="os-r"><b>Status anterior:</b> ${esc(c.st||'—')}</div>
+    <div class="os-r"><b>Motivo:</b> ${esc(c.mr||'—')}</div>
+    <div style="margin-top:8px"><button type="button" class="btn btn-p btn-restore-ch" data-id="${escAttr(c.id)}" style="padding:6px 10px;font-size:.7rem">Restaurar chamado</button></div>
+  </article>`).join(''):'<div class="empty">Nenhum chamado excluído da lista.</div>';
+}
+
+async function exportarChamadosArquivados(){
+  const itens=D.ch.filter(c=>c.arquivado===true);
+  if(!itens.length){nfToast('Não há chamados excluídos para exportar.');return;}
+  const linhas=itens.map(c=>({'Protocolo / OS':identificacaoOs(c),'SDM':c.sdm||'','Circuito':c.ci||'','Site / Cliente':c.si||'','Técnico':c.te?nt(c.te):'','Status anterior':c.st||'','Motivo':c.mr||'','Data de abertura':c.cr||''}));
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(linhas),'Chamados excluídos');
+  XLSX.writeFile(wb,'chamados_excluidos_da_lista.xlsx');
+}
+
+async function alterarArquivoChamado(id,restaurar=null){
+  const chamado=D.ch.find(c=>String(c.id)===String(id));
+  if(!chamado)return;
+  const arquivar=typeof restaurar==='boolean'?!restaurar:!chamado.arquivado;
+  const acao=arquivar?'Excluir da lista':'Restaurar chamado';
+  if(!confirm(arquivar?'Excluir este chamado da lista? Os dados, o histórico e os valores serão preservados e poderão ser restaurados.':'Restaurar este chamado na lista de chamados?'))return;
+  const botao=document.querySelector('.btn-del-ch[data-id="'+CSS.escape(String(id))+'"],.btn-restore-ch[data-id="'+CSS.escape(String(id))+'"]');
+  const rotulo=botao?.textContent;
+  try{
+    if(botao){botao.disabled=true;botao.textContent=arquivar?'Arquivando...':'Restaurando...';}
+    const admin=await sbExigirSessaoAdmin();
+    const agora=new Date().toISOString();
+    const {data,error}=await sbExecutarComSessaoAdmin(()=>SB.from('chamados_arquivados').upsert({
+      chamado_id:chamado.id,ativo:arquivar,alterado_por:admin.id,alterado_em:agora
+    },{onConflict:'chamado_id'}).select('chamado_id,ativo,alterado_em').single());
+    if(error)throw error;
+    if(!data||String(data.chamado_id)!==String(chamado.id)||data.ativo!==arquivar)throw new Error('O servidor não confirmou a alteração do arquivo.');
+    chamado.arquivado=arquivar;chamado.atualizadoEm=agora;lsSet('dd',D);
+    rCh();renderArquivoChamados();
+    sbSetConnectionBadge(arquivar?'Chamado arquivado':'Chamado restaurado',true);
+    nfToast(arquivar?'Chamado excluído da lista. Dados e histórico preservados.':'Chamado restaurado na lista.','sucesso');
+  }catch(error){
+    sbShowError('Não foi possível '+(arquivar?'excluir o chamado da lista':'restaurar o chamado'),error);
+    await sbRecarregarDados();
+  }finally{if(botao){botao.disabled=false;botao.textContent=rotulo||acao;}}
+}
+
 async function excluirChamado(id) {
   return alterarArquivoChamado(id);
 }
@@ -5506,6 +5561,8 @@ document.addEventListener('DOMContentLoaded', function() {
   if(btnExp) btnExp.addEventListener('click', expCSV);
   const btnExpConsolidado = el('btn-exp-consolidado');
   if(btnExpConsolidado) btnExpConsolidado.addEventListener('click', exportarConsolidadoPagamentos);
+  el('busca-arquivados-admin')?.addEventListener('input',renderArquivoChamados);
+  el('btn-exportar-arquivados')?.addEventListener('click',()=>exportarChamadosArquivados().catch(err=>sbShowError('Não foi possível exportar os chamados excluídos',err)));
   const btnLimparRlCards = el('btn-limpar-rl-cards');
   if(btnLimparRlCards) btnLimparRlCards.addEventListener('click', limparCardsRelatorio);
   const btnExpPerdas=el('btn-exp-perdas');
@@ -5568,7 +5625,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Delegação de eventos para botões dinâmicos
   document.addEventListener('click', function(e) {
-    const t = e.target.closest('.btn-lg-secao, .btn-aplicacoes-tecnico, .btn-exportar-aplicacoes-pendentes, .btn-fechar-aplicacoes-material, .btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-rl-validacao-nao, .btn-validacao-tecnica-validar, .btn-validacao-tecnica-nao-validar, .btn-validacao-tecnica-reenviar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
+    const t = e.target.closest('.btn-restore-ch, .btn-lg-secao, .btn-aplicacoes-tecnico, .btn-exportar-aplicacoes-pendentes, .btn-fechar-aplicacoes-material, .btn-foto-detalhe, .btn-ap-servico, .btn-at-revisar, .btn-valor-parceiro, .btn-ver-pl, .btn-dp, .btn-tr, .btn-redir, .btn-encerrar-admin, .btn-del-ch, .btn-ac, .btn-rc, .btn-ex, .btn-ajustar, .btn-fotos, .btn-email-fotos, .btn-reset-senha, .btn-rm-tec, .btn-rm-adm, .btn-endereco-tec, .btn-rl-aprovados, .btn-rl-nao-aprovados, .btn-rl-aprovar, .btn-rl-rejeitar, .btn-rl-validacao-nao, .btn-validacao-tecnica-validar, .btn-validacao-tecnica-nao-validar, .btn-validacao-tecnica-reenviar, .btn-aplicar-material, .btn-aplicacao-aprovar, .btn-aplicacao-reprovar, .btn-ml-processar, .btn-avulso-aprovar, .btn-avulso-reprovar, .btn-mat-direcionar, .btn-mat-separar, .btn-mat-entregar, .btn-log-enviar, .btn-log-liberar, .btn-tech-aceitar-material, .btn-tech-consultar-entrega, .btn-top5-tecnico, .btn-correios, .btn-rm-mat, .btn-tec-chamados, .btn-suporte-tec') || e.target;
     if(t.classList.contains('btn-lg-secao')) { selecionarSecaoLogistica(t.dataset.secao); }
     if(t.classList.contains('btn-aplicacoes-tecnico')) { abrirAprovacoesMaterialTecnico(t.dataset.tecnico); }
     if(t.classList.contains('btn-exportar-aplicacoes-pendentes')) { exportarListaAplicacoesPendentes(); }
@@ -5591,6 +5648,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if(t.classList.contains('btn-redir')) { opRedirecionar(t.dataset.id); }
     if(t.classList.contains('btn-encerrar-admin')) { encerrarChamadoAdmin(t.dataset.id); }
     if(t.classList.contains('btn-del-ch')) { excluirChamado(t.dataset.id); }
+    if(t.classList.contains('btn-restore-ch')) { alterarArquivoChamado(t.dataset.id,true); }
     if(t.classList.contains('btn-ac')) { acCh(t.dataset.id); }
     if(t.classList.contains('btn-rc')) { opRc(t.dataset.id); }
     if(t.classList.contains('btn-ex')) { opEx(t.dataset.id); }
@@ -6067,7 +6125,7 @@ async function sbLoadAll(){
   if(!SB_PROFILE) return;
   sbSetConnectionBadge('Sincronizando Supabase...', true);
   await carregarConfigPainel();
-  const [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR,ajustesPeriodoR] = await Promise.all([
+  const [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR,ajustesPeriodoR,arqR] = await Promise.all([
     SB.from('perfis').select('*').eq('ativo',true).order('nome'),
     sbTabelaCompleta('chamados','id'),
     sbTabelaCompleta('execucoes','chamado_id'),
@@ -6083,9 +6141,10 @@ async function sbLoadAll(){
     SB.from('materiais_retirados').select('*').order('retirado_em',{ascending:false}),
     SB.from('movimentacoes_estoque').select('*').order('criado_em',{ascending:false}).limit(60),
     SB.from('tecnico_enderecos_logistica').select('*'),
-    SB.from('ajustes_periodo_pagamento').select('chamado_id,data_contabilizacao')
+    SB.from('ajustes_periodo_pagamento').select('chamado_id,data_contabilizacao'),
+    SB.from('chamados_arquivados').select('chamado_id,ativo')
   ]);
-  for(const r of [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR,ajustesPeriodoR]) if(r.error) throw r.error;
+  for(const r of [pR,cR,eR,aR,tR,mR,sR,amR,escR,fotoR,vR,xR,retR,movR,endR,ajustesPeriodoR,arqR]) if(r.error) throw r.error;
   SB_ESCOLAS=escR.data||[];
   SB_FOTOS_MAP=new Map();
   (fotoR.data||[]).forEach(f=>{if(!SB_FOTOS_MAP.has(f.chamado_id))SB_FOTOS_MAP.set(f.chamado_id,[]);SB_FOTOS_MAP.get(f.chamado_id).push(f);});
@@ -6100,6 +6159,7 @@ async function sbLoadAll(){
   const exMap=new Map((eR.data||[]).map(x=>[x.chamado_id,x]));
   const validacaoMap=new Map((vR.data||[]).map(x=>[x.chamado_id,x]));
   const exclusaoPortalMap=new Map((xR.data||[]).map(x=>[x.chamado_id,x]));
+  const arquivoChamadosMap=new Map((arqR.data||[]).map(x=>[String(x.chamado_id),x.ativo===true]));
   const apMap=new Map((aR.data||[]).map(x=>[x.chamado_id,x]));
   const ajustesPeriodoMap=new Map((ajustesPeriodoR.data||[]).map(x=>[String(x.chamado_id),x.data_contabilizacao]));
   const trMap=new Map();
@@ -6118,6 +6178,7 @@ async function sbLoadAll(){
       ex:null, ap:null,validacaoOperador:validacao?{validacao:validacao.validacao,senha:validacao.senha,resultado:validacao.resultado||'validado',motivoNaoValidacao:validacao.motivo_nao_validacao||'',validadoEm:validacao.validado_em,solicitanteId:validacao.solicitante_id}:null,
       exclusaoPortal:exclusaoPortal?{nome:exclusaoPortal.excluido_por_nome,email:exclusaoPortal.excluido_por_email,data:exclusaoPortal.excluido_em,statusAnterior:exclusaoPortal.status_anterior}:null
     };
+    legacy.arquivado=arquivoChamadosMap.get(String(c.id))===true;
     legacy._trLoadedCount=legacy.tr.length;
     if(ex) legacy.ex={execucaoId:ex.id,validacaoTecnicaStatus:ex.validacao_tecnica_status||'aguardando_validacao',validacaoTecnicaMotivo:ex.validacao_tecnica_motivo||'',validacaoTecnicaEm:ex.validacao_tecnica_em||'',validacaoTecnicaRevisao:Number(ex.validacao_tecnica_revisao||0),co:ex.cidade_origem||'',cd:ex.cidade_destino||'',cr:ex.cidade_retorno||'',esco:ex.origem_escola_id||'',escd:ex.destino_escola_id||'',escr:ex.retorno_escola_id||'',cobrarKm:ex.deslocamento_cobrado===true,km:String(ex.km_total??''),vkm:'R$ '+Number(ex.valor_km||0).toFixed(2).replace('.',','),atv:ex.atividade||'',vatv:String(ex.valor_atividade??''),avulso:String(ex.valor_avulso??''),utp:String(ex.utp_metros??''),cci:String(ex.cci_metros??''),can:String(ex.canaleta_metros??''),materiais:normalizarMateriaisUtilizados(ex),tmat:'R$ '+Number(ex.valor_materiais||0).toFixed(2).replace('.',','),obs:ex.observacao||'',relatorio:ex.relatorio_encerramento||'',pagamentoExcluido:!!ex.pagamento_excluido,pagamentoRevisao:ex.pagamento_revisao||0,pagamentoMotivo:ex.pagamento_motivo||'',valorOriginal:ex.valor_total,valorCorrigido:ex.pagamento_valor_corrigido,total:'R$ '+Number(ex.pagamento_valor_corrigido??ex.valor_total??0).toFixed(2).replace('.',','),enviadoValidacaoEm:ex.enviado_validacao_em||'',fotos:SB_FOTOS_MAP.get(c.id)||[]};
     if(ap) legacy.ap={status:ap.status,obs:ap.observacao||'',data:ap.atualizado_em,admin:sbNameById(ap.administrador_id),reenviado:!!ap.reenviado};
