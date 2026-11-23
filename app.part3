@@ -2602,6 +2602,45 @@ function dataAtendimentoFormatada(valor) {
   return partes.day+'/'+partes.month+'/'+partes.year+', '+partes.hour+':'+partes.minute+':'+partes.second;
 }
 
+function exportarAtendimentoExcel(){
+  const trs=[...document.querySelectorAll('#tb-at tr[data-at-chamado-id]')];
+  if(!trs.length){nfToast('Não há OS para exportar com os filtros selecionados.','aviso');return;}
+  const dados=trs.map(tr=>{
+    const c=D.ch.find(ch=>String(ch.id)===String(tr.dataset.atChamadoId));
+    if(!c)return null;
+    const status=c.st==='andamento'?'Em execução':(c.ap?.status==='rejeitado'?'Aguardando nova análise após rejeição':'Concluído aguardando aprovação');
+    return {
+      'Protocolo / OS interna':identificacaoOs(c),
+      'OS PE Conectado':c.osPeConectado||'',
+      'Tipo de OS':c.tipoOs==='servico'?'OS de Serviços':'OS de Manutenção',
+      'SDM':c.sdm||'',
+      'Circuito':c.ci||'',
+      'Site / Cliente':c.si||'',
+      'Cidade':c.cid||'',
+      'Endereço':c.en||'',
+      'Técnico':nt(c.te)||'',
+      'Status':status,
+      'Incluído em':dataAtendimentoFormatada(c.cr),
+      'Início do atendimento':c.am?dataAtendimentoFormatada(c.am):'',
+      'Região':nomeRegiao(c.re),
+      'Skill':nomeSkill(skillChamado(c)),
+      'Prazo restante':tr.cells[5]?.innerText.trim()||'',
+      'Pendência ativa':c.pendenciaAtiva?'Sim':'Não'
+    };
+  }).filter(Boolean);
+  if(!dados.length){nfToast('Não há OS para exportar com os filtros selecionados.','aviso');return;}
+  const ws=XLSX.utils.json_to_sheet(dados);
+  ws['!cols']=[{wch:30},{wch:28},{wch:22},{wch:16},{wch:22},{wch:36},{wch:24},{wch:46},{wch:30},{wch:38},{wch:22},{wch:22},{wch:24},{wch:25},{wch:32},{wch:18}];
+  if(ws['!ref'])ws['!autofilter']={ref:ws['!ref']};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'OS em atendimento');
+  const tecnico=document.getElementById('at-filtro-tecnico')?.value.trim()||'todos';
+  const protocolo=document.getElementById('at-filtro-protocolo')?.value.trim()||'';
+  const acao=document.getElementById('at-filtro-acao')?.selectedOptions?.[0]?.textContent.trim()||'todas_acoes';
+  const sufixo=(tecnico+'_'+protocolo+'_'+acao).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,'').slice(0,70);
+  XLSX.writeFile(wb,'OS_em_atendimento_'+(sufixo||'filtros')+'.xlsx');
+}
+
 function rAt() {
   const tb = el('tb-at');
   if(!tb) return;

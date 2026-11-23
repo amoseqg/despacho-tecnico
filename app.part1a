@@ -784,7 +784,7 @@ textarea.input{min-height:92px;line-height:1.5;resize:vertical}
     </div>
     <div id="v-at" class="hidden">
       <div class="card">
-        <h3 style="font-size:.85rem;color:var(--p);margin-bottom:10px">⏱️ Chamados em Atendimento</h3>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px"><h3 style="font-size:.85rem;color:var(--p);margin:0">⏱️ Chamados em Atendimento</h3><button type="button" class="btn btn-p" id="btn-exportar-atendimento" onclick="exportarAtendimentoExcel()">📥 Exportar Excel</button></div>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),360px));gap:10px;margin-bottom:12px">
           <div class="form-group" style="margin:0"><label class="label" for="at-filtro-tecnico">Filtrar por técnico</label><input class="input" id="at-filtro-tecnico" type="search" placeholder="Digite o nome do técnico" autocomplete="off" oninput="rAt()"></div>
           <div class="form-group" style="margin:0"><label class="label" for="at-filtro-protocolo">Localizar protocolo</label><input class="input" id="at-filtro-protocolo" type="search" placeholder="Digite o protocolo ou OS" autocomplete="off" oninput="rAt()"></div>
