@@ -1,10 +1,10 @@
 (function(){
 'use strict';
-const EMAIL='amos.gomes@metodotelecom.com.br';
+const EMAILS=new Set(['amos.gomes@metodotelecom.com.br','marilia.silva@metodotelecom.com.br']);
 function adminAutorizado(){
  const perfil=ADMIN_TEC_CONTEXT?.adminProfile||SB_PROFILE;
  const sessao=ADMIN_TEC_CONTEXT?.admin||S;
- return !!(sessao?.t==='adm'&&perfil?.tipo==='admin'&&perfil?.admin_geral===true&&String(perfil?.email||'').trim().toLowerCase()===EMAIL&&String(perfil?.id||'')===String(sessao?._id||''));
+ return !!(sessao?.t==='adm'&&perfil?.tipo==='admin'&&perfil?.admin_geral===true&&EMAILS.has(String(perfil?.email||'').trim().toLowerCase())&&String(perfil?.id||'')===String(sessao?._id||''));
 }
 adminPodeAcessarPerfilTecnico=function(){return adminAutorizado();};
 acessarPerfilTecnicoComoAdmin=function(id){
