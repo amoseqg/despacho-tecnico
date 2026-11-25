@@ -504,11 +504,11 @@ function ss() { lsSet('ss', S); }
 function ag() { return new Date().toLocaleString('pt-BR'); }
 function nt(u) { const t = D.tc.find(x => x.u === u); return t ? t.n : u; }
 function adminGeral() { return !!(S && S.t === 'adm' && D.ad.some(a => a.u === S.u && a.p)); }
-const EMAIL_ADMIN_GERAL_ACESSO_TECNICO='amos.gomes@metodotelecom.com.br';
+const EMAILS_ADMIN_GERAL_ACESSO_TECNICO=new Set(['amos.gomes@metodotelecom.com.br','marilia.silva@metodotelecom.com.br']);
 function adminPodeAcessarPerfilTecnico(){
   const administradorId=String(ADMIN_TEC_CONTEXT?.admin?._id||S?._id||'');
   const contextoValido=S?.t==='adm'||!!ADMIN_TEC_CONTEXT;
-  return !!(contextoValido&&SB_PROFILE?.tipo==='admin'&&SB_PROFILE?.admin_geral===true&&String(SB_PROFILE?.email||'').trim().toLowerCase()===EMAIL_ADMIN_GERAL_ACESSO_TECNICO&&administradorId===String(SB_PROFILE.id||''));
+  return !!(contextoValido&&SB_PROFILE?.tipo==='admin'&&SB_PROFILE?.admin_geral===true&&EMAILS_ADMIN_GERAL_ACESSO_TECNICO.has(String(SB_PROFILE?.email||'').trim().toLowerCase())&&administradorId===String(SB_PROFILE.id||''));
 }
 function adminMostrarBannerAcessoTecnico(){
   const painel=el('pt');
@@ -3071,7 +3071,7 @@ function rlValorMoeda(valor){
   return new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(valor)||0);
 }
 
-function rlPodeEditarDataPeriodoPagamento(){return S?.t==='adm'&&SB_PROFILE?.tipo==='admin'&&String(SB_PROFILE?.email||'').trim().toLowerCase()==='amos.gomes@metodotelecom.com.br';}
+function rlPodeEditarDataPeriodoPagamento(){return S?.t==='adm'&&SB_PROFILE?.tipo==='admin'&&EMAILS_ADMIN_GERAL_ACESSO_TECNICO.has(String(SB_PROFILE?.email||'').trim().toLowerCase());}
 async function rlSalvarDataPeriodoPagamento(input,usuario,dialog){
   if(!rlPodeEditarDataPeriodoPagamento()){nfToast('Somente o perfil amos.gomes@metodotelecom.com.br pode alterar a data de contabilização.','erro');return;}
   const chamadoId=String(input?.dataset?.id||''),chamado=D.ch.find(c=>String(c.id)===chamadoId);
@@ -3112,7 +3112,7 @@ function rlAbrirChamadosProximoPeriodo(usuario){
   })).filter(c=>!c.ex?.pagamentoExcluido&&c.ap?.status==='aprovado');
   const total=totalAprovadoServicos(chamados);
   const podeAjustarData=rlPodeEditarDataPeriodoPagamento();
-  const ajudaData=podeAjustarData?'<p class="info" style="margin-top:10px">Altere a data para mover este serviço ao período anterior ou posterior correspondente. A alteração só está habilitada para amos.gomes@metodotelecom.com.br. Para desfazer, selecione a data original.</p>':'';
+  const ajudaData=podeAjustarData?'<p class="info" style="margin-top:10px">Altere a data para mover este serviço ao período anterior ou posterior correspondente. A alteração só está habilitada para os perfis Amós Gomes e Marilia Silva. Para desfazer, selecione a data original.</p>':'';
   const linhas=chamados.map(c=>{
     const data=dataPeriodoPagamentoChamado(c),dataISO=dataBrasilISO(data),dataOriginal=dataBrasilISO(dataEncerramentoChamado(c));
     const controleData=podeAjustarData?'<input type="date" class="input rl-ajuste-data-periodo" data-id="'+esc(c.id)+'" value="'+esc(dataISO)+'" aria-label="Alterar data de contabilização do protocolo '+esc(c.pr||'')+'" title="A data escolhida define o período que receberá este valor" style="min-width:145px;padding:5px">':esc(data?formatarDataBrasil(data):'—');
